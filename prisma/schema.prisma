@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MonthStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum MovementType {
+  EXPENSE
+  POCKET_DEPOSIT_FROM_SUBCATEGORY
+  POCKET_DEPOSIT_EXTERNAL
+  SURPLUS_TO_POCKET_ON_CLOSE
+  DEFICIT_COVER_FROM_SUBCATEGORY
+  DEFICIT_COVER_FROM_POCKET
+}
+
+model TemplateCategory {
+  id            String                @id @default(cuid())
+  name          String
+  sortOrder     Int                   @default(0)
+  subcategories TemplateSubcategory[]
+  monthCategories MonthCategory[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([sortOrder])
+}
+
+model TemplateSubcategory {
+  id                 String           @id @default(cuid())
+  categoryId         String
+  category           TemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name               String
+  plannedAmount      Decimal          @db.Decimal(12, 2)
+  defaultPocketId    String?
+  defaultPocket      SavingsPocket?   @relation(fields: [defaultPocketId], references: [id], onDelete: SetNull)
+  active             Boolean          @default(true)
+  sortOrder          Int              @default(0)
+  monthSubcategories MonthSubcategory[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([categoryId, sortOrder])
+}
+
+model SavingsPocket {
+  id                    String              @id @default(cuid())
+  name                  String              @unique
+  goalAmount            Decimal?            @db.Decimal(12, 2)
+  active                Boolean             @default(true)
+  templateSubcategories TemplateSubcategory[]
+  monthSubcategories    MonthSubcategory[]
+  outgoingMovements     Movement[]          @relation("MovementSourcePocket")
+  incomingMovements     Movement[]          @relation("MovementTargetPocket")
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+}
+
+model Month {
+  id        String        @id @default(cuid())
+  year      Int
+  month     Int
+  status    MonthStatus   @default(ACTIVE)
+  openedAt  DateTime      @default(now())
+  closedAt  DateTime?
+  categories MonthCategory[]
+  movements Movement[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([year, month])
+  @@index([status])
+}
+
+model MonthCategory {
+  id                 String             @id @default(cuid())
+  monthId            String
+  month              Month              @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  name               String
+  templateCategoryId String?
+  templateCategory   TemplateCategory?  @relation(fields: [templateCategoryId], references: [id], onDelete: SetNull)
+  sortOrder          Int                @default(0)
+  subcategories      MonthSubcategory[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([monthId, sortOrder])
+}
+
+model MonthSubcategory {
+  id                    String               @id @default(cuid())
+  monthCategoryId       String
+  monthCategory         MonthCategory        @relation(fields: [monthCategoryId], references: [id], onDelete: Cascade)
+  name                  String
+  plannedAmount         Decimal              @db.Decimal(12, 2)
+  defaultPocketId       String?
+  defaultPocket         SavingsPocket?       @relation(fields: [defaultPocketId], references: [id], onDelete: SetNull)
+  templateSubcategoryId String?
+  templateSubcategory   TemplateSubcategory? @relation(fields: [templateSubcategoryId], references: [id], onDelete: SetNull)
+  sortOrder             Int                  @default(0)
+  outgoingMovements     Movement[]           @relation("MovementSourceSubcategory")
+  incomingMovements     Movement[]           @relation("MovementTargetSubcategory")
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  @@index([monthCategoryId, sortOrder])
+}
+
+model Movement {
+  id                  String           @id @default(cuid())
+  type                MovementType
+  amount              Decimal          @db.Decimal(12, 2)
+  occurredAt          DateTime         @default(now())
+  description         String?
+  monthId             String?
+  month               Month?           @relation(fields: [monthId], references: [id], onDelete: SetNull)
+  sourceSubcategoryId String?
+  sourceSubcategory   MonthSubcategory? @relation("MovementSourceSubcategory", fields: [sourceSubcategoryId], references: [id], onDelete: SetNull)
+  targetSubcategoryId String?
+  targetSubcategory   MonthSubcategory? @relation("MovementTargetSubcategory", fields: [targetSubcategoryId], references: [id], onDelete: SetNull)
+  sourcePocketId      String?
+  sourcePocket        SavingsPocket?    @relation("MovementSourcePocket", fields: [sourcePocketId], references: [id], onDelete: SetNull)
+  targetPocketId      String?
+  targetPocket        SavingsPocket?    @relation("MovementTargetPocket", fields: [targetPocketId], references: [id], onDelete: SetNull)
+  externalSourceLabel String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([monthId, occurredAt])
+  @@index([sourceSubcategoryId])
+  @@index([targetSubcategoryId])
+  @@index([sourcePocketId])
+  @@index([targetPocketId])
+}

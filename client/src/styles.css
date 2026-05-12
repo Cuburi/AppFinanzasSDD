@@ -1,0 +1,214 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #1f2937;
+  background: #f3f4f6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+.app-header,
+.page-header,
+.row,
+.budget-line {
+  display: flex;
+}
+
+.app-header,
+.page-header,
+.between {
+  justify-content: space-between;
+}
+
+.app-header,
+.page-header,
+.align-start {
+  align-items: flex-start;
+}
+
+.nav,
+.row,
+.grid-subcategory {
+  gap: 0.75rem;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.nav a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.page {
+  display: grid;
+  gap: 1rem;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+.field-amount {
+  min-width: 180px;
+}
+
+.small-field {
+  width: 140px;
+}
+
+.grow {
+  flex: 1;
+}
+
+.wrap {
+  flex-wrap: wrap;
+}
+
+.grid-subcategory {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px auto;
+  align-items: end;
+}
+
+.button {
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.button.primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.button.secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.button.tertiary {
+  background: transparent;
+  border: 1px dashed #94a3b8;
+  color: #334155;
+}
+
+.stack-sm,
+.stack-md,
+.stack-lg {
+  display: grid;
+}
+
+.stack-sm {
+  gap: 0.75rem;
+}
+
+.stack-md {
+  gap: 1rem;
+}
+
+.stack-lg {
+  gap: 1.5rem;
+}
+
+.gap-sm {
+  gap: 0.75rem;
+}
+
+.success {
+  color: #166534;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.pill {
+  align-self: center;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-weight: 700;
+}
+
+.pill.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pill.danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.budget-line {
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .app-header,
+  .page-header,
+  .budget-line {
+    flex-direction: column;
+  }
+
+  .grid-subcategory {
+    grid-template-columns: 1fr;
+  }
+
+  .small-field {
+    width: 100%;
+  }
+}
