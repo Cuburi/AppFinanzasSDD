@@ -2,6 +2,8 @@ import { MonthStatus, MovementType, Prisma } from "@prisma/client";
 
 import { prisma } from "../../lib/prisma.js";
 import {
+  type ClosureActionInput,
+  type ClosureReviewView,
   type MonthView,
   type OpenMonthInput,
   type DepositToPocketInput,
@@ -23,6 +25,7 @@ export class DomainError extends Error {
 
 const decimal = (value: number) => new Prisma.Decimal(value.toFixed(2));
 const decimalToNumber = (value: Prisma.Decimal) => Number(value.toString());
+const isZero = (value: number) => Math.abs(value) < 0.005;
 
 type TemplateCategoryRecord = {
   id: string;
@@ -91,7 +94,7 @@ type MonthlyCycleDb = {
   };
   month: {
     findFirst(args: {
-      where: { status: MonthStatus.ACTIVE };
+      where: { status: MonthStatus };
       select?: { id: true; year: true; month: true };
       orderBy?: { openedAt: "desc" };
       include?: typeof monthInclude;
@@ -101,7 +104,7 @@ type MonthlyCycleDb = {
       data: {
         year: number;
         month: number;
-        status: MonthStatus.ACTIVE;
+        status: MonthStatus;
         categories: {
           create: Array<{
             name: string;
@@ -121,6 +124,11 @@ type MonthlyCycleDb = {
       };
       include: typeof monthInclude;
     }): Promise<MonthRecord>;
+    update(args: {
+      where: { id: string };
+      data: { status: MonthStatus; closedAt: Date };
+      include: typeof monthInclude;
+    }): Promise<MonthRecord>;
   };
   movement: {
     create(args: {
@@ -130,6 +138,8 @@ type MonthlyCycleDb = {
         description?: string | null;
         monthId?: string | null;
         sourceSubcategoryId?: string | null;
+        targetSubcategoryId?: string | null;
+        sourcePocketId?: string | null;
         targetPocketId?: string | null;
         externalSourceLabel?: string | null;
       };
@@ -221,6 +231,8 @@ const assertMonthIsMutable = (month: MonthRecord) => {
 const findMonthSubcategory = (month: MonthRecord, subcategoryId: string) =>
   month.categories.flatMap((category) => category.subcategories).find((subcategory) => subcategory.id === subcategoryId);
 
+const listMonthSubcategories = (month: MonthRecord) => month.categories.flatMap((category) => category.subcategories);
+
 const readMonthById = async (db: MonthlyCycleDb, monthId: string): Promise<MonthRecord> => {
   const month = await db.month.findUnique({
     where: { id: monthId },
@@ -239,6 +251,67 @@ const readTemplateCategories = async (db: MonthlyCycleDb) =>
     orderBy: { sortOrder: "asc" },
     include: templateInclude,
   });
+
+const buildClosureReview = (month: MonthRecord): ClosureReviewView => {
+  const balances = calculateMonthBalances(month);
+  const pendingSurpluses = [];
+  const pendingDeficits = [];
+
+  for (const subcategory of listMonthSubcategories(month)) {
+    const available = balances.subcategoryBalances.get(subcategory.id) ?? decimalToNumber(subcategory.plannedAmount);
+
+    if (available > 0 && !isZero(available)) {
+      pendingSurpluses.push({
+        subcategoryId: subcategory.id,
+        subcategoryName: subcategory.name,
+        amount: Number(available.toFixed(2)),
+        defaultPocketId: subcategory.defaultPocketId,
+        requiresPocketSelection: !subcategory.defaultPocketId,
+      });
+    }
+
+    if (available < 0 && !isZero(available)) {
+      pendingDeficits.push({
+        subcategoryId: subcategory.id,
+        subcategoryName: subcategory.name,
+        amount: Number(Math.abs(available).toFixed(2)),
+      });
+    }
+  }
+
+  return {
+    monthId: month.id,
+    status: month.status,
+    pendingSurpluses,
+    pendingDeficits,
+    canClose: month.status === MonthStatus.ACTIVE && pendingSurpluses.length === 0 && pendingDeficits.length === 0,
+  };
+};
+
+const assertPocketIsActive = async (db: MonthlyCycleDb, pocketId: string, label: string) => {
+  const pocket = await db.savingsPocket.findUnique({
+    where: { id: pocketId },
+    select: { id: true, active: true },
+  });
+
+  if (!pocket || !pocket.active) {
+    throw new DomainError(400, `${label} must exist and be active.`);
+  }
+};
+
+const readActionAmount = (requestedAmount: number | null | undefined, pendingAmount: number) => {
+  const amount = requestedAmount ?? pendingAmount;
+
+  if (amount <= 0) {
+    throw new DomainError(400, "Closure action amount must be greater than zero.");
+  }
+
+  if (amount - pendingAmount > 0.005) {
+    throw new DomainError(400, "Closure action amount cannot exceed the pending amount.");
+  }
+
+  return amount;
+};
 
 export const createMonthlyCycleService = (db: MonthlyCycleDb) => ({
   async getTemplate(): Promise<TemplateView> {
@@ -259,7 +332,7 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => ({
               create: category.subcategories.map((subcategory, subcategoryIndex) => ({
                 name: subcategory.name,
                 plannedAmount: decimal(subcategory.plannedAmount),
-                defaultPocketId: subcategory.defaultPocketId,
+                defaultPocketId: subcategory.defaultPocketId ?? null,
                 sortOrder: subcategoryIndex,
               })),
             },
@@ -424,6 +497,160 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => ({
 
     return month ? mapMonth(month) : null;
   },
+
+  async getClosureReview(monthId: string): Promise<ClosureReviewView> {
+    const month = await readMonthById(db, monthId);
+    return buildClosureReview(month);
+  },
+
+  async applyClosureAction(input: ClosureActionInput): Promise<ClosureReviewView> {
+    const month = await db.$transaction(async (tx) => {
+      const existingMonth = await readMonthById(tx, input.monthId);
+      assertMonthIsMutable(existingMonth);
+
+      const balances = calculateMonthBalances(existingMonth);
+
+      if (input.type === MovementType.SURPLUS_TO_POCKET_ON_CLOSE) {
+        const sourceSubcategoryId = input.sourceSubcategoryId;
+
+        if (!sourceSubcategoryId) {
+          throw new DomainError(400, "Source subcategory is required for surplus transfer.");
+        }
+
+        const sourceSubcategory = findMonthSubcategory(existingMonth, sourceSubcategoryId);
+
+        if (!sourceSubcategory) {
+          throw new DomainError(400, "Source subcategory does not belong to this month.");
+        }
+
+        const pendingSurplus = balances.subcategoryBalances.get(sourceSubcategory.id) ?? decimalToNumber(sourceSubcategory.plannedAmount);
+
+        if (pendingSurplus <= 0 || isZero(pendingSurplus)) {
+          throw new DomainError(400, "Source subcategory does not have pending surplus.");
+        }
+
+        const targetPocketId = input.targetPocketId ?? sourceSubcategory.defaultPocketId;
+
+        if (!targetPocketId) {
+          throw new DomainError(400, "Target pocket is required because this subcategory has no default pocket.");
+        }
+
+        await assertPocketIsActive(tx, targetPocketId, "Target pocket");
+        await tx.movement.create({
+          data: {
+            type: MovementType.SURPLUS_TO_POCKET_ON_CLOSE,
+            amount: decimal(readActionAmount(input.amount, pendingSurplus)),
+            description: input.description,
+            monthId: input.monthId,
+            sourceSubcategoryId: sourceSubcategory.id,
+            targetPocketId,
+          },
+        });
+      }
+
+      if (input.type === MovementType.DEFICIT_COVER_FROM_SUBCATEGORY) {
+        const sourceSubcategoryId = input.sourceSubcategoryId;
+        const targetSubcategoryId = input.targetSubcategoryId;
+
+        if (!sourceSubcategoryId || !targetSubcategoryId) {
+          throw new DomainError(400, "Source and target subcategories are required for deficit coverage.");
+        }
+
+        if (sourceSubcategoryId === targetSubcategoryId) {
+          throw new DomainError(400, "Source and target subcategories must be different.");
+        }
+
+        const sourceSubcategory = findMonthSubcategory(existingMonth, sourceSubcategoryId);
+        const targetSubcategory = findMonthSubcategory(existingMonth, targetSubcategoryId);
+
+        if (!sourceSubcategory || !targetSubcategory) {
+          throw new DomainError(400, "Source and target subcategories must belong to this month.");
+        }
+
+        const sourceAvailable = balances.subcategoryBalances.get(sourceSubcategory.id) ?? decimalToNumber(sourceSubcategory.plannedAmount);
+        const targetAvailable = balances.subcategoryBalances.get(targetSubcategory.id) ?? decimalToNumber(targetSubcategory.plannedAmount);
+
+        if (targetAvailable >= 0 || isZero(targetAvailable)) {
+          throw new DomainError(400, "Target subcategory does not have a pending deficit.");
+        }
+
+        const amount = readActionAmount(input.amount, Math.abs(targetAvailable));
+
+        if (sourceAvailable - amount < -0.005) {
+          throw new DomainError(400, "Source subcategory does not have enough available balance.");
+        }
+
+        await tx.movement.create({
+          data: {
+            type: MovementType.DEFICIT_COVER_FROM_SUBCATEGORY,
+            amount: decimal(amount),
+            description: input.description,
+            monthId: input.monthId,
+            sourceSubcategoryId: sourceSubcategory.id,
+            targetSubcategoryId: targetSubcategory.id,
+          },
+        });
+      }
+
+      if (input.type === MovementType.DEFICIT_COVER_FROM_POCKET) {
+        const sourcePocketId = input.sourcePocketId;
+        const targetSubcategoryId = input.targetSubcategoryId;
+
+        if (!sourcePocketId || !targetSubcategoryId) {
+          throw new DomainError(400, "Source pocket and target subcategory are required for deficit coverage.");
+        }
+
+        const targetSubcategory = findMonthSubcategory(existingMonth, targetSubcategoryId);
+
+        if (!targetSubcategory) {
+          throw new DomainError(400, "Target subcategory must belong to this month.");
+        }
+
+        const targetAvailable = balances.subcategoryBalances.get(targetSubcategory.id) ?? decimalToNumber(targetSubcategory.plannedAmount);
+
+        if (targetAvailable >= 0 || isZero(targetAvailable)) {
+          throw new DomainError(400, "Target subcategory does not have a pending deficit.");
+        }
+
+        await assertPocketIsActive(tx, sourcePocketId, "Source pocket");
+        await tx.movement.create({
+          data: {
+            type: MovementType.DEFICIT_COVER_FROM_POCKET,
+            amount: decimal(readActionAmount(input.amount, Math.abs(targetAvailable))),
+            description: input.description,
+            monthId: input.monthId,
+            sourcePocketId,
+            targetSubcategoryId: targetSubcategory.id,
+          },
+        });
+      }
+
+      return readMonthById(tx, input.monthId);
+    });
+
+    return buildClosureReview(month);
+  },
+
+  async closeMonth(monthId: string): Promise<MonthView> {
+    const month = await db.$transaction(async (tx) => {
+      const existingMonth = await readMonthById(tx, monthId);
+      assertMonthIsMutable(existingMonth);
+
+      const review = buildClosureReview(existingMonth);
+
+      if (!review.canClose) {
+        throw new DomainError(409, "Month cannot be closed while pending surpluses or deficits remain.");
+      }
+
+      return tx.month.update({
+        where: { id: monthId },
+        data: { status: MonthStatus.CLOSED, closedAt: new Date() },
+        include: monthInclude,
+      });
+    });
+
+    return mapMonth(month);
+  },
 });
 
 const monthlyCycleService = createMonthlyCycleService(prisma as unknown as MonthlyCycleDb);
@@ -434,3 +661,6 @@ export const openMonth = (input: OpenMonthInput) => monthlyCycleService.openMont
 export const getActiveMonth = () => monthlyCycleService.getActiveMonth();
 export const recordExpense = (input: RecordExpenseInput) => monthlyCycleService.recordExpense(input);
 export const depositToPocket = (input: DepositToPocketInput) => monthlyCycleService.depositToPocket(input);
+export const getClosureReview = (monthId: string) => monthlyCycleService.getClosureReview(monthId);
+export const applyClosureAction = (input: ClosureActionInput) => monthlyCycleService.applyClosureAction(input);
+export const closeMonth = (monthId: string) => monthlyCycleService.closeMonth(monthId);

@@ -1,7 +1,24 @@
 import { Router } from "express";
 
-import { parseDepositToPocketInput, parseOpenMonthInput, parseRecordExpenseInput, parseTemplateInput } from "./dto.js";
-import { DomainError, depositToPocket, getActiveMonth, getTemplate, openMonth, recordExpense, updateTemplate } from "./service.js";
+import {
+  parseClosureActionInput,
+  parseDepositToPocketInput,
+  parseOpenMonthInput,
+  parseRecordExpenseInput,
+  parseTemplateInput,
+} from "./dto.js";
+import {
+  DomainError,
+  applyClosureAction,
+  closeMonth,
+  depositToPocket,
+  getActiveMonth,
+  getClosureReview,
+  getTemplate,
+  openMonth,
+  recordExpense,
+  updateTemplate,
+} from "./service.js";
 
 const isDomainError = (error: unknown): error is DomainError => error instanceof DomainError;
 
@@ -70,6 +87,49 @@ export const monthlyCycleRouter = () => {
       const payload = parseDepositToPocketInput(request.body);
       const month = await depositToPocket(payload);
       response.status(201).json({ month });
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.get("/months/:id/closure-review", async (request, response) => {
+    try {
+      const review = await getClosureReview(request.params.id);
+      response.json(review);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.post("/months/:id/closure-actions", async (request, response) => {
+    try {
+      const payload = parseClosureActionInput(request.params.id, request.body);
+      const review = await applyClosureAction(payload);
+      response.status(201).json(review);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.post("/months/:id/close", async (request, response) => {
+    try {
+      const month = await closeMonth(request.params.id);
+      response.json(month);
     } catch (error) {
       if (isDomainError(error)) {
         response.status(error.statusCode).json({ message: error.message });

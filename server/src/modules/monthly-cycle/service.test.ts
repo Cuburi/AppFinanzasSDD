@@ -122,7 +122,7 @@ const createDbStub = ({
   let capturedCreateArgs: unknown;
   const capturedMovements: unknown[] = [];
 
-  const db = {
+  const db: any = {
     async $transaction<T>(callback: (tx: typeof db) => Promise<T>) {
       return callback(db);
     },
@@ -157,19 +157,37 @@ const createDbStub = ({
         capturedCreateArgs = args;
         return monthToReturn;
       },
+      async update() {
+        if (!monthById) {
+          throw new Error("Month missing in stub.");
+        }
+
+        monthById.status = MonthStatus.CLOSED;
+        monthById.closedAt = new Date("2026-05-04T00:00:00.000Z");
+        return monthById;
+      },
     },
     movement: {
       async create(args: unknown) {
         capturedMovements.push(args);
-        const movement = args as { data?: { type?: MovementType; amount?: Prisma.Decimal; sourceSubcategoryId?: string | null; targetPocketId?: string | null } };
+        const movement = args as {
+          data?: {
+            type?: MovementType;
+            amount?: Prisma.Decimal;
+            sourceSubcategoryId?: string | null;
+            targetSubcategoryId?: string | null;
+            sourcePocketId?: string | null;
+            targetPocketId?: string | null;
+          };
+        };
 
         if (monthById && movement.data?.type && movement.data.amount) {
           monthById.movements.push({
             type: movement.data.type,
             amount: movement.data.amount,
             sourceSubcategoryId: movement.data.sourceSubcategoryId ?? null,
-            targetSubcategoryId: null,
-            sourcePocketId: null,
+            targetSubcategoryId: movement.data.targetSubcategoryId ?? null,
+            sourcePocketId: movement.data.sourcePocketId ?? null,
             targetPocketId: movement.data.targetPocketId ?? null,
           });
         }
@@ -309,4 +327,117 @@ test("depositToPocket rejects source subcategory deposits in closed months", asy
       return true;
     },
   );
+});
+
+test("getClosureReview returns pending surpluses and deficits without mutating movements", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategory = month.categories[0]?.subcategories[0];
+
+  if (!subcategory) {
+    throw new Error("Missing subcategory fixture.");
+  }
+
+  month.movements.push({
+    type: MovementType.EXPENSE,
+    amount: amount(300),
+    sourceSubcategoryId: subcategory.id,
+    targetSubcategoryId: null,
+    sourcePocketId: null,
+    targetPocketId: null,
+  });
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const review = await service.getClosureReview(month.id);
+
+  assert.deepEqual(review.pendingSurpluses, []);
+  assert.equal(review.pendingDeficits[0]?.subcategoryId, subcategory.id);
+  assert.equal(review.pendingDeficits[0]?.amount, 50);
+  assert.equal(review.canClose, false);
+  assert.equal(dbStub.getCapturedMovements().length, 0);
+});
+
+test("applyClosureAction persists surplus transfer using the default pocket", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategory = month.categories[0]?.subcategories[0];
+
+  if (!subcategory) {
+    throw new Error("Missing subcategory fixture.");
+  }
+
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const review = await service.applyClosureAction({
+    monthId: month.id,
+    type: "SURPLUS_TO_POCKET_ON_CLOSE",
+    sourceSubcategoryId: subcategory.id,
+  });
+  const movement = dbStub.getCapturedMovements()[0] as {
+    data: { type: MovementType; sourceSubcategoryId: string; targetPocketId: string; amount: Prisma.Decimal };
+  };
+
+  assert.equal(movement.data.type, MovementType.SURPLUS_TO_POCKET_ON_CLOSE);
+  assert.equal(movement.data.sourceSubcategoryId, subcategory.id);
+  assert.equal(movement.data.targetPocketId, "pocket-home");
+  assert.equal(Number(movement.data.amount.toString()), 250);
+  assert.equal(review.canClose, true);
+});
+
+test("applyClosureAction requires explicit target pocket when surplus has no default pocket", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategory = month.categories[0]?.subcategories[0];
+
+  if (!subcategory) {
+    throw new Error("Missing subcategory fixture.");
+  }
+
+  subcategory.defaultPocketId = null;
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  await assert.rejects(
+    () =>
+      service.applyClosureAction({
+        monthId: month.id,
+        type: "SURPLUS_TO_POCKET_ON_CLOSE",
+        sourceSubcategoryId: subcategory.id,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /target pocket is required/i);
+      return true;
+    },
+  );
+});
+
+test("closeMonth rejects pending closure balances and closes after explicit movements", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategory = month.categories[0]?.subcategories[0];
+
+  if (!subcategory) {
+    throw new Error("Missing subcategory fixture.");
+  }
+
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  await assert.rejects(() => service.closeMonth(month.id), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 409);
+    assert.match(error.message, /pending surpluses or deficits/i);
+    return true;
+  });
+
+  await service.applyClosureAction({
+    monthId: month.id,
+    type: "SURPLUS_TO_POCKET_ON_CLOSE",
+    sourceSubcategoryId: subcategory.id,
+  });
+
+  const closedMonth = await service.closeMonth(month.id);
+
+  assert.equal(closedMonth.status, MonthStatus.CLOSED);
+  assert.ok(closedMonth.closedAt);
 });
