@@ -1,4 +1,4 @@
-import type { EditableTemplate, Month, Template } from "../types";
+import type { ClosureActionInput, ClosureReview, EditableTemplate, Month, Template } from "../types";
 
 const readJson = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
@@ -84,5 +84,35 @@ export const api = {
     const payload = await readJson<{ month: Month | null }>(response);
 
     return payload.month;
+  },
+  async getClosureReview(monthId: string): Promise<ClosureReview> {
+    const response = await fetch(`/api/months/${monthId}/closure-review`);
+    return readJson<ClosureReview>(response);
+  },
+  async applyClosureAction(input: ClosureActionInput): Promise<ClosureReview> {
+    const response = await fetch(`/api/months/${input.monthId}/closure-actions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: input.type,
+        sourceSubcategoryId: input.sourceSubcategoryId,
+        targetSubcategoryId: input.targetSubcategoryId,
+        sourcePocketId: input.sourcePocketId,
+        targetPocketId: input.targetPocketId,
+        amount: input.amount,
+        description: input.description,
+      }),
+    });
+
+    return readJson<ClosureReview>(response);
+  },
+  async closeMonth(monthId: string): Promise<Month> {
+    const response = await fetch(`/api/months/${monthId}/close`, {
+      method: "POST",
+    });
+
+    return readJson<Month>(response);
   },
 };

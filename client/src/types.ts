@@ -56,3 +56,36 @@ export type Month = {
   closedAt: string | null;
   categories: MonthCategory[];
 };
+
+export type ClosurePendingSurplus = {
+  subcategoryId: string;
+  subcategoryName: string;
+  amount: number;
+  defaultPocketId: string | null;
+  requiresPocketSelection: boolean;
+};
+
+export type ClosurePendingDeficit = {
+  subcategoryId: string;
+  subcategoryName: string;
+  amount: number;
+};
+
+export type ClosureReview = {
+  monthId: string;
+  status: "ACTIVE" | "CLOSED";
+  pendingSurpluses: ClosurePendingSurplus[];
+  pendingDeficits: ClosurePendingDeficit[];
+  canClose: boolean;
+};
+
+export type ClosureActionInput = {
+  monthId: string;
+  type: "SURPLUS_TO_POCKET_ON_CLOSE" | "DEFICIT_COVER_FROM_SUBCATEGORY" | "DEFICIT_COVER_FROM_POCKET";
+  sourceSubcategoryId?: string;
+  targetSubcategoryId?: string;
+  sourcePocketId?: string;
+  targetPocketId?: string;
+  amount?: number;
+  description?: string;
+};
