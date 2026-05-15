@@ -147,6 +147,8 @@ const readOptionalString = (value: unknown): string | null => {
   return value.trim();
 };
 
+const readOptionalDefaultPocketId = (value: unknown): string | null => readOptionalString(value);
+
 const readPositiveAmount = (value: unknown, label: string): number => {
   const amount = toNumber(value);
 
@@ -191,10 +193,7 @@ export const parseTemplateInput = (payload: unknown): TemplateInput => {
         return {
           name: readNonEmptyString(rawSubcategory.name, `Subcategory ${categoryIndex + 1}.${subcategoryIndex + 1} name`),
           plannedAmount,
-          defaultPocketId:
-            typeof rawSubcategory.defaultPocketId === "string" && rawSubcategory.defaultPocketId.trim() !== ""
-              ? rawSubcategory.defaultPocketId.trim()
-              : null,
+          defaultPocketId: readOptionalDefaultPocketId(rawSubcategory.defaultPocketId),
         };
       }),
     };
