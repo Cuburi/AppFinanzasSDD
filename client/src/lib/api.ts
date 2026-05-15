@@ -1,4 +1,14 @@
-import type { ClosureActionInput, ClosureReview, EditableTemplate, Month, Template } from "../types";
+import type {
+  ClosureActionInput,
+  ClosureReview,
+  CreatePocketInput,
+  EditableTemplate,
+  Month,
+  PocketListFilter,
+  SavingsPocket,
+  Template,
+  UpdatePocketInput,
+} from "../types";
 
 const readJson = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
@@ -20,6 +30,46 @@ const readJson = async <T>(response: Response): Promise<T> => {
 };
 
 export const api = {
+  async getPockets(filter: PocketListFilter = "active"): Promise<SavingsPocket[]> {
+    const activeQuery = filter === "all" ? "all" : String(filter === "active");
+    const response = await fetch(`/api/pockets?active=${activeQuery}`);
+    const payload = await readJson<{ pockets: SavingsPocket[] }>(response);
+
+    return payload.pockets;
+  },
+  async getPocket(id: string): Promise<SavingsPocket> {
+    const response = await fetch(`/api/pockets/${id}`);
+    return readJson<SavingsPocket>(response);
+  },
+  async createPocket(input: CreatePocketInput): Promise<SavingsPocket> {
+    const response = await fetch("/api/pockets", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+
+    return readJson<SavingsPocket>(response);
+  },
+  async updatePocket(id: string, input: UpdatePocketInput): Promise<SavingsPocket> {
+    const response = await fetch(`/api/pockets/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+
+    return readJson<SavingsPocket>(response);
+  },
+  async deactivatePocket(id: string): Promise<SavingsPocket> {
+    const response = await fetch(`/api/pockets/${id}`, {
+      method: "DELETE",
+    });
+
+    return readJson<SavingsPocket>(response);
+  },
   async getTemplate(): Promise<Template> {
     const response = await fetch("/api/template");
     return readJson<Template>(response);

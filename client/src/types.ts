@@ -29,6 +29,36 @@ export type EditableTemplate = {
   categories: EditableTemplateCategory[];
 };
 
+export type SavingsPocketMovement = {
+  id: string;
+  amount: number;
+  description: string | null;
+  createdAt: string;
+  direction: "IN" | "OUT";
+};
+
+export type SavingsPocket = {
+  id: string;
+  name: string;
+  goalAmount: number | null;
+  active: boolean;
+  balance: number;
+  recentMovements?: SavingsPocketMovement[];
+};
+
+export type PocketListFilter = "active" | "inactive" | "all";
+
+export type CreatePocketInput = {
+  name: string;
+  goalAmount?: number | null;
+};
+
+export type UpdatePocketInput = {
+  name?: string;
+  goalAmount?: number | null;
+  active?: boolean;
+};
+
 export type MonthSubcategory = {
   id: string;
   name: string;
