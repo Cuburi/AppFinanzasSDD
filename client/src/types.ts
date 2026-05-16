@@ -33,8 +33,8 @@ export type SavingsPocketMovement = {
   id: string;
   amount: number;
   description: string | null;
-  createdAt: string;
-  direction: "IN" | "OUT";
+  occurredAt: string;
+  direction: "in" | "out";
 };
 
 export type SavingsPocket = {

@@ -27,8 +27,8 @@ const emergencyPocket: SavingsPocket = {
       id: "movement-1",
       amount: 250,
       description: "Ahorro inicial",
-      createdAt: "2026-05-10T12:00:00.000Z",
-      direction: "IN",
+      occurredAt: "2026-05-10T12:00:00.000Z",
+      direction: "in",
     },
   ],
 };
@@ -73,6 +73,27 @@ describe("PocketsPage", () => {
     expect(screen.getByText("Sin meta definida")).toBeInTheDocument();
     expect(screen.getByText("Sin movimientos recientes.")).toBeInTheDocument();
     expect(apiMock.getPockets).toHaveBeenLastCalledWith("inactive");
+  });
+
+  it("renders backend outgoing pocket movements as Salida", async () => {
+    apiMock.getPockets.mockResolvedValueOnce([
+      {
+        ...emergencyPocket,
+        recentMovements: [
+          {
+            id: "movement-2",
+            amount: 75,
+            description: "Uso de emergencia",
+            occurredAt: "2026-05-11T12:00:00.000Z",
+            direction: "out",
+          },
+        ],
+      },
+    ]);
+
+    render(<PocketsPage />);
+
+    expect(await screen.findByText("Uso de emergencia · Salida $75.00")).toBeInTheDocument();
   });
 
   it("creates, edits, and deactivates pockets without hard deleting history", async () => {

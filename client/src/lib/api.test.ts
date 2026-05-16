@@ -13,8 +13,8 @@ const pocketPayload = {
       id: "move-1",
       amount: 250,
       description: "Ahorro inicial",
-      createdAt: "2026-05-10T12:00:00.000Z",
-      direction: "IN",
+      occurredAt: "2026-05-10T12:00:00.000Z",
+      direction: "in",
     },
   ],
 };

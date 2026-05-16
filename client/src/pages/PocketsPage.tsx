@@ -43,7 +43,7 @@ const PocketMovements = ({ pocket }: PocketMovementsProps) => (
       <ul>
         {pocket.recentMovements.map((movement) => (
           <li key={movement.id}>
-            {movement.description ?? "Movimiento sin descripción"} · {movement.direction === "IN" ? "Entrada" : "Salida"} {formatMoney(movement.amount)}
+            {movement.description ?? "Movimiento sin descripción"} · {movement.direction === "in" ? "Entrada" : "Salida"} {formatMoney(movement.amount)}
           </li>
         ))}
       </ul>
