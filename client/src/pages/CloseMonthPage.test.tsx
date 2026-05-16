@@ -3,10 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CloseMonthPage } from "./CloseMonthPage";
-import type { ClosureReview, Month } from "../types";
+import type { ClosureReview, Month, SavingsPocket } from "../types";
 
 const apiMock = vi.hoisted(() => ({
   getActiveMonth: vi.fn(),
+  getPockets: vi.fn(),
   getClosureReview: vi.fn(),
   applyClosureAction: vi.fn(),
   closeMonth: vi.fn(),
@@ -48,6 +49,24 @@ const cleanReview: ClosureReview = {
   pendingSurpluses: [],
 };
 
+const noDefaultReview: ClosureReview = {
+  ...pendingReview,
+  pendingSurpluses: [
+    {
+      subcategoryId: "sub-fun",
+      subcategoryName: "Salidas",
+      amount: 80,
+      defaultPocketId: null,
+      requiresPocketSelection: true,
+    },
+  ],
+};
+
+const activePockets: SavingsPocket[] = [
+  { id: "pocket-food", name: "Comida", goalAmount: null, active: true, balance: 75 },
+  { id: "pocket-emergency", name: "Emergencias", goalAmount: 1000, active: true, balance: 250 },
+];
+
 describe("CloseMonthPage", () => {
   afterEach(() => {
     cleanup();
@@ -56,6 +75,7 @@ describe("CloseMonthPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     apiMock.getActiveMonth.mockResolvedValue(activeMonth);
+    apiMock.getPockets.mockResolvedValue(activePockets);
   });
 
   it("shows pending balances and keeps close disabled while explicit actions are missing", async () => {
@@ -93,7 +113,7 @@ describe("CloseMonthPage", () => {
       monthId: activeMonth.id,
       type: "SURPLUS_TO_POCKET_ON_CLOSE",
       sourceSubcategoryId: "sub-food",
-      targetPocketId: undefined,
+      targetPocketId: "pocket-food",
       amount: undefined,
       description: "Transferencia de sobrante al cierre",
     });
@@ -105,5 +125,50 @@ describe("CloseMonthPage", () => {
 
     await waitFor(() => expect(apiMock.closeMonth).toHaveBeenCalledWith(activeMonth.id));
     expect(await screen.findByText(/cerrado\. Ya no se puede modificar/i)).toBeInTheDocument();
+  });
+
+  it("prefills the active-pocket selector with the default surplus destination", async () => {
+    apiMock.getClosureReview.mockResolvedValue(pendingReview);
+
+    render(<CloseMonthPage />);
+
+    const surplusForm = (await screen.findByText("Comida")).closest("form");
+    if (!surplusForm) throw new Error("Missing surplus form.");
+
+    expect(within(surplusForm).queryByLabelText("ID bolsillo destino")).not.toBeInTheDocument();
+    expect(within(surplusForm).getByLabelText("Bolsillo destino")).toHaveValue("pocket-food");
+    expect(within(surplusForm).getByRole("option", { name: "Comida ($75.00)" })).toBeInTheDocument();
+    expect(apiMock.getPockets).toHaveBeenCalledWith("active");
+  });
+
+  it("requires choosing an active destination when a surplus has no default pocket", async () => {
+    const user = userEvent.setup();
+    apiMock.getClosureReview.mockResolvedValueOnce(noDefaultReview).mockResolvedValueOnce(cleanReview);
+    apiMock.applyClosureAction.mockResolvedValue(cleanReview);
+
+    render(<CloseMonthPage />);
+
+    const surplusForm = (await screen.findByText("Salidas")).closest("form");
+    if (!surplusForm) throw new Error("Missing surplus form.");
+
+    expect(within(surplusForm).getByText(/elegí un bolsillo activo antes de transferir/i)).toBeInTheDocument();
+    expect(within(surplusForm).getByLabelText("Bolsillo destino")).toHaveValue("");
+
+    await user.click(within(surplusForm).getByRole("button", { name: "Transferir sobrante" }));
+    expect(apiMock.applyClosureAction).not.toHaveBeenCalled();
+
+    await user.selectOptions(within(surplusForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
+    await user.click(within(surplusForm).getByRole("button", { name: "Transferir sobrante" }));
+
+    await waitFor(() =>
+      expect(apiMock.applyClosureAction).toHaveBeenCalledWith({
+        monthId: activeMonth.id,
+        type: "SURPLUS_TO_POCKET_ON_CLOSE",
+        sourceSubcategoryId: "sub-fun",
+        targetPocketId: "pocket-emergency",
+        amount: undefined,
+        description: "Transferencia de sobrante al cierre",
+      }),
+    );
   });
 });
