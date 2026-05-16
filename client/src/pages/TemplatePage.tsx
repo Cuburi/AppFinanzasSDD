@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../lib/api";
-import type { EditableTemplate, EditableTemplateCategory } from "../types";
+import type { EditableTemplate, EditableTemplateCategory, SavingsPocket } from "../types";
 
 const emptyCategory = (): EditableTemplateCategory => ({
   name: "",
@@ -26,16 +26,18 @@ export const TemplatePage = () => {
   const [template, setTemplate] = useState<EditableTemplate>({ categories: [emptyCategory()] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activePockets, setActivePockets] = useState<SavingsPocket[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const currentTemplate = await api.getTemplate();
+        const [currentTemplate, pockets] = await Promise.all([api.getTemplate(), api.getPockets("active")]);
         setTemplate(toEditableTemplate(currentTemplate));
+        setActivePockets(pockets);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "No se pudo cargar la plantilla.");
+        setError(loadError instanceof Error ? loadError.message : "No se pudo cargar la plantilla y los bolsillos activos.");
       } finally {
         setLoading(false);
       }
@@ -70,7 +72,7 @@ export const TemplatePage = () => {
   const updateSubcategory = (
     categoryIndex: number,
     subcategoryIndex: number,
-    field: "name" | "plannedAmount",
+    field: "name" | "plannedAmount" | "defaultPocketId",
     value: string,
   ) => {
     setTemplate((current) => ({
@@ -82,7 +84,7 @@ export const TemplatePage = () => {
                 currentSubcategoryIndex === subcategoryIndex
                   ? {
                       ...subcategory,
-                      [field]: field === "plannedAmount" ? Number(value) : value,
+                      [field]: field === "plannedAmount" ? Number(value) : field === "defaultPocketId" ? value || null : value,
                     }
                   : subcategory,
               ),
@@ -200,6 +202,21 @@ export const TemplatePage = () => {
                       value={subcategory.plannedAmount}
                       onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "plannedAmount", event.target.value)}
                     />
+                  </label>
+
+                  <label className="field">
+                    <span>Bolsillo por defecto (opcional)</span>
+                    <select
+                      value={subcategory.defaultPocketId ?? ""}
+                      onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "defaultPocketId", event.target.value)}
+                    >
+                      <option value="">Sin bolsillo por defecto</option>
+                      {activePockets.map((pocket) => (
+                        <option key={pocket.id} value={pocket.id}>
+                          {pocket.name} (${pocket.balance.toFixed(2)})
+                        </option>
+                      ))}
+                    </select>
                   </label>
 
                   <button

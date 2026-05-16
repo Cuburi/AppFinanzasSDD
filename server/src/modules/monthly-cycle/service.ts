@@ -299,6 +299,19 @@ const assertPocketIsActive = async (db: MonthlyCycleDb, pocketId: string, label:
   }
 };
 
+const assertTemplateDefaultPocketsAreActive = async (db: MonthlyCycleDb, input: TemplateInput) => {
+  const defaultPocketIds = new Set(
+    input.categories
+      .flatMap((category) => category.subcategories)
+      .map((subcategory) => subcategory.defaultPocketId)
+      .filter((defaultPocketId): defaultPocketId is string => Boolean(defaultPocketId)),
+  );
+
+  for (const defaultPocketId of defaultPocketIds) {
+    await assertPocketIsActive(db, defaultPocketId, "Default pocket");
+  }
+};
+
 const readActionAmount = (requestedAmount: number | null | undefined, pendingAmount: number) => {
   const amount = requestedAmount ?? pendingAmount;
 
@@ -321,6 +334,7 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => ({
 
   async updateTemplate(input: TemplateInput): Promise<TemplateView> {
     const categories = await db.$transaction(async (tx) => {
+      await assertTemplateDefaultPocketsAreActive(tx, input);
       await tx.templateCategory.deleteMany();
 
       for (const [categoryIndex, category] of input.categories.entries()) {
@@ -372,7 +386,7 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => ({
       }
 
       const template = await readTemplateCategories(tx);
-      assertTemplateHasSubcategories({
+      const templateInput = {
         categories: template.map((category) => ({
           name: category.name,
           subcategories: category.subcategories.map((subcategory) => ({
@@ -381,7 +395,9 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => ({
             defaultPocketId: subcategory.defaultPocketId,
           })),
         })),
-      });
+      };
+      assertTemplateHasSubcategories(templateInput);
+      await assertTemplateDefaultPocketsAreActive(tx, templateInput);
 
       const createdMonth = await tx.month.create({
         data: {
