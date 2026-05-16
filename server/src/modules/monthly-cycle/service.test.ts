@@ -108,6 +108,7 @@ const createDbStub = ({
   existingTargetMonth = null,
   monthById = null,
   targetPocket = { id: "pocket-home", active: true },
+  targetPockets,
   createdMonth,
 }: {
   template?: TemplateFixture;
@@ -115,8 +116,9 @@ const createDbStub = ({
   existingTargetMonth?: { id: string } | null;
   monthById?: MonthFixture | null;
   targetPocket?: { id: string; active: boolean } | null;
+  targetPockets?: Record<string, { id: string; active: boolean } | null>;
   createdMonth?: MonthFixture;
-}) => {
+} = {}) => {
   let readTemplate = cloneTemplateFixture(template);
   let monthToReturn = createdMonth ?? buildCreatedMonth(readTemplate, 2026, 5);
   let capturedCreateArgs: unknown;
@@ -134,7 +136,8 @@ const createDbStub = ({
         readTemplate = [];
         return { count: 0 };
       },
-      async create() {
+      async create(args: unknown) {
+        capturedCreateArgs = args;
         return {};
       },
     },
@@ -196,7 +199,11 @@ const createDbStub = ({
       },
     },
     savingsPocket: {
-      async findUnique() {
+      async findUnique(args: { where?: { id?: string } }) {
+        if (targetPockets && args.where?.id) {
+          return targetPockets[args.where.id] ?? null;
+        }
+
         return targetPocket;
       },
     },
@@ -211,6 +218,169 @@ const createDbStub = ({
     },
   };
 };
+
+test("updateTemplate keeps defaultPocketId optional when saving subcategories", async () => {
+  const dbStub = createDbStub();
+  const service = createMonthlyCycleService(dbStub.db);
+
+  await service.updateTemplate({
+    categories: [
+      {
+        name: "Ahorro",
+        subcategories: [{ name: "Emergencias", plannedAmount: 100, defaultPocketId: null }],
+      },
+    ],
+  });
+  const createArgs = dbStub.getCapturedCreateArgs() as {
+    data: { subcategories: { create: Array<{ defaultPocketId: string | null }> } };
+  };
+
+  assert.equal(createArgs.data.subcategories.create[0]?.defaultPocketId, null);
+});
+
+test("updateTemplate rejects inactive or nonexistent default pockets", async () => {
+  const serviceWithInactivePocket = createMonthlyCycleService(
+    createDbStub({ targetPockets: { "pocket-inactive": { id: "pocket-inactive", active: false } } }).db,
+  );
+  const serviceWithMissingPocket = createMonthlyCycleService(createDbStub({ targetPockets: { "pocket-missing": null } }).db);
+
+  await assert.rejects(
+    () =>
+      serviceWithInactivePocket.updateTemplate({
+        categories: [
+          {
+            name: "Ahorro",
+            subcategories: [{ name: "Emergencias", plannedAmount: 100, defaultPocketId: "pocket-inactive" }],
+          },
+        ],
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /default pocket must exist and be active/i);
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () =>
+      serviceWithMissingPocket.updateTemplate({
+        categories: [
+          {
+            name: "Ahorro",
+            subcategories: [{ name: "Emergencias", plannedAmount: 100, defaultPocketId: "pocket-missing" }],
+          },
+        ],
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /default pocket must exist and be active/i);
+      return true;
+    },
+  );
+});
+
+test("openMonth rejects template snapshots with inactive or nonexistent default pockets", async () => {
+  const template = templateFixture();
+  const serviceWithInactivePocket = createMonthlyCycleService(
+    createDbStub({
+      template,
+      targetPockets: { "pocket-home": { id: "pocket-home", active: false } },
+      createdMonth: buildCreatedMonth(template, 2026, 6),
+    }).db,
+  );
+  const serviceWithMissingPocket = createMonthlyCycleService(
+    createDbStub({
+      template,
+      targetPockets: { "pocket-home": null },
+      createdMonth: buildCreatedMonth(template, 2026, 6),
+    }).db,
+  );
+
+  await assert.rejects(() => serviceWithInactivePocket.openMonth({ year: 2026, month: 6 }), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 400);
+    assert.match(error.message, /default pocket must exist and be active/i);
+    return true;
+  });
+
+  await assert.rejects(() => serviceWithMissingPocket.openMonth({ year: 2026, month: 6 }), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 400);
+    assert.match(error.message, /default pocket must exist and be active/i);
+    return true;
+  });
+});
+
+test("depositToPocket rejects inactive or nonexistent target pockets", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  const serviceWithInactivePocket = createMonthlyCycleService(
+    createDbStub({ monthById: month, targetPockets: { "pocket-inactive": { id: "pocket-inactive", active: false } } }).db,
+  );
+  const serviceWithMissingPocket = createMonthlyCycleService(createDbStub({ monthById: month, targetPockets: { "pocket-missing": null } }).db);
+
+  await assert.rejects(
+    () =>
+      serviceWithInactivePocket.depositToPocket({
+        monthId: month.id,
+        sourceSubcategoryId: subcategoryId,
+        targetPocketId: "pocket-inactive",
+        amount: 10,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /target pocket must exist and be active/i);
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () =>
+      serviceWithMissingPocket.depositToPocket({
+        monthId: month.id,
+        sourceSubcategoryId: subcategoryId,
+        targetPocketId: "pocket-missing",
+        amount: 10,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /target pocket must exist and be active/i);
+      return true;
+    },
+  );
+});
+
+test("applyClosureAction rejects inactive default pockets for new surplus actions", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategory = month.categories[0]?.subcategories[0];
+
+  if (!subcategory) {
+    throw new Error("Missing subcategory fixture.");
+  }
+
+  const service = createMonthlyCycleService(
+    createDbStub({ monthById: month, targetPockets: { "pocket-home": { id: "pocket-home", active: false } } }).db,
+  );
+
+  await assert.rejects(
+    () =>
+      service.applyClosureAction({
+        monthId: month.id,
+        type: "SURPLUS_TO_POCKET_ON_CLOSE",
+        sourceSubcategoryId: subcategory.id,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /target pocket must exist and be active/i);
+      return true;
+    },
+  );
+});
 
 test("openMonth snapshots the current template into a new active month", async () => {
   const template = templateFixture();

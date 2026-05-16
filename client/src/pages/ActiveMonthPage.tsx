@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
-import type { Month } from "../types";
+import type { Month, SavingsPocket } from "../types";
 
 const now = new Date();
 
@@ -11,6 +11,7 @@ export const ActiveMonthPage = () => {
   const [month, setMonth] = useState(String(now.getMonth() + 1));
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [activePockets, setActivePockets] = useState<SavingsPocket[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expenseSubcategoryId, setExpenseSubcategoryId] = useState("");
@@ -29,9 +30,11 @@ export const ActiveMonthPage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        await refresh();
+        const [monthData, pockets] = await Promise.all([api.getActiveMonth(), api.getPockets("active")]);
+        setActiveMonth(monthData);
+        setActivePockets(pockets);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "No se pudo consultar el mes activo.");
+        setError(loadError instanceof Error ? loadError.message : "No se pudo consultar el mes activo y los bolsillos activos.");
       } finally {
         setLoading(false);
       }
@@ -192,8 +195,15 @@ export const ActiveMonthPage = () => {
               </select>
             </label>
             <label className="field">
-              <span>ID bolsillo destino</span>
-              <input value={depositPocketId} onChange={(event) => setDepositPocketId(event.target.value)} required />
+              <span>Bolsillo destino</span>
+              <select value={depositPocketId} onChange={(event) => setDepositPocketId(event.target.value)} required>
+                <option value="">Elegí un bolsillo activo</option>
+                {activePockets.map((pocket) => (
+                  <option key={pocket.id} value={pocket.id}>
+                    {pocket.name} (${pocket.balance.toFixed(2)})
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="field small-field">
               <span>Monto</span>

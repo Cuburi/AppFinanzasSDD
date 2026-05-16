@@ -2,11 +2,13 @@ import "./load-env.js";
 import express from "express";
 
 import { monthlyCycleRouter } from "./modules/monthly-cycle/routes.js";
+import { pocketsRouter } from "./modules/pockets/routes.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
 
 app.use(express.json());
+app.use("/api", pocketsRouter());
 app.use("/api", monthlyCycleRouter());
 
 app.get("/health", (_request, response) => {
