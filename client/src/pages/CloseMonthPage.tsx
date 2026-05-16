@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
-import type { ClosureReview, Month } from "../types";
+import type { ClosurePendingSurplus, ClosureReview, Month, SavingsPocket } from "../types";
 
 type TextById = Record<string, string>;
 
@@ -10,6 +10,7 @@ export const CloseMonthPage = () => {
   const [review, setReview] = useState<ClosureReview | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [activePockets, setActivePockets] = useState<SavingsPocket[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [surplusPocketIds, setSurplusPocketIds] = useState<TextById>({});
@@ -28,14 +29,22 @@ export const CloseMonthPage = () => {
 
     const closureReview = await api.getClosureReview(month.id);
     setReview(closureReview);
+    setSurplusPocketIds((current) => ({
+      ...closureReview.pendingSurpluses.reduce<TextById>((defaults, surplus) => {
+        defaults[surplus.subcategoryId] = current[surplus.subcategoryId] ?? surplus.defaultPocketId ?? "";
+        return defaults;
+      }, {}),
+    }));
   };
 
   useEffect(() => {
     const load = async () => {
       try {
+        const pockets = await api.getPockets("active");
+        setActivePockets(pockets);
         await refresh();
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "No se pudo cargar la revisión de cierre.");
+        setError(loadError instanceof Error ? loadError.message : "No se pudo cargar la revisión de cierre y los bolsillos activos.");
       } finally {
         setLoading(false);
       }
@@ -60,7 +69,7 @@ export const CloseMonthPage = () => {
         monthId: activeMonth.id,
         type: "SURPLUS_TO_POCKET_ON_CLOSE",
         sourceSubcategoryId: subcategoryId,
-        targetPocketId: surplusPocketIds[subcategoryId] || undefined,
+        targetPocketId: surplusPocketIds[subcategoryId] || pendingSurplus.defaultPocketId || undefined,
         amount: surplusAmounts[subcategoryId] ? Number(surplusAmounts[subcategoryId]) : undefined,
         description: "Transferencia de sobrante al cierre",
       });
@@ -130,6 +139,24 @@ export const CloseMonthPage = () => {
     return <p>Cargando revisión de cierre...</p>;
   }
 
+  const renderPocketOptions = (surplus: ClosurePendingSurplus) => {
+    const missingDefaultId = surplus.defaultPocketId && !activePockets.some((pocket) => pocket.id === surplus.defaultPocketId)
+      ? surplus.defaultPocketId
+      : null;
+
+    return (
+      <>
+        <option value="">Elegí un bolsillo activo</option>
+        {missingDefaultId ? <option value={missingDefaultId}>{missingDefaultId}</option> : null}
+        {activePockets.map((pocket) => (
+          <option key={pocket.id} value={pocket.id}>
+            {pocket.name} (${pocket.balance.toFixed(2)})
+          </option>
+        ))}
+      </>
+    );
+  };
+
   return (
     <section className="page stack-lg">
       <header className="page-header">
@@ -185,23 +212,23 @@ export const CloseMonthPage = () => {
                     <strong>{surplus.subcategoryName}</strong>
                     <span className="pill success">Sobrante: ${surplus.amount.toFixed(2)}</span>
                     {surplus.defaultPocketId ? (
-                      <p>Si no indicás otro ID, se usará el bolsillo por defecto: {surplus.defaultPocketId}</p>
+                      <p>Se preseleccionó el bolsillo por defecto. Podés elegir otro bolsillo activo antes de transferir.</p>
                     ) : (
                       <p className="error">
-                        Esta subcategoría no tiene bolsillo por defecto. Como el MVP todavía no incluye gestión de bolsillos, necesitás pegar un
-                        targetPocketId existente para transferir el sobrante.
+                        Esta subcategoría no tiene bolsillo por defecto: elegí un bolsillo activo antes de transferir el sobrante.
                       </p>
                     )}
                   </div>
 
                   <label className="field">
-                    <span>ID bolsillo destino</span>
-                    <input
-                      placeholder={surplus.defaultPocketId ?? "Bolsillo existente requerido"}
+                    <span>Bolsillo destino</span>
+                    <select
                       required={surplus.requiresPocketSelection}
                       value={surplusPocketIds[surplus.subcategoryId] ?? ""}
                       onChange={(event) => setSurplusPocketIds((current) => ({ ...current, [surplus.subcategoryId]: event.target.value }))}
-                    />
+                    >
+                      {renderPocketOptions(surplus)}
+                    </select>
                   </label>
 
                   <label className="field small-field">
