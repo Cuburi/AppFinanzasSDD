@@ -475,7 +475,13 @@ test("service integration: income CRUD rejects closed month mutations", async ()
   const service = createMonthlyCycleService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
-  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-05T00:00:00.000Z" });
+  const withIncome = await service.createMonthlyIncome({
+    monthId: month.id,
+    sourceName: "Salary",
+    amount: 300,
+    receivedAt: "2026-05-05T00:00:00.000Z",
+  });
+  const incomeId = withIncome.incomes[0]?.id ?? "";
   await service.applyClosureAction({ monthId: month.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategoryId });
   const closed = await service.closeMonth(month.id);
 
@@ -488,6 +494,50 @@ test("service integration: income CRUD rejects closed month mutations", async ()
       return true;
     },
   );
+
+  await assert.rejects(
+    () => service.updateMonthlyIncome({ monthId: closed.id, incomeId, amount: 350 }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /closed months are immutable/i);
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () => service.deleteMonthlyIncome(closed.id, incomeId),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /closed months are immutable/i);
+      return true;
+    },
+  );
+});
+
+test("service integration: opening next month does not carry forward prior income", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const may = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = may.categories[0]?.subcategories[0]?.id ?? "";
+
+  const mayWithIncome = await service.createMonthlyIncome({
+    monthId: may.id,
+    sourceName: "Salary",
+    amount: 300,
+    receivedAt: "2026-05-05T00:00:00.000Z",
+  });
+  await service.applyClosureAction({ monthId: may.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategoryId });
+  await service.closeMonth(may.id);
+
+  const june = await service.openMonth({ year: 2026, month: 6 });
+
+  assert.equal(mayWithIncome.incomes.length, 1);
+  assert.equal(mayWithIncome.monthlyIncomeTotal, 300);
+  assert.equal(june.incomes.length, 0);
+  assert.equal(june.monthlyIncomeTotal, 0);
+  assert.equal(june.availableMoney, 0);
 });
 
 test("service integration: overspend is persisted and recalculates the month as negative", async () => {
