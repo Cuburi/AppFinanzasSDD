@@ -2,6 +2,7 @@ node_modules/
 dist/
 .atl/
 *.http
+monthly-income-pr-plan.md
 .env
 .env.*
 !.env.example
