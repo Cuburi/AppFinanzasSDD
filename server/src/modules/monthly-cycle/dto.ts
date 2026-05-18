@@ -51,6 +51,17 @@ export type MonthCategoryView = {
   subcategories: MonthSubcategoryView[];
 };
 
+export type MonthlyIncomeView = {
+  id: string;
+  monthId: string;
+  sourceName: string;
+  amount: number;
+  receivedAt: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type MonthView = {
   id: string;
   year: number;
@@ -58,6 +69,9 @@ export type MonthView = {
   status: "ACTIVE" | "CLOSED";
   openedAt: string;
   closedAt: string | null;
+  incomes: MonthlyIncomeView[];
+  monthlyIncomeTotal: number;
+  availableMoney: number;
   categories: MonthCategoryView[];
 };
 
@@ -82,6 +96,23 @@ export type DepositToPocketInput = {
   externalSourceLabel?: string | null;
 };
 
+export type CreateMonthlyIncomeInput = {
+  monthId: string;
+  sourceName: string;
+  amount: number;
+  receivedAt: string;
+  notes?: string | null;
+};
+
+export type UpdateMonthlyIncomeInput = {
+  monthId: string;
+  incomeId: string;
+  sourceName?: string;
+  amount?: number;
+  receivedAt?: string;
+  notes?: string | null;
+};
+
 export type ClosurePendingSurplusView = {
   subcategoryId: string;
   subcategoryName: string;
@@ -101,6 +132,8 @@ export type ClosureReviewView = {
   status: "ACTIVE" | "CLOSED";
   pendingSurpluses: ClosurePendingSurplusView[];
   pendingDeficits: ClosurePendingDeficitView[];
+  availableMoney: number;
+  availableMoneyBlocker: "SURPLUS" | "DEFICIT" | null;
   canClose: boolean;
 };
 
@@ -157,6 +190,16 @@ const readPositiveAmount = (value: unknown, label: string): number => {
   }
 
   return amount;
+};
+
+const readIsoDateString = (value: unknown, label: string): string => {
+  const date = readNonEmptyString(value, label);
+
+  if (Number.isNaN(Date.parse(date))) {
+    throw new Error(`${label} must be a valid date.`);
+  }
+
+  return date;
 };
 
 export const parseTemplateInput = (payload: unknown): TemplateInput => {
@@ -270,6 +313,62 @@ export const parseDepositToPocketInput = (payload: unknown): DepositToPocketInpu
     description: readOptionalString(rawPayload.description),
     externalSourceLabel,
   };
+};
+
+export const parseCreateMonthlyIncomeInput = (monthId: string, payload: unknown): CreateMonthlyIncomeInput => {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Monthly income payload is required.");
+  }
+
+  const rawPayload = payload as {
+    sourceName?: unknown;
+    amount?: unknown;
+    receivedAt?: unknown;
+    notes?: unknown;
+  };
+
+  return {
+    monthId: readNonEmptyString(monthId, "Month id"),
+    sourceName: readNonEmptyString(rawPayload.sourceName, "Income source"),
+    amount: readPositiveAmount(rawPayload.amount, "Income amount"),
+    receivedAt: readIsoDateString(rawPayload.receivedAt, "Income received date"),
+    notes: readOptionalString(rawPayload.notes),
+  };
+};
+
+export const parseUpdateMonthlyIncomeInput = (monthId: string, incomeId: string, payload: unknown): UpdateMonthlyIncomeInput => {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Monthly income payload is required.");
+  }
+
+  const rawPayload = payload as {
+    sourceName?: unknown;
+    amount?: unknown;
+    receivedAt?: unknown;
+    notes?: unknown;
+  };
+  const input: UpdateMonthlyIncomeInput = {
+    monthId: readNonEmptyString(monthId, "Month id"),
+    incomeId: readNonEmptyString(incomeId, "Income id"),
+  };
+
+  if (rawPayload.sourceName !== undefined) {
+    input.sourceName = readNonEmptyString(rawPayload.sourceName, "Income source");
+  }
+
+  if (rawPayload.amount !== undefined) {
+    input.amount = readPositiveAmount(rawPayload.amount, "Income amount");
+  }
+
+  if (rawPayload.receivedAt !== undefined) {
+    input.receivedAt = readIsoDateString(rawPayload.receivedAt, "Income received date");
+  }
+
+  if (rawPayload.notes !== undefined) {
+    input.notes = readOptionalString(rawPayload.notes);
+  }
+
+  return input;
 };
 
 const readOptionalPositiveAmount = (value: unknown, label: string): number | null => {

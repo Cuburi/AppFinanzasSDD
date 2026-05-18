@@ -71,12 +71,27 @@ model Month {
   openedAt  DateTime      @default(now())
   closedAt  DateTime?
   categories MonthCategory[]
+  incomes   MonthlyIncome[]
   movements Movement[]
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
   @@unique([year, month])
   @@index([status])
+}
+
+model MonthlyIncome {
+  id         String   @id @default(cuid())
+  monthId    String
+  month      Month    @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  sourceName String
+  amount     Decimal  @db.Decimal(12, 2)
+  receivedAt DateTime
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([monthId, receivedAt])
 }
 
 model MonthCategory {
