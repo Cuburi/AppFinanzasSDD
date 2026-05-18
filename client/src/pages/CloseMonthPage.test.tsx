@@ -176,4 +176,34 @@ describe("CloseMonthPage", () => {
       }),
     );
   });
+
+  it("shows an explicit surplus available-money blocker without adding a withdrawal action", async () => {
+    apiMock.getClosureReview.mockResolvedValue({
+      ...pendingReview,
+      pendingSurpluses: [],
+      availableMoney: 250,
+      availableMoneyBlocker: "SURPLUS",
+    });
+
+    render(<CloseMonthPage />);
+
+    expect(await screen.findByText(/Sobra dinero disponible del mes: \$250\.00/i)).toBeInTheDocument();
+    expect(screen.getByText(/depositándolo en un bolsillo desde Mes activo/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /retirar/i })).not.toBeInTheDocument();
+  });
+
+  it("shows an explicit deficit available-money blocker and no generic pocket withdrawal flow", async () => {
+    apiMock.getClosureReview.mockResolvedValue({
+      ...pendingReview,
+      pendingSurpluses: [],
+      availableMoney: -90,
+      availableMoneyBlocker: "DEFICIT",
+    });
+
+    render(<CloseMonthPage />);
+
+    expect(await screen.findByText(/El dinero disponible del mes está en negativo: \$-90\.00/i)).toBeInTheDocument();
+    expect(screen.getByText(/no agrega un retiro genérico desde bolsillos/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /retirar/i })).not.toBeInTheDocument();
+  });
 });
