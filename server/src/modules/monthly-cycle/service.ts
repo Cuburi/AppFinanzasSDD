@@ -10,7 +10,7 @@ import {
   type RecordExpenseInput,
   type TemplateInput,
   type TemplateView,
-} from "./dto.js";
+} from "./dto/index.js";
 import { calculateMonthBalances } from "./balance-calculator.js";
 
 export class DomainError extends Error {

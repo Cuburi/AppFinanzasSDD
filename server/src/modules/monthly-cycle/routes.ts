@@ -6,7 +6,7 @@ import {
   parseOpenMonthInput,
   parseRecordExpenseInput,
   parseTemplateInput,
-} from "./dto.js";
+} from "./dto/index.js";
 import {
   DomainError,
   applyClosureAction,
