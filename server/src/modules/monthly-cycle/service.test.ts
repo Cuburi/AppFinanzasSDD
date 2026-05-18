@@ -27,6 +27,16 @@ type MonthFixture = {
   status: MonthStatus;
   openedAt: Date;
   closedAt: Date | null;
+  incomes: Array<{
+    id: string;
+    monthId: string;
+    sourceName: string;
+    amount: Prisma.Decimal;
+    receivedAt: Date;
+    notes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
   categories: Array<{
     id: string;
     name: string;
@@ -76,6 +86,7 @@ const buildCreatedMonth = (template: TemplateFixture, year: number, month: numbe
   status: MonthStatus.ACTIVE,
   openedAt: new Date("2026-05-03T00:00:00.000Z"),
   closedAt: null,
+  incomes: [],
   categories: template.map((category) => ({
     id: `${category.id}-snapshot`,
     name: category.name,
@@ -123,6 +134,7 @@ const createDbStub = ({
   let monthToReturn = createdMonth ?? buildCreatedMonth(readTemplate, 2026, 5);
   let capturedCreateArgs: unknown;
   const capturedMovements: unknown[] = [];
+  const capturedIncomes: unknown[] = [];
 
   const db: any = {
     async $transaction<T>(callback: (tx: typeof db) => Promise<T>) {
@@ -198,6 +210,38 @@ const createDbStub = ({
         return { id: `movement-${capturedMovements.length}` };
       },
     },
+    monthlyIncome: {
+      async findUnique(args: { where: { id: string } }) {
+        return monthById?.incomes.find((income) => income.id === args.where.id) ?? null;
+      },
+      async create(args: {
+        data: { monthId: string; sourceName: string; amount: Prisma.Decimal; receivedAt: Date; notes: string | null };
+      }) {
+        capturedIncomes.push(args);
+        monthById?.incomes.push({
+          id: `income-${capturedIncomes.length}`,
+          monthId: args.data.monthId,
+          sourceName: args.data.sourceName,
+          amount: args.data.amount,
+          receivedAt: args.data.receivedAt,
+          notes: args.data.notes,
+          createdAt: new Date("2026-05-03T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-03T00:00:00.000Z"),
+        });
+        return { id: `income-${capturedIncomes.length}` };
+      },
+      async update(args: { where: { id: string }; data: Partial<MonthFixture["incomes"][number]> }) {
+        const income = monthById?.incomes.find((candidate) => candidate.id === args.where.id);
+        if (income) Object.assign(income, args.data, { updatedAt: new Date("2026-05-04T00:00:00.000Z") });
+        return income ?? null;
+      },
+      async delete(args: { where: { id: string } }) {
+        if (monthById) {
+          monthById.incomes = monthById.incomes.filter((income) => income.id !== args.where.id);
+        }
+        return {};
+      },
+    },
     savingsPocket: {
       async findUnique(args: { where?: { id?: string } }) {
         if (targetPockets && args.where?.id) {
@@ -213,6 +257,7 @@ const createDbStub = ({
     db,
     getCapturedCreateArgs: () => capturedCreateArgs,
     getCapturedMovements: () => capturedMovements,
+    getCapturedIncomes: () => capturedIncomes,
     setCreatedMonth: (value: MonthFixture) => {
       monthToReturn = value;
     },
@@ -476,6 +521,97 @@ test("recordExpense persists an expense and returns recalculated balances", asyn
   assert.equal(updatedMonth.categories[0]?.subcategories[0]?.available, 175);
 });
 
+test("createMonthlyIncome persists active-month income and recalculates available money", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const updatedMonth = await service.createMonthlyIncome({
+    monthId: month.id,
+    sourceName: "Salary",
+    amount: 1000,
+    receivedAt: "2026-05-15T00:00:00.000Z",
+    notes: "Main job",
+  });
+  const income = dbStub.getCapturedIncomes()[0] as { data: { sourceName: string; amount: Prisma.Decimal; notes: string | null } };
+
+  assert.equal(income.data.sourceName, "Salary");
+  assert.equal(Number(income.data.amount.toString()), 1000);
+  assert.equal(income.data.notes, "Main job");
+  assert.equal(updatedMonth.monthlyIncomeTotal, 1000);
+  assert.equal(updatedMonth.availableMoney, 1000);
+});
+
+test("createMonthlyIncome rejects income dates outside the linked month", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+
+  await assert.rejects(
+    () =>
+      service.createMonthlyIncome({
+        monthId: month.id,
+        sourceName: "Salary",
+        amount: 1000,
+        receivedAt: "2026-06-01T00:00:00.000Z",
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /inside the linked month/i);
+      return true;
+    },
+  );
+});
+
+test("update and delete monthly income require mutable linked month ownership", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  month.incomes.push({
+    id: "income-1",
+    monthId: month.id,
+    sourceName: "Salary",
+    amount: amount(1000),
+    receivedAt: new Date("2026-05-10T00:00:00.000Z"),
+    notes: null,
+    createdAt: new Date("2026-05-10T00:00:00.000Z"),
+    updatedAt: new Date("2026-05-10T00:00:00.000Z"),
+  });
+  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+
+  const updatedMonth = await service.updateMonthlyIncome({
+    monthId: month.id,
+    incomeId: "income-1",
+    amount: 1200,
+    sourceName: "Salary updated",
+  });
+  const deletedMonth = await service.deleteMonthlyIncome(month.id, "income-1");
+
+  assert.equal(updatedMonth.monthlyIncomeTotal, 1200);
+  assert.equal(updatedMonth.incomes[0]?.sourceName, "Salary updated");
+  assert.equal(deletedMonth.monthlyIncomeTotal, 0);
+  assert.equal(deletedMonth.incomes.length, 0);
+});
+
+test("createMonthlyIncome rejects closed months", async () => {
+  const month = { ...buildCreatedMonth(templateFixture(), 2026, 5), status: MonthStatus.CLOSED };
+  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+
+  await assert.rejects(
+    () =>
+      service.createMonthlyIncome({
+        monthId: month.id,
+        sourceName: "Salary",
+        amount: 1000,
+        receivedAt: "2026-05-10T00:00:00.000Z",
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /closed months/i);
+      return true;
+    },
+  );
+});
+
 test("depositToPocket rejects source subcategory deposits in closed months", async () => {
   const month = { ...buildCreatedMonth(templateFixture(), 2026, 5), status: MonthStatus.CLOSED };
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
@@ -527,8 +663,60 @@ test("getClosureReview returns pending surpluses and deficits without mutating m
   assert.equal(dbStub.getCapturedMovements().length, 0);
 });
 
+test("getClosureReview blocks close when available money is positive or negative", async () => {
+  const surplusMonth = buildCreatedMonth(templateFixture(), 2026, 5);
+  surplusMonth.incomes.push({
+    id: "income-1",
+    monthId: surplusMonth.id,
+    sourceName: "Salary",
+    amount: amount(300),
+    receivedAt: new Date("2026-05-10T00:00:00.000Z"),
+    notes: null,
+    createdAt: new Date("2026-05-10T00:00:00.000Z"),
+    updatedAt: new Date("2026-05-10T00:00:00.000Z"),
+  });
+  surplusMonth.movements.push({
+    type: MovementType.SURPLUS_TO_POCKET_ON_CLOSE,
+    amount: amount(250),
+    sourceSubcategoryId: surplusMonth.categories[0]?.subcategories[0]?.id ?? "",
+    targetSubcategoryId: null,
+    sourcePocketId: null,
+    targetPocketId: "pocket-home",
+  });
+
+  const deficitMonth = buildCreatedMonth(templateFixture(), 2026, 5);
+  deficitMonth.movements.push({
+    type: MovementType.SURPLUS_TO_POCKET_ON_CLOSE,
+    amount: amount(250),
+    sourceSubcategoryId: deficitMonth.categories[0]?.subcategories[0]?.id ?? "",
+    targetSubcategoryId: null,
+    sourcePocketId: null,
+    targetPocketId: "pocket-home",
+  });
+
+  const surplusReview = await createMonthlyCycleService(createDbStub({ monthById: surplusMonth }).db).getClosureReview(surplusMonth.id);
+  const deficitReview = await createMonthlyCycleService(createDbStub({ monthById: deficitMonth }).db).getClosureReview(deficitMonth.id);
+
+  assert.equal(surplusReview.availableMoney, 50);
+  assert.equal(surplusReview.availableMoneyBlocker, "SURPLUS");
+  assert.equal(surplusReview.canClose, false);
+  assert.equal(deficitReview.availableMoney, -250);
+  assert.equal(deficitReview.availableMoneyBlocker, "DEFICIT");
+  assert.equal(deficitReview.canClose, false);
+});
+
 test("applyClosureAction persists surplus transfer using the default pocket", async () => {
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  month.incomes.push({
+    id: "income-1",
+    monthId: month.id,
+    sourceName: "Salary",
+    amount: amount(250),
+    receivedAt: new Date("2026-05-10T00:00:00.000Z"),
+    notes: null,
+    createdAt: new Date("2026-05-10T00:00:00.000Z"),
+    updatedAt: new Date("2026-05-10T00:00:00.000Z"),
+  });
   const subcategory = month.categories[0]?.subcategories[0];
 
   if (!subcategory) {
@@ -596,8 +784,19 @@ test("closeMonth rejects pending closure balances and closes after explicit move
   await assert.rejects(() => service.closeMonth(month.id), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /pending surpluses or deficits/i);
+    assert.match(error.message, /pending subcategory balances or available money/i);
     return true;
+  });
+
+  month.incomes.push({
+    id: "income-1",
+    monthId: month.id,
+    sourceName: "Salary",
+    amount: amount(250),
+    receivedAt: new Date("2026-05-10T00:00:00.000Z"),
+    notes: null,
+    createdAt: new Date("2026-05-10T00:00:00.000Z"),
+    updatedAt: new Date("2026-05-10T00:00:00.000Z"),
   });
 
   await service.applyClosureAction({

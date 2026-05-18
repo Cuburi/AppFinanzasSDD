@@ -4,12 +4,14 @@ import { prisma } from "../../lib/prisma.js";
 import {
   type ClosureActionInput,
   type ClosureReviewView,
+  type CreateMonthlyIncomeInput,
   type MonthView,
   type OpenMonthInput,
   type DepositToPocketInput,
   type RecordExpenseInput,
   type TemplateInput,
   type TemplateView,
+  type UpdateMonthlyIncomeInput,
 } from "./dto/index.js";
 import { calculateMonthBalances } from "./balance-calculator.js";
 
@@ -81,6 +83,8 @@ type MonthRecord = {
     targetPocketId: string | null;
   }>;
 };
+
+type MonthlyIncomeRecord = NonNullable<MonthRecord["incomes"]>[number];
 
 type MonthlyCycleDb = {
   $transaction<T>(callback: (tx: MonthlyCycleDb) => Promise<T>): Promise<T>;
@@ -155,6 +159,28 @@ type MonthlyCycleDb = {
       };
     }): Promise<unknown>;
   };
+  monthlyIncome: {
+    findUnique(args: { where: { id: string } }): Promise<MonthlyIncomeRecord | null>;
+    create(args: {
+      data: {
+        monthId: string;
+        sourceName: string;
+        amount: Prisma.Decimal;
+        receivedAt: Date;
+        notes: string | null;
+      };
+    }): Promise<unknown>;
+    update(args: {
+      where: { id: string };
+      data: {
+        sourceName?: string;
+        amount?: Prisma.Decimal;
+        receivedAt?: Date;
+        notes?: string | null;
+      };
+    }): Promise<unknown>;
+    delete(args: { where: { id: string } }): Promise<unknown>;
+  };
   savingsPocket: {
     findUnique(args: { where: { id: string }; select: { id: true; active: true } }): Promise<{ id: string; active: boolean } | null>;
   };
@@ -202,7 +228,6 @@ const mapTemplate = (categories: TemplateCategoryRecord[]): TemplateView => ({
 const mapMonth = (month: MonthRecord): MonthView => {
   const balances = calculateMonthBalances(month);
   const incomes = month.incomes ?? [];
-  const monthlyIncomeTotal = incomes.reduce((total, income) => total + decimalToNumber(income.amount), 0);
 
   return {
     id: month.id,
@@ -221,8 +246,8 @@ const mapMonth = (month: MonthRecord): MonthView => {
       createdAt: income.createdAt.toISOString(),
       updatedAt: income.updatedAt.toISOString(),
     })),
-    monthlyIncomeTotal: Number(monthlyIncomeTotal.toFixed(2)),
-    availableMoney: 0,
+    monthlyIncomeTotal: balances.monthlyIncomeTotal,
+    availableMoney: balances.availableMoney,
     categories: month.categories.map((category) => ({
       id: category.id,
       name: category.name,
@@ -253,6 +278,33 @@ const assertMonthIsMutable = (month: MonthRecord) => {
   if (month.status === MonthStatus.CLOSED) {
     throw new DomainError(409, "Closed months are immutable.");
   }
+};
+
+const parseReceivedAt = (receivedAt: string) => {
+  const date = new Date(receivedAt);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new DomainError(400, "Income received date must be a valid ISO date.");
+  }
+
+  return date;
+};
+
+const assertReceivedAtBelongsToMonth = (month: MonthRecord, receivedAt: Date) => {
+  const monthStart = new Date(Date.UTC(month.year, month.month - 1, 1));
+  const nextMonthStart = new Date(Date.UTC(month.year, month.month, 1));
+
+  if (receivedAt < monthStart || receivedAt >= nextMonthStart) {
+    throw new DomainError(400, "Income received date must be inside the linked month period.");
+  }
+};
+
+const assertIncomeBelongsToMonth = (income: MonthlyIncomeRecord | null, monthId: string): MonthlyIncomeRecord => {
+  if (!income || income.monthId !== monthId) {
+    throw new DomainError(404, "Monthly income was not found for this month.");
+  }
+
+  return income;
 };
 
 const findMonthSubcategory = (month: MonthRecord, subcategoryId: string) =>
@@ -311,9 +363,18 @@ const buildClosureReview = (month: MonthRecord): ClosureReviewView => {
     status: month.status,
     pendingSurpluses,
     pendingDeficits,
-    availableMoney: 0,
-    availableMoneyBlocker: null,
-    canClose: month.status === MonthStatus.ACTIVE && pendingSurpluses.length === 0 && pendingDeficits.length === 0,
+    availableMoney: balances.availableMoney,
+    availableMoneyBlocker:
+      balances.availableMoney > 0 && !isZero(balances.availableMoney)
+        ? "SURPLUS"
+        : balances.availableMoney < 0 && !isZero(balances.availableMoney)
+          ? "DEFICIT"
+          : null,
+    canClose:
+      month.status === MonthStatus.ACTIVE &&
+      pendingSurpluses.length === 0 &&
+      pendingDeficits.length === 0 &&
+      isZero(balances.availableMoney),
   };
 };
 
@@ -543,6 +604,68 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => ({
     return month ? mapMonth(month) : null;
   },
 
+  async createMonthlyIncome(input: CreateMonthlyIncomeInput): Promise<MonthView> {
+    const month = await db.$transaction(async (tx) => {
+      const existingMonth = await readMonthById(tx, input.monthId);
+      assertMonthIsMutable(existingMonth);
+      const receivedAt = parseReceivedAt(input.receivedAt);
+      assertReceivedAtBelongsToMonth(existingMonth, receivedAt);
+
+      await tx.monthlyIncome.create({
+        data: {
+          monthId: input.monthId,
+          sourceName: input.sourceName,
+          amount: decimal(input.amount),
+          receivedAt,
+          notes: input.notes ?? null,
+        },
+      });
+
+      return readMonthById(tx, input.monthId);
+    });
+
+    return mapMonth(month);
+  },
+
+  async updateMonthlyIncome(input: UpdateMonthlyIncomeInput): Promise<MonthView> {
+    const month = await db.$transaction(async (tx) => {
+      const existingMonth = await readMonthById(tx, input.monthId);
+      assertMonthIsMutable(existingMonth);
+      assertIncomeBelongsToMonth(await tx.monthlyIncome.findUnique({ where: { id: input.incomeId } }), input.monthId);
+
+      const data: Parameters<MonthlyCycleDb["monthlyIncome"]["update"]>[0]["data"] = {};
+
+      if (input.sourceName !== undefined) data.sourceName = input.sourceName;
+      if (input.amount !== undefined) data.amount = decimal(input.amount);
+      if (input.receivedAt !== undefined) {
+        const receivedAt = parseReceivedAt(input.receivedAt);
+        assertReceivedAtBelongsToMonth(existingMonth, receivedAt);
+        data.receivedAt = receivedAt;
+      }
+      if (input.notes !== undefined) data.notes = input.notes;
+
+      await tx.monthlyIncome.update({ where: { id: input.incomeId }, data });
+
+      return readMonthById(tx, input.monthId);
+    });
+
+    return mapMonth(month);
+  },
+
+  async deleteMonthlyIncome(monthId: string, incomeId: string): Promise<MonthView> {
+    const month = await db.$transaction(async (tx) => {
+      const existingMonth = await readMonthById(tx, monthId);
+      assertMonthIsMutable(existingMonth);
+      assertIncomeBelongsToMonth(await tx.monthlyIncome.findUnique({ where: { id: incomeId } }), monthId);
+
+      await tx.monthlyIncome.delete({ where: { id: incomeId } });
+
+      return readMonthById(tx, monthId);
+    });
+
+    return mapMonth(month);
+  },
+
   async getClosureReview(monthId: string): Promise<ClosureReviewView> {
     const month = await readMonthById(db, monthId);
     return buildClosureReview(month);
@@ -684,7 +807,7 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => ({
       const review = buildClosureReview(existingMonth);
 
       if (!review.canClose) {
-        throw new DomainError(409, "Month cannot be closed while pending surpluses or deficits remain.");
+        throw new DomainError(409, "Month cannot be closed while pending subcategory balances or available money remain unresolved.");
       }
 
       return tx.month.update({
@@ -706,6 +829,9 @@ export const openMonth = (input: OpenMonthInput) => monthlyCycleService.openMont
 export const getActiveMonth = () => monthlyCycleService.getActiveMonth();
 export const recordExpense = (input: RecordExpenseInput) => monthlyCycleService.recordExpense(input);
 export const depositToPocket = (input: DepositToPocketInput) => monthlyCycleService.depositToPocket(input);
+export const createMonthlyIncome = (input: CreateMonthlyIncomeInput) => monthlyCycleService.createMonthlyIncome(input);
+export const updateMonthlyIncome = (input: UpdateMonthlyIncomeInput) => monthlyCycleService.updateMonthlyIncome(input);
+export const deleteMonthlyIncome = (monthId: string, incomeId: string) => monthlyCycleService.deleteMonthlyIncome(monthId, incomeId);
 export const getClosureReview = (monthId: string) => monthlyCycleService.getClosureReview(monthId);
 export const applyClosureAction = (input: ClosureActionInput) => monthlyCycleService.applyClosureAction(input);
 export const closeMonth = (monthId: string) => monthlyCycleService.closeMonth(monthId);

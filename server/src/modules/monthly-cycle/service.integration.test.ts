@@ -27,6 +27,16 @@ type MonthState = {
   status: MonthStatus;
   openedAt: Date;
   closedAt: Date | null;
+  incomes: Array<{
+    id: string;
+    monthId: string;
+    sourceName: string;
+    amount: Prisma.Decimal;
+    receivedAt: Date;
+    notes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
   categories: Array<{
     id: string;
     name: string;
@@ -67,6 +77,13 @@ const cloneMonth = (month: MonthState): MonthState => ({
   ...month,
   openedAt: new Date(month.openedAt),
   closedAt: month.closedAt ? new Date(month.closedAt) : null,
+  incomes: month.incomes.map((income) => ({
+    ...income,
+    amount: money(Number(income.amount.toString())),
+    receivedAt: new Date(income.receivedAt),
+    createdAt: new Date(income.createdAt),
+    updatedAt: new Date(income.updatedAt),
+  })),
   categories: month.categories.map((category) => ({
     ...category,
     subcategories: category.subcategories.map((subcategory) => ({
@@ -195,6 +212,7 @@ const createIntegrationDb = (initialTemplate?: TemplateCategoryState[]) => {
           status: args.data.status,
           openedAt: new Date("2026-05-01T00:00:00.000Z"),
           closedAt: null,
+          incomes: [],
           categories: args.data.categories.create.map((category) => ({
             id: `month-category-${nextId++}`,
             name: category.name,
@@ -259,6 +277,41 @@ const createIntegrationDb = (initialTemplate?: TemplateCategoryState[]) => {
         return { id: `movement-${nextId++}` };
       },
     },
+    monthlyIncome: {
+      async findUnique(args: { where: { id: string } }) {
+        return months.flatMap((month) => month.incomes).find((income) => income.id === args.where.id) ?? null;
+      },
+      async create(args: {
+        data: { monthId: string; sourceName: string; amount: Prisma.Decimal; receivedAt: Date; notes: string | null };
+      }) {
+        const month = months.find((candidate) => candidate.id === args.data.monthId);
+        if (!month) throw new Error("Month missing in integration stub.");
+        const income = {
+          id: `income-${nextId++}`,
+          monthId: args.data.monthId,
+          sourceName: args.data.sourceName,
+          amount: args.data.amount,
+          receivedAt: args.data.receivedAt,
+          notes: args.data.notes,
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z"),
+        };
+        month.incomes.push(income);
+        return income;
+      },
+      async update(args: { where: { id: string }; data: Partial<MonthState["incomes"][number]> }) {
+        const income = months.flatMap((month) => month.incomes).find((candidate) => candidate.id === args.where.id);
+        if (!income) throw new Error("Income missing in integration stub.");
+        Object.assign(income, args.data, { updatedAt: new Date("2026-05-02T00:00:00.000Z") });
+        return income;
+      },
+      async delete(args: { where: { id: string } }) {
+        for (const month of months) {
+          month.incomes = month.incomes.filter((income) => income.id !== args.where.id);
+        }
+        return {};
+      },
+    },
     savingsPocket: {
       async findUnique(args: { where: { id: string } }) {
         return pockets.get(args.where.id) ?? null;
@@ -312,6 +365,13 @@ test("service integration: closed months are immutable", async () => {
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
+  await service.createMonthlyIncome({
+    monthId: month.id,
+    sourceName: "Salary",
+    amount: 300,
+    receivedAt: "2026-05-05T00:00:00.000Z",
+  });
+
   await service.applyClosureAction({
     monthId: month.id,
     type: "SURPLUS_TO_POCKET_ON_CLOSE",
@@ -338,7 +398,7 @@ test("service integration: closing is rejected while closure review has pending 
   await assert.rejects(() => service.closeMonth(month.id), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /pending surpluses or deficits/i);
+    assert.match(error.message, /pending subcategory balances or available money/i);
     return true;
   });
 });
@@ -385,6 +445,49 @@ test("service integration: valid external deposits persist without a month ledge
   assert.equal(movement?.targetPocketId, "pocket-buffer");
   assert.equal(movement?.externalSourceLabel, "Ingreso aislado");
   assert.equal(Number(movement?.amount.toString()), 75);
+});
+
+test("service integration: income CRUD updates month totals while active", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+
+  const withIncome = await service.createMonthlyIncome({
+    monthId: month.id,
+    sourceName: "Salary",
+    amount: 1000,
+    receivedAt: "2026-05-05T00:00:00.000Z",
+  });
+  const incomeId = withIncome.incomes[0]?.id ?? "";
+  const updated = await service.updateMonthlyIncome({ monthId: month.id, incomeId, amount: 1200, notes: "net" });
+  const deleted = await service.deleteMonthlyIncome(month.id, incomeId);
+
+  assert.equal(withIncome.monthlyIncomeTotal, 1000);
+  assert.equal(withIncome.availableMoney, 1000);
+  assert.equal(updated.monthlyIncomeTotal, 1200);
+  assert.equal(updated.incomes[0]?.notes, "net");
+  assert.equal(deleted.monthlyIncomeTotal, 0);
+  assert.equal(deleted.incomes.length, 0);
+});
+
+test("service integration: income CRUD rejects closed month mutations", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-05T00:00:00.000Z" });
+  await service.applyClosureAction({ monthId: month.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategoryId });
+  const closed = await service.closeMonth(month.id);
+
+  await assert.rejects(
+    () => service.createMonthlyIncome({ monthId: closed.id, sourceName: "Bonus", amount: 10, receivedAt: "2026-05-06T00:00:00.000Z" }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /closed months are immutable/i);
+      return true;
+    },
+  );
 });
 
 test("service integration: overspend is persisted and recalculates the month as negative", async () => {
