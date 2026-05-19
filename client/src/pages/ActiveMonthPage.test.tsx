@@ -24,6 +24,9 @@ const activeMonth: Month = {
   status: "ACTIVE",
   openedAt: "2026-05-01T00:00:00.000Z",
   closedAt: null,
+  incomes: [],
+  monthlyIncomeTotal: 0,
+  availableMoney: 0,
   categories: [
     {
       id: "cat-income",

@@ -77,6 +77,17 @@ export type MonthCategory = {
   subcategories: MonthSubcategory[];
 };
 
+export type MonthlyIncome = {
+  id: string;
+  monthId: string;
+  sourceName: string;
+  amount: number;
+  receivedAt: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Month = {
   id: string;
   year: number;
@@ -84,6 +95,9 @@ export type Month = {
   status: "ACTIVE" | "CLOSED";
   openedAt: string;
   closedAt: string | null;
+  incomes: MonthlyIncome[];
+  monthlyIncomeTotal: number;
+  availableMoney: number;
   categories: MonthCategory[];
 };
 
@@ -106,6 +120,8 @@ export type ClosureReview = {
   status: "ACTIVE" | "CLOSED";
   pendingSurpluses: ClosurePendingSurplus[];
   pendingDeficits: ClosurePendingDeficit[];
+  availableMoney: number;
+  availableMoneyBlocker: "SURPLUS" | "DEFICIT" | null;
   canClose: boolean;
 };
 

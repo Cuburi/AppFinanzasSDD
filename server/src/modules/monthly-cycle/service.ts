@@ -48,6 +48,16 @@ type MonthRecord = {
   status: MonthStatus;
   openedAt: Date;
   closedAt: Date | null;
+  incomes?: Array<{
+    id: string;
+    monthId: string;
+    sourceName: string;
+    amount: Prisma.Decimal;
+    receivedAt: Date;
+    notes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
   categories: Array<{
     id: string;
     name: string;
@@ -168,6 +178,9 @@ const monthInclude = {
   movements: {
     orderBy: { occurredAt: "asc" as const },
   },
+  incomes: {
+    orderBy: { receivedAt: "asc" as const },
+  },
 };
 
 const mapTemplate = (categories: TemplateCategoryRecord[]): TemplateView => ({
@@ -188,6 +201,8 @@ const mapTemplate = (categories: TemplateCategoryRecord[]): TemplateView => ({
 
 const mapMonth = (month: MonthRecord): MonthView => {
   const balances = calculateMonthBalances(month);
+  const incomes = month.incomes ?? [];
+  const monthlyIncomeTotal = incomes.reduce((total, income) => total + decimalToNumber(income.amount), 0);
 
   return {
     id: month.id,
@@ -196,6 +211,18 @@ const mapMonth = (month: MonthRecord): MonthView => {
     status: month.status,
     openedAt: month.openedAt.toISOString(),
     closedAt: month.closedAt ? month.closedAt.toISOString() : null,
+    incomes: incomes.map((income) => ({
+      id: income.id,
+      monthId: income.monthId,
+      sourceName: income.sourceName,
+      amount: decimalToNumber(income.amount),
+      receivedAt: income.receivedAt.toISOString(),
+      notes: income.notes,
+      createdAt: income.createdAt.toISOString(),
+      updatedAt: income.updatedAt.toISOString(),
+    })),
+    monthlyIncomeTotal: Number(monthlyIncomeTotal.toFixed(2)),
+    availableMoney: 0,
     categories: month.categories.map((category) => ({
       id: category.id,
       name: category.name,
@@ -284,6 +311,8 @@ const buildClosureReview = (month: MonthRecord): ClosureReviewView => {
     status: month.status,
     pendingSurpluses,
     pendingDeficits,
+    availableMoney: 0,
+    availableMoneyBlocker: null,
     canClose: month.status === MonthStatus.ACTIVE && pendingSurpluses.length === 0 && pendingDeficits.length === 0,
   };
 };
