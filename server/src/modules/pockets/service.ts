@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma } from "../../lib/prisma-client.js";
 
 import { prisma } from "../../lib/prisma.js";
 import type { CreatePocketInput, PocketListFilter, SavingsPocketView, UpdatePocketInput } from "./dto.js";

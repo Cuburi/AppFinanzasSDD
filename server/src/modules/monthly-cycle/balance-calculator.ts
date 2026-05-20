@@ -1,4 +1,4 @@
-import { MovementType, Prisma } from "@prisma/client";
+import { MovementType, Prisma } from "../../lib/prisma-client.js";
 
 type MonthShape = {
   incomes?: Array<{

@@ -1,4 +1,4 @@
-import { MonthStatus, MovementType, Prisma } from "@prisma/client";
+import { MonthStatus, MovementType, Prisma } from "../../lib/prisma-client.js";
 
 import { prisma } from "../../lib/prisma.js";
 import {
@@ -75,7 +75,7 @@ type MonthRecord = {
     }>;
   }>;
   movements: Array<{
-    type: import("@prisma/client").MovementType;
+    type: MovementType;
     amount: Prisma.Decimal;
     sourceSubcategoryId: string | null;
     targetSubcategoryId: string | null;
