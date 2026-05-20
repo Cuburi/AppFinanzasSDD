@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
-import type { Month, SavingsPocket } from "../types";
+import type { Month, MonthlyIncome, SavingsPocket } from "../types";
 
 const now = new Date();
+
+const formatMonthDate = (month: Month) => `${month.year}-${String(month.month).padStart(2, "0")}-01`;
+const formatDisplayDate = (value: string) => new Date(value).toLocaleDateString("es-AR", { timeZone: "UTC" });
 
 export const ActiveMonthPage = () => {
   const [activeMonth, setActiveMonth] = useState<Month | null>(null);
@@ -21,6 +24,11 @@ export const ActiveMonthPage = () => {
   const [depositPocketId, setDepositPocketId] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
   const [depositExternalSource, setDepositExternalSource] = useState("");
+  const [incomeSourceName, setIncomeSourceName] = useState("");
+  const [incomeAmount, setIncomeAmount] = useState("");
+  const [incomeReceivedAt, setIncomeReceivedAt] = useState("");
+  const [incomeNotes, setIncomeNotes] = useState("");
+  const [editingIncomeId, setEditingIncomeId] = useState<string | null>(null);
 
   const refresh = async () => {
     const monthData = await api.getActiveMonth();
@@ -65,6 +73,23 @@ export const ActiveMonthPage = () => {
   };
 
   const subcategories = activeMonth?.categories.flatMap((category) => category.subcategories) ?? [];
+  const canMutateActiveMonth = activeMonth?.status === "ACTIVE";
+
+  const resetIncomeForm = (monthData = activeMonth) => {
+    setIncomeSourceName("");
+    setIncomeAmount("");
+    setIncomeReceivedAt(monthData ? formatMonthDate(monthData) : "");
+    setIncomeNotes("");
+    setEditingIncomeId(null);
+  };
+
+  const startEditingIncome = (income: MonthlyIncome) => {
+    setIncomeSourceName(income.sourceName);
+    setIncomeAmount(String(income.amount));
+    setIncomeReceivedAt(income.receivedAt.slice(0, 10));
+    setIncomeNotes(income.notes ?? "");
+    setEditingIncomeId(income.id);
+  };
 
   const handleExpense = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -86,6 +111,55 @@ export const ActiveMonthPage = () => {
       setMessage("Gasto registrado y saldos recalculados.");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo registrar el gasto.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleIncome = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!activeMonth || !canMutateActiveMonth) return;
+    setSubmitting(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const input = {
+        monthId: activeMonth.id,
+        sourceName: incomeSourceName,
+        amount: Number(incomeAmount),
+        receivedAt: incomeReceivedAt || formatMonthDate(activeMonth),
+        notes: incomeNotes || null,
+      };
+      const updatedMonth = editingIncomeId
+        ? await api.updateMonthlyIncome({ ...input, incomeId: editingIncomeId })
+        : await api.createMonthlyIncome(input);
+
+      setActiveMonth(updatedMonth);
+      resetIncomeForm(updatedMonth);
+      setMessage(editingIncomeId ? "Ingreso actualizado y totales recalculados." : "Ingreso registrado y totales recalculados.");
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo guardar el ingreso.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteIncome = async (income: MonthlyIncome) => {
+    if (!activeMonth || !canMutateActiveMonth) return;
+    setSubmitting(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const updatedMonth = await api.deleteMonthlyIncome(activeMonth.id, income.id);
+      setActiveMonth(updatedMonth);
+      if (editingIncomeId === income.id) {
+        resetIncomeForm(updatedMonth);
+      }
+      setMessage(`Ingreso de ${income.sourceName} eliminado y totales recalculados.`);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo eliminar el ingreso.");
     } finally {
       setSubmitting(false);
     }
@@ -152,6 +226,78 @@ export const ActiveMonthPage = () => {
         {message ? <p className="success">{message}</p> : null}
         {error ? <p className="error">{error}</p> : null}
       </article>
+
+      {activeMonth ? (
+        <article className="card stack-md">
+          <div>
+            <h2>Ingresos del mes</h2>
+            <p>El dinero disponible lo calcula la API con ingresos, gastos y depósitos a bolsillos.</p>
+          </div>
+
+          <div className="row gap-sm wrap">
+            <span className="pill success">Ingresos: ${activeMonth.monthlyIncomeTotal.toFixed(2)}</span>
+            <span className={activeMonth.availableMoney < 0 ? "pill danger" : "pill success"}>Disponible del mes: ${activeMonth.availableMoney.toFixed(2)}</span>
+          </div>
+
+          {canMutateActiveMonth ? (
+            <form className="row gap-sm wrap" onSubmit={handleIncome}>
+              <label className="field">
+                <span>Fuente del ingreso</span>
+                <input value={incomeSourceName} onChange={(event) => setIncomeSourceName(event.target.value)} required />
+              </label>
+              <label className="field small-field">
+                <span>Monto</span>
+                <input min="0.01" step="0.01" type="number" value={incomeAmount} onChange={(event) => setIncomeAmount(event.target.value)} required />
+              </label>
+              <label className="field small-field">
+                <span>Fecha</span>
+                <input type="date" value={incomeReceivedAt || formatMonthDate(activeMonth)} onChange={(event) => setIncomeReceivedAt(event.target.value)} required />
+              </label>
+              <label className="field">
+                <span>Notas</span>
+                <input value={incomeNotes} onChange={(event) => setIncomeNotes(event.target.value)} />
+              </label>
+              <button className="button primary" disabled={submitting} type="submit">
+                {editingIncomeId ? "Actualizar ingreso" : "Registrar ingreso"}
+              </button>
+              {editingIncomeId ? (
+                <button className="button secondary" disabled={submitting} onClick={() => resetIncomeForm()} type="button">
+                  Cancelar edición
+                </button>
+              ) : null}
+            </form>
+          ) : (
+            <p className="error">El mes está cerrado: los ingresos son de solo lectura.</p>
+          )}
+
+          <div className="stack-sm">
+            {activeMonth.incomes.length === 0 ? <p>No hay ingresos cargados para este mes.</p> : null}
+            {activeMonth.incomes.map((income) => (
+              <div className="budget-line align-start" key={income.id}>
+                <div>
+                  <strong>{income.sourceName}</strong>
+                  <p>
+                    {formatDisplayDate(income.receivedAt)}{income.notes ? ` · ${income.notes}` : ""}
+                  </p>
+                </div>
+                <div className="row gap-sm wrap">
+                  <span className="pill success">${income.amount.toFixed(2)}</span>
+                  {canMutateActiveMonth ? (
+                    <>
+                      <button className="button secondary" disabled={submitting} onClick={() => startEditingIncome(income)} type="button">
+                        Editar ingreso
+                      </button>
+                      <button className="button tertiary" disabled={submitting} onClick={() => void handleDeleteIncome(income)} type="button">
+                        Eliminar ingreso
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </article>
+      ) : null}
 
       {activeMonth ? (
         <article className="card stack-md">

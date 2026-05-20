@@ -88,6 +88,23 @@ export type MonthlyIncome = {
   updatedAt: string;
 };
 
+export type CreateMonthlyIncomeInput = {
+  monthId: string;
+  sourceName: string;
+  amount: number;
+  receivedAt: string;
+  notes?: string | null;
+};
+
+export type UpdateMonthlyIncomeInput = {
+  monthId: string;
+  incomeId: string;
+  sourceName?: string;
+  amount?: number;
+  receivedAt?: string;
+  notes?: string | null;
+};
+
 export type Month = {
   id: string;
   year: number;

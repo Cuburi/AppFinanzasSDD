@@ -552,6 +552,22 @@ test("createMonthlyIncome rejects income dates outside the linked month", async 
         monthId: month.id,
         sourceName: "Salary",
         amount: 1000,
+        receivedAt: "2026-04-30T23:59:59.999Z",
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /inside the linked month/i);
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () =>
+      service.createMonthlyIncome({
+        monthId: month.id,
+        sourceName: "Salary",
+        amount: 1000,
         receivedAt: "2026-06-01T00:00:00.000Z",
       }),
     (error: unknown) => {
@@ -561,6 +577,38 @@ test("createMonthlyIncome rejects income dates outside the linked month", async 
       return true;
     },
   );
+});
+
+test("updateMonthlyIncome rejects received dates outside the linked month", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  month.incomes.push({
+    id: "income-1",
+    monthId: month.id,
+    sourceName: "Salary",
+    amount: amount(1000),
+    receivedAt: new Date("2026-05-10T00:00:00.000Z"),
+    notes: null,
+    createdAt: new Date("2026-05-10T00:00:00.000Z"),
+    updatedAt: new Date("2026-05-10T00:00:00.000Z"),
+  });
+  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+
+  await assert.rejects(
+    () =>
+      service.updateMonthlyIncome({
+        monthId: month.id,
+        incomeId: "income-1",
+        receivedAt: "2026-06-01T00:00:00.000Z",
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /inside the linked month/i);
+      return true;
+    },
+  );
+
+  assert.equal(month.incomes[0]?.receivedAt.toISOString(), "2026-05-10T00:00:00.000Z");
 });
 
 test("update and delete monthly income require mutable linked month ownership", async () => {

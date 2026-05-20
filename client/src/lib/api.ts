@@ -1,11 +1,13 @@
 import type {
   ClosureActionInput,
   ClosureReview,
+  CreateMonthlyIncomeInput,
   CreatePocketInput,
   EditableTemplate,
   Month,
   PocketListFilter,
   SavingsPocket,
+  UpdateMonthlyIncomeInput,
   Template,
   UpdatePocketInput,
 } from "../types";
@@ -112,6 +114,45 @@ export const api = {
         amount: input.amount,
         description: input.description,
       }),
+    });
+
+    return readJson<Month>(response);
+  },
+  async createMonthlyIncome(input: CreateMonthlyIncomeInput): Promise<Month> {
+    const response = await fetch(`/api/months/${input.monthId}/incomes`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sourceName: input.sourceName,
+        amount: input.amount,
+        receivedAt: input.receivedAt,
+        notes: input.notes,
+      }),
+    });
+
+    return readJson<Month>(response);
+  },
+  async updateMonthlyIncome(input: UpdateMonthlyIncomeInput): Promise<Month> {
+    const response = await fetch(`/api/months/${input.monthId}/incomes/${input.incomeId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sourceName: input.sourceName,
+        amount: input.amount,
+        receivedAt: input.receivedAt,
+        notes: input.notes,
+      }),
+    });
+
+    return readJson<Month>(response);
+  },
+  async deleteMonthlyIncome(monthId: string, incomeId: string): Promise<Month> {
+    const response = await fetch(`/api/months/${monthId}/incomes/${incomeId}`, {
+      method: "DELETE",
     });
 
     return readJson<Month>(response);

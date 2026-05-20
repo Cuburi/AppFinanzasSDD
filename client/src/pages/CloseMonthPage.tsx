@@ -5,6 +5,26 @@ import type { ClosurePendingSurplus, ClosureReview, Month, SavingsPocket } from 
 
 type TextById = Record<string, string>;
 
+const renderAvailableMoneyBlocker = (review: ClosureReview) => {
+  if (review.availableMoneyBlocker === "SURPLUS") {
+    return (
+      <p className="error">
+        Sobra dinero disponible del mes: ${review.availableMoney.toFixed(2)}. Antes de cerrar, asignalo registrando el gasto, corrigiendo ingresos o depositándolo en un bolsillo desde Mes activo.
+      </p>
+    );
+  }
+
+  if (review.availableMoneyBlocker === "DEFICIT") {
+    return (
+      <p className="error">
+        El dinero disponible del mes está en negativo: ${review.availableMoney.toFixed(2)}. Corregí ingresos, gastos o depósitos; este MVP no agrega un retiro genérico desde bolsillos para cubrir disponibilidad.
+      </p>
+    );
+  }
+
+  return <p className="success">Dinero disponible del mes balanceado en $0.00.</p>;
+};
+
 export const CloseMonthPage = () => {
   const [activeMonth, setActiveMonth] = useState<Month | null>(null);
   const [review, setReview] = useState<ClosureReview | null>(null);
@@ -188,6 +208,7 @@ export const CloseMonthPage = () => {
                   {activeMonth.year}-{String(activeMonth.month).padStart(2, "0")}
                 </h2>
                 <p>Estado: {review.status}</p>
+                <p>Disponible del mes: ${review.availableMoney.toFixed(2)}</p>
               </div>
               <button className="button primary" disabled={submitting || !review.canClose} onClick={() => void closeMonth()} type="button">
                 {submitting ? "Procesando..." : "Cerrar mes"}
@@ -199,6 +220,8 @@ export const CloseMonthPage = () => {
             ) : (
               <p className="success">No quedan sobrantes ni desfalcos pendientes. Ya podés cerrar el mes.</p>
             )}
+
+            {renderAvailableMoneyBlocker(review)}
           </article>
 
           <article className="card stack-md">
