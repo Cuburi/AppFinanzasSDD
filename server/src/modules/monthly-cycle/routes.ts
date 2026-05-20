@@ -1,22 +1,27 @@
 import { Router } from "express";
 
 import {
+  parseCreateMonthlyIncomeInput,
   parseClosureActionInput,
   parseDepositToPocketInput,
   parseOpenMonthInput,
   parseRecordExpenseInput,
   parseTemplateInput,
+  parseUpdateMonthlyIncomeInput,
 } from "./dto/index.js";
 import {
   DomainError,
   applyClosureAction,
   closeMonth,
+  createMonthlyIncome,
+  deleteMonthlyIncome,
   depositToPocket,
   getActiveMonth,
   getClosureReview,
   getTemplate,
   openMonth,
   recordExpense,
+  updateMonthlyIncome,
   updateTemplate,
 } from "./service.js";
 
@@ -72,6 +77,50 @@ export const monthlyCycleRouter = () => {
       const payload = parseRecordExpenseInput(request.params.id, request.body);
       const month = await recordExpense(payload);
       response.status(201).json(month);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.post("/months/:id/incomes", async (request, response) => {
+    try {
+      const payload = parseCreateMonthlyIncomeInput(request.params.id, request.body);
+      const month = await createMonthlyIncome(payload);
+      response.status(201).json(month);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.patch("/months/:id/incomes/:incomeId", async (request, response) => {
+    try {
+      const payload = parseUpdateMonthlyIncomeInput(request.params.id, request.params.incomeId, request.body);
+      const month = await updateMonthlyIncome(payload);
+      response.json(month);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.delete("/months/:id/incomes/:incomeId", async (request, response) => {
+    try {
+      const month = await deleteMonthlyIncome(request.params.id, request.params.incomeId);
+      response.json(month);
     } catch (error) {
       if (isDomainError(error)) {
         response.status(error.statusCode).json({ message: error.message });

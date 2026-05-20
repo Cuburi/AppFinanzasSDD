@@ -8,6 +8,7 @@ const amount = (value: number) => new Prisma.Decimal(value.toFixed(2));
 
 test("calculateMonthBalances allows overspend and tracks pocket transfers", () => {
   const balances = calculateMonthBalances({
+    incomes: [{ amount: amount(500) }],
     categories: [
       {
         subcategories: [
@@ -47,6 +48,8 @@ test("calculateMonthBalances allows overspend and tracks pocket transfers", () =
   assert.equal(balances.subcategoryBalances.get("food"), -20);
   assert.equal(balances.subcategoryBalances.get("fun"), 35);
   assert.equal(balances.pocketBalances.get("emergency"), 40);
+  assert.equal(balances.monthlyIncomeTotal, 500);
+  assert.equal(balances.availableMoney, 340);
 });
 
 test("calculateMonthBalances applies closure movements to source and target balances", () => {
@@ -90,4 +93,14 @@ test("calculateMonthBalances applies closure movements to source and target bala
   assert.equal(balances.subcategoryBalances.get("groceries"), 80);
   assert.equal(balances.subcategoryBalances.get("transport"), 30);
   assert.equal(balances.pocketBalances.get("vacation"), 10);
+});
+
+test("calculateMonthBalances reports zero income defaults and available money", () => {
+  const balances = calculateMonthBalances({
+    categories: [{ subcategories: [{ id: "food", plannedAmount: amount(100) }] }],
+    movements: [],
+  });
+
+  assert.equal(balances.monthlyIncomeTotal, 0);
+  assert.equal(balances.availableMoney, 0);
 });

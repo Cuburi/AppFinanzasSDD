@@ -1,6 +1,9 @@
 import { MovementType, Prisma } from "@prisma/client";
 
 type MonthShape = {
+  incomes?: Array<{
+    amount: Prisma.Decimal;
+  }>;
   categories: Array<{
     subcategories: Array<{
       id: string;
@@ -19,9 +22,13 @@ type MonthShape = {
 
 const decimalToNumber = (value: Prisma.Decimal): number => Number(value.toString());
 
+const roundMoney = (value: number) => Number(value.toFixed(2));
+
 export const calculateMonthBalances = (month: MonthShape) => {
   const subcategoryBalances = new Map<string, number>();
   const pocketBalances = new Map<string, number>();
+  const monthlyIncomeTotal = roundMoney((month.incomes ?? []).reduce((total, income) => total + decimalToNumber(income.amount), 0));
+  let monthOutflows = 0;
 
   for (const category of month.categories) {
     for (const subcategory of category.subcategories) {
@@ -31,6 +38,17 @@ export const calculateMonthBalances = (month: MonthShape) => {
 
   for (const movement of month.movements) {
     const amount = decimalToNumber(movement.amount);
+
+    switch (movement.type) {
+      case MovementType.EXPENSE:
+      case MovementType.POCKET_DEPOSIT_FROM_SUBCATEGORY:
+      case MovementType.POCKET_DEPOSIT_EXTERNAL:
+      case MovementType.SURPLUS_TO_POCKET_ON_CLOSE:
+        monthOutflows += amount;
+        break;
+      default:
+        break;
+    }
 
     switch (movement.type) {
       case MovementType.EXPENSE:
@@ -82,5 +100,7 @@ export const calculateMonthBalances = (month: MonthShape) => {
   return {
     subcategoryBalances,
     pocketBalances,
+    monthlyIncomeTotal,
+    availableMoney: roundMoney(monthlyIncomeTotal - monthOutflows),
   };
 };
