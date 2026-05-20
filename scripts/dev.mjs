@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const npmCommand = "npm";
+const packageManagerCommand = "pnpm";
 const useShell = process.platform === "win32";
 
 const processes = [
@@ -12,7 +12,7 @@ const processes = [
 ];
 
 const children = processes.map(({ name, cwd, args }) => {
-  const child = spawn(npmCommand, args, {
+  const child = spawn(packageManagerCommand, args, {
     cwd,
     stdio: "inherit",
     shell: useShell,

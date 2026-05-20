@@ -28,7 +28,7 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
 ## Requisitos
 
 - Node.js
-- npm
+- pnpm vía Corepack
 - PostgreSQL
 
 ## Configuración local
@@ -36,9 +36,8 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
 1. Instalar dependencias:
 
    ```bash
-   npm install
-   npm install --prefix client
-   npm install --prefix server
+   corepack enable
+   pnpm install
    ```
 
 2. Crear el archivo `.env` desde el ejemplo:
@@ -52,26 +51,26 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
 4. Ejecutar Prisma:
 
    ```bash
-   npm run prisma:generate --prefix server
-   npm run prisma:migrate --prefix server
+   pnpm prisma:generate
+   pnpm prisma:migrate
    ```
 
 5. Levantar cliente y servidor juntos:
 
    ```bash
-   npm run dev
+   pnpm dev
    ```
 
 ## Scripts principales
 
 | Comando | Descripción |
 |---------|-------------|
-| `npm run dev` | Levanta frontend y backend en paralelo desde la raíz. |
-| `npm run dev --prefix client` | Levanta solo el frontend. |
-| `npm run dev --prefix server` | Levanta solo el backend. |
-| `npm test --prefix server` | Ejecuta las pruebas del backend. |
-| `npm run prisma:migrate --prefix server` | Ejecuta migraciones Prisma usando `prisma/schema.prisma`. |
-| `npm run prisma:studio --prefix server` | Abre Prisma Studio. |
+| `pnpm dev` | Levanta frontend y backend en paralelo desde la raíz. |
+| `pnpm --dir client dev` | Levanta solo el frontend. |
+| `pnpm --dir server dev` | Levanta solo el backend. |
+| `pnpm --dir server test` | Ejecuta las pruebas del backend. |
+| `pnpm prisma:migrate` | Ejecuta migraciones Prisma usando `prisma/schema.prisma`. |
+| `pnpm prisma:studio` | Abre Prisma Studio. |
 
 ## Dominio funcional
 

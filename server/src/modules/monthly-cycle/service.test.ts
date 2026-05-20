@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MonthStatus, MovementType, Prisma } from "@prisma/client";
+import { MonthStatus, MovementType, Prisma } from "../../lib/prisma-client.js";
 
 import { createMonthlyCycleService, DomainError } from "./service.js";
 
