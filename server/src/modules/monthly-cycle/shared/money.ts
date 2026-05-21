@@ -1,4 +1,4 @@
-import { Prisma } from "../../lib/prisma-client.js";
+import { Prisma } from "../../../lib/prisma-client.js";
 
 export const decimal = (value: number) => new Prisma.Decimal(value.toFixed(2));
 export const decimalToNumber = (value: Prisma.Decimal) => Number(value.toString());

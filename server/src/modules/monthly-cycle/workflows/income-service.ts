@@ -1,9 +1,9 @@
-import type { CreateMonthlyIncomeInput, MonthView, UpdateMonthlyIncomeInput } from "./dto/index.js";
-import { decimal } from "./money.js";
-import { assertMonthIsMutable, readMonthById } from "./month-queries.js";
-import { mapMonth } from "./monthly-cycle-mappers.js";
-import { DomainError } from "./service-errors.js";
-import type { MonthRecord, MonthlyCycleDb, MonthlyIncomeRecord } from "./service-types.js";
+import type { CreateMonthlyIncomeInput, MonthView, UpdateMonthlyIncomeInput } from "../dto/index.js";
+import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
+import { decimal } from "../shared/money.js";
+import { assertMonthIsMutable, readMonthById } from "../shared/month-queries.js";
+import { DomainError } from "../shared/service-errors.js";
+import type { MonthRecord, MonthlyCycleDb, MonthlyIncomeRecord } from "../shared/service-types.js";
 
 const parseReceivedAt = (receivedAt: string) => {
   const date = new Date(receivedAt);

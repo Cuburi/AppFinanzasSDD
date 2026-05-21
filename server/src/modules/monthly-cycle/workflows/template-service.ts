@@ -1,8 +1,8 @@
-import type { TemplateInput, TemplateView } from "./dto/index.js";
-import { decimal } from "./money.js";
-import { readTemplateCategories, assertTemplateDefaultPocketsAreActive } from "./month-queries.js";
-import { mapTemplate } from "./monthly-cycle-mappers.js";
-import type { MonthlyCycleDb } from "./service-types.js";
+import type { TemplateInput, TemplateView } from "../dto/index.js";
+import { mapTemplate } from "../mappers/monthly-cycle-mappers.js";
+import { decimal } from "../shared/money.js";
+import { readTemplateCategories, assertTemplateDefaultPocketsAreActive } from "../shared/month-queries.js";
+import type { MonthlyCycleDb } from "../shared/service-types.js";
 
 export const createTemplateService = (db: MonthlyCycleDb) => ({
   async getTemplate(): Promise<TemplateView> {

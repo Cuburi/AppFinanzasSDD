@@ -1,4 +1,4 @@
-import { MonthStatus, MovementType, Prisma } from "../../lib/prisma-client.js";
+import { MonthStatus, MovementType, Prisma } from "../../../lib/prisma-client.js";
 
 export const templateInclude = {
   subcategories: {

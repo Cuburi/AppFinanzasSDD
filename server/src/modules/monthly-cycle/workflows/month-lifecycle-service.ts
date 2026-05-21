@@ -1,11 +1,11 @@
-import { MonthStatus } from "../../lib/prisma-client.js";
+import { MonthStatus } from "../../../lib/prisma-client.js";
 
-import type { ClosureReviewView, MonthView, OpenMonthInput, TemplateInput } from "./dto/index.js";
-import { decimalToNumber } from "./money.js";
-import { assertMonthIsMutable, assertTemplateDefaultPocketsAreActive, readMonthById, readTemplateCategories } from "./month-queries.js";
-import { mapMonth } from "./monthly-cycle-mappers.js";
-import { DomainError } from "./service-errors.js";
-import { monthInclude, type MonthRecord, type MonthlyCycleDb } from "./service-types.js";
+import type { ClosureReviewView, MonthView, OpenMonthInput, TemplateInput } from "../dto/index.js";
+import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
+import { decimalToNumber } from "../shared/money.js";
+import { assertMonthIsMutable, assertTemplateDefaultPocketsAreActive, readMonthById, readTemplateCategories } from "../shared/month-queries.js";
+import { DomainError } from "../shared/service-errors.js";
+import { monthInclude, type MonthRecord, type MonthlyCycleDb } from "../shared/service-types.js";
 
 const assertTemplateHasSubcategories = (input: TemplateInput) => {
   const count = input.categories.reduce((total, category) => total + category.subcategories.length, 0);

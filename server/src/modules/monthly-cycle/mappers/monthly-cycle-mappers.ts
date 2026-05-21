@@ -1,7 +1,7 @@
-import type { MonthView, TemplateView } from "./dto/index.js";
-import { calculateMonthBalances } from "./balance-calculator.js";
-import { decimalToNumber } from "./money.js";
-import type { MonthRecord, TemplateCategoryRecord } from "./service-types.js";
+import type { MonthView, TemplateView } from "../dto/index.js";
+import { calculateMonthBalances } from "../balance-calculator.js";
+import { decimalToNumber } from "../shared/money.js";
+import type { MonthRecord, TemplateCategoryRecord } from "../shared/service-types.js";
 
 export const mapTemplate = (categories: TemplateCategoryRecord[]): TemplateView => ({
   categories: categories.map((category) => ({

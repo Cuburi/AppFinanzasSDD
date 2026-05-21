@@ -1,6 +1,6 @@
-import { MonthStatus } from "../../lib/prisma-client.js";
+import { MonthStatus } from "../../../lib/prisma-client.js";
 
-import type { TemplateInput } from "./dto/index.js";
+import type { TemplateInput } from "../dto/index.js";
 import { DomainError } from "./service-errors.js";
 import { monthInclude, templateInclude, type MonthRecord, type MonthlyCycleDb } from "./service-types.js";
 
