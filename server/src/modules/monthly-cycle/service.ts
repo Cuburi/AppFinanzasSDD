@@ -8,14 +8,14 @@ import {
   type TemplateInput,
   type UpdateMonthlyIncomeInput,
 } from "./dto/index.js";
-import { createClosureService, buildClosureReview } from "./closure-service.js";
-import { createIncomeService } from "./income-service.js";
-import { createMonthLifecycleService } from "./month-lifecycle-service.js";
-import { createMovementService } from "./movement-service.js";
-import { createTemplateService } from "./template-service.js";
-import type { MonthlyCycleDb } from "./service-types.js";
+import { createClosureService, buildClosureReview } from "./workflows/closure-service.js";
+import { createIncomeService } from "./workflows/income-service.js";
+import { createMonthLifecycleService } from "./workflows/month-lifecycle-service.js";
+import { createMovementService } from "./workflows/movement-service.js";
+import { createTemplateService } from "./workflows/template-service.js";
+import type { MonthlyCycleDb } from "./shared/service-types.js";
 
-export { DomainError } from "./service-errors.js";
+export { DomainError } from "./shared/service-errors.js";
 
 export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
   const templateService = createTemplateService(db);

@@ -1,11 +1,11 @@
-import { MovementType } from "../../lib/prisma-client.js";
+import { MovementType } from "../../../lib/prisma-client.js";
 
-import type { DepositToPocketInput, MonthView, RecordExpenseInput } from "./dto/index.js";
-import { decimal } from "./money.js";
-import { assertMonthIsMutable, assertPocketIsActive, findMonthSubcategory, readMonthById } from "./month-queries.js";
-import { mapMonth } from "./monthly-cycle-mappers.js";
-import { DomainError } from "./service-errors.js";
-import type { MonthlyCycleDb } from "./service-types.js";
+import type { DepositToPocketInput, MonthView, RecordExpenseInput } from "../dto/index.js";
+import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
+import { decimal } from "../shared/money.js";
+import { assertMonthIsMutable, assertPocketIsActive, findMonthSubcategory, readMonthById } from "../shared/month-queries.js";
+import { DomainError } from "../shared/service-errors.js";
+import type { MonthlyCycleDb } from "../shared/service-types.js";
 
 export const createMovementService = (db: MonthlyCycleDb) => ({
   async recordExpense(input: RecordExpenseInput): Promise<MonthView> {

@@ -1,11 +1,11 @@
-import { MonthStatus, MovementType } from "../../lib/prisma-client.js";
+import { MonthStatus, MovementType } from "../../../lib/prisma-client.js";
 
-import type { ClosureActionInput, ClosureReviewView } from "./dto/index.js";
-import { calculateMonthBalances } from "./balance-calculator.js";
-import { decimal, decimalToNumber, isZero } from "./money.js";
-import { assertMonthIsMutable, assertPocketIsActive, findMonthSubcategory, listMonthSubcategories, readMonthById } from "./month-queries.js";
-import { DomainError } from "./service-errors.js";
-import type { MonthRecord, MonthlyCycleDb } from "./service-types.js";
+import type { ClosureActionInput, ClosureReviewView } from "../dto/index.js";
+import { calculateMonthBalances } from "../balance-calculator.js";
+import { decimal, decimalToNumber, isZero } from "../shared/money.js";
+import { assertMonthIsMutable, assertPocketIsActive, findMonthSubcategory, listMonthSubcategories, readMonthById } from "../shared/month-queries.js";
+import { DomainError } from "../shared/service-errors.js";
+import type { MonthRecord, MonthlyCycleDb } from "../shared/service-types.js";
 
 export const buildClosureReview = (month: MonthRecord): ClosureReviewView => {
   const balances = calculateMonthBalances(month);
