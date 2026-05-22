@@ -15,11 +15,18 @@ enum MonthStatus {
 
 enum MovementType {
   EXPENSE
+  CASH_WITHDRAWAL
+  CASH_CARRYOVER_IN
   POCKET_DEPOSIT_FROM_SUBCATEGORY
   POCKET_DEPOSIT_EXTERNAL
   SURPLUS_TO_POCKET_ON_CLOSE
   DEFICIT_COVER_FROM_SUBCATEGORY
   DEFICIT_COVER_FROM_POCKET
+}
+
+enum PaymentMethod {
+  NON_CASH
+  CASH
 }
 
 model TemplateCategory {
@@ -132,6 +139,7 @@ model MonthSubcategory {
 model Movement {
   id                  String           @id @default(cuid())
   type                MovementType
+  paymentMethod       PaymentMethod?
   amount              Decimal          @db.Decimal(12, 2)
   occurredAt          DateTime         @default(now())
   description         String?
@@ -150,6 +158,8 @@ model Movement {
   updatedAt           DateTime          @updatedAt
 
   @@index([monthId, occurredAt])
+  @@index([monthId, type, occurredAt])
+  @@index([paymentMethod])
   @@index([sourceSubcategoryId])
   @@index([targetSubcategoryId])
   @@index([sourcePocketId])

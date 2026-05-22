@@ -1,4 +1,4 @@
-import { MovementType, Prisma } from "../../lib/prisma-client.js";
+import { MovementType, PaymentMethod, Prisma } from "../../lib/prisma-client.js";
 
 type MonthShape = {
   incomes?: Array<{
@@ -12,6 +12,7 @@ type MonthShape = {
   }>;
   movements: Array<{
     type: MovementType;
+    paymentMethod?: PaymentMethod | null;
     amount: Prisma.Decimal;
     sourceSubcategoryId: string | null;
     targetSubcategoryId: string | null;
@@ -41,6 +42,11 @@ export const calculateMonthBalances = (month: MonthShape) => {
 
     switch (movement.type) {
       case MovementType.EXPENSE:
+        if (movement.paymentMethod !== PaymentMethod.CASH) {
+          monthOutflows += amount;
+        }
+        break;
+      case MovementType.CASH_WITHDRAWAL:
       case MovementType.POCKET_DEPOSIT_FROM_SUBCATEGORY:
       case MovementType.POCKET_DEPOSIT_EXTERNAL:
       case MovementType.SURPLUS_TO_POCKET_ON_CLOSE:

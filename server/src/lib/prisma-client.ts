@@ -1,1 +1,1 @@
-export { MonthStatus, MovementType, Prisma, PrismaClient } from "../generated/prisma/index.js";
+export { MonthStatus, MovementType, PaymentMethod, Prisma, PrismaClient } from "../generated/prisma/index.js";
