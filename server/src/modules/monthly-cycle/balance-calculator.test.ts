@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MovementType, Prisma } from "../../lib/prisma-client.js";
+import { MovementType, PaymentMethod, Prisma } from "../../lib/prisma-client.js";
 
 import { calculateMonthBalances } from "./balance-calculator.js";
 
@@ -103,4 +103,61 @@ test("calculateMonthBalances reports zero income defaults and available money", 
 
   assert.equal(balances.monthlyIncomeTotal, 0);
   assert.equal(balances.availableMoney, 0);
+});
+
+test("calculateMonthBalances does not double-count cash expenses against available money", () => {
+  const balances = calculateMonthBalances({
+    incomes: [{ amount: amount(500) }],
+    categories: [{ subcategories: [{ id: "food", plannedAmount: amount(200) }] }],
+    movements: [
+      {
+        type: MovementType.CASH_WITHDRAWAL,
+        amount: amount(100),
+        sourceSubcategoryId: null,
+        targetSubcategoryId: null,
+        sourcePocketId: null,
+        targetPocketId: null,
+      },
+      {
+        type: MovementType.EXPENSE,
+        paymentMethod: PaymentMethod.CASH,
+        amount: amount(40),
+        sourceSubcategoryId: "food",
+        targetSubcategoryId: null,
+        sourcePocketId: null,
+        targetPocketId: null,
+      },
+      {
+        type: MovementType.EXPENSE,
+        paymentMethod: PaymentMethod.NON_CASH,
+        amount: amount(30),
+        sourceSubcategoryId: "food",
+        targetSubcategoryId: null,
+        sourcePocketId: null,
+        targetPocketId: null,
+      },
+    ],
+  });
+
+  assert.equal(balances.availableMoney, 370);
+  assert.equal(balances.subcategoryBalances.get("food"), 130);
+});
+
+test("calculateMonthBalances ignores cash carryover for available money", () => {
+  const balances = calculateMonthBalances({
+    incomes: [{ amount: amount(300) }],
+    categories: [{ subcategories: [] }],
+    movements: [
+      {
+        type: MovementType.CASH_CARRYOVER_IN,
+        amount: amount(80),
+        sourceSubcategoryId: null,
+        targetSubcategoryId: null,
+        sourcePocketId: null,
+        targetPocketId: null,
+      },
+    ],
+  });
+
+  assert.equal(balances.availableMoney, 300);
 });
