@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
-import type { Month, MonthlyIncome, SavingsPocket } from "../types";
+import type { ExpenseHistoryItem, Month, MonthlyIncome, PaymentMethod, SavingsPocket } from "../types";
 
 const now = new Date();
 
 const formatMonthDate = (month: Month) => `${month.year}-${String(month.month).padStart(2, "0")}-01`;
 const formatDisplayDate = (value: string) => new Date(value).toLocaleDateString("es-AR", { timeZone: "UTC" });
+const formatPaymentMethod = (paymentMethod: PaymentMethod) => (paymentMethod === "CASH" ? "Efectivo" : "No efectivo");
 
 export const ActiveMonthPage = () => {
   const [activeMonth, setActiveMonth] = useState<Month | null>(null);
@@ -20,6 +21,12 @@ export const ActiveMonthPage = () => {
   const [expenseSubcategoryId, setExpenseSubcategoryId] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseDescription, setExpenseDescription] = useState("");
+  const [expenseOccurredAt, setExpenseOccurredAt] = useState("");
+  const [expensePaymentMethod, setExpensePaymentMethod] = useState<PaymentMethod>("NON_CASH");
+  const [expenseHistory, setExpenseHistory] = useState<ExpenseHistoryItem[]>([]);
+  const [withdrawalAmount, setWithdrawalAmount] = useState("");
+  const [withdrawalOccurredAt, setWithdrawalOccurredAt] = useState("");
+  const [withdrawalDescription, setWithdrawalDescription] = useState("");
   const [depositSourceSubcategoryId, setDepositSourceSubcategoryId] = useState("");
   const [depositPocketId, setDepositPocketId] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
@@ -30,9 +37,27 @@ export const ActiveMonthPage = () => {
   const [incomeNotes, setIncomeNotes] = useState("");
   const [editingIncomeId, setEditingIncomeId] = useState<string | null>(null);
 
+  const refreshExpenseHistory = async (monthId: string) => {
+    const expenses = await api.getExpenseHistory(monthId);
+    setExpenseHistory(expenses);
+  };
+
+  const refreshExpenseHistoryBestEffort = async (monthId: string) => {
+    try {
+      await refreshExpenseHistory(monthId);
+    } catch {
+      // A failed history refresh must not turn an already-persisted mutation into a user-facing mutation failure.
+    }
+  };
+
   const refresh = async () => {
     const monthData = await api.getActiveMonth();
     setActiveMonth(monthData);
+    if (monthData) {
+      await refreshExpenseHistory(monthData.id);
+    } else {
+      setExpenseHistory([]);
+    }
   };
 
   useEffect(() => {
@@ -41,6 +66,11 @@ export const ActiveMonthPage = () => {
         const [monthData, pockets] = await Promise.all([api.getActiveMonth(), api.getPockets("active")]);
         setActiveMonth(monthData);
         setActivePockets(pockets);
+        if (monthData) {
+          setExpenseOccurredAt(formatMonthDate(monthData));
+          setWithdrawalOccurredAt(formatMonthDate(monthData));
+          await refreshExpenseHistory(monthData.id);
+        }
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "No se pudo consultar el mes activo y los bolsillos activos.");
       } finally {
@@ -64,6 +94,9 @@ export const ActiveMonthPage = () => {
       });
 
       setActiveMonth(createdMonth);
+      setExpenseOccurredAt(formatMonthDate(createdMonth));
+      setWithdrawalOccurredAt(formatMonthDate(createdMonth));
+      await refreshExpenseHistoryBestEffort(createdMonth.id);
       setMessage(`Mes ${createdMonth.year}-${String(createdMonth.month).padStart(2, "0")} abierto con snapshot de la plantilla vigente.`);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo abrir el mes.");
@@ -104,13 +137,41 @@ export const ActiveMonthPage = () => {
         sourceSubcategoryId: expenseSubcategoryId,
         amount: Number(expenseAmount),
         description: expenseDescription,
+        occurredAt: expenseOccurredAt || formatMonthDate(activeMonth),
+        paymentMethod: expensePaymentMethod,
       });
       setActiveMonth(updatedMonth);
       setExpenseAmount("");
       setExpenseDescription("");
+      await refreshExpenseHistoryBestEffort(updatedMonth.id);
       setMessage("Gasto registrado y saldos recalculados.");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo registrar el gasto.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCashWithdrawal = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!activeMonth || !canMutateActiveMonth) return;
+    setSubmitting(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const updatedMonth = await api.withdrawCash({
+        monthId: activeMonth.id,
+        amount: Number(withdrawalAmount),
+        occurredAt: withdrawalOccurredAt || formatMonthDate(activeMonth),
+        description: withdrawalDescription || undefined,
+      });
+      setActiveMonth(updatedMonth);
+      setWithdrawalAmount("");
+      setWithdrawalDescription("");
+      setMessage("Retiro de efectivo registrado y saldos recalculados.");
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo retirar efectivo.");
     } finally {
       setSubmitting(false);
     }
@@ -237,6 +298,7 @@ export const ActiveMonthPage = () => {
           <div className="row gap-sm wrap">
             <span className="pill success">Ingresos: ${activeMonth.monthlyIncomeTotal.toFixed(2)}</span>
             <span className={activeMonth.availableMoney < 0 ? "pill danger" : "pill success"}>Disponible del mes: ${activeMonth.availableMoney.toFixed(2)}</span>
+            <span className={activeMonth.cashBalance < 0 ? "pill danger" : "pill success"}>Efectivo físico: ${activeMonth.cashBalance.toFixed(2)}</span>
           </div>
 
           {canMutateActiveMonth ? (
@@ -319,12 +381,41 @@ export const ActiveMonthPage = () => {
               <span>Monto</span>
               <input min="0.01" step="0.01" type="number" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} required />
             </label>
+            <label className="field small-field">
+              <span>Fecha del gasto</span>
+              <input type="date" value={expenseOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setExpenseOccurredAt(event.target.value)} required />
+            </label>
+            <label className="field small-field">
+              <span>Método de pago</span>
+              <select value={expensePaymentMethod} onChange={(event) => setExpensePaymentMethod(event.target.value as PaymentMethod)} required>
+                <option value="NON_CASH">No efectivo</option>
+                <option value="CASH">Efectivo</option>
+              </select>
+            </label>
             <label className="field">
               <span>Descripción</span>
               <input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} />
             </label>
             <button className="button primary" disabled={submitting} type="submit">
               Registrar gasto
+            </button>
+          </form>
+
+          <form className="row gap-sm wrap" onSubmit={handleCashWithdrawal}>
+            <label className="field small-field">
+              <span>Monto a retirar</span>
+              <input min="0.01" step="0.01" type="number" value={withdrawalAmount} onChange={(event) => setWithdrawalAmount(event.target.value)} required />
+            </label>
+            <label className="field small-field">
+              <span>Fecha del retiro</span>
+              <input type="date" value={withdrawalOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setWithdrawalOccurredAt(event.target.value)} required />
+            </label>
+            <label className="field">
+              <span>Descripción del retiro</span>
+              <input value={withdrawalDescription} onChange={(event) => setWithdrawalDescription(event.target.value)} />
+            </label>
+            <button className="button primary" disabled={submitting || !canMutateActiveMonth} type="submit">
+              Retirar efectivo
             </button>
           </form>
 
@@ -363,6 +454,22 @@ export const ActiveMonthPage = () => {
               Depositar en bolsillo
             </button>
           </form>
+
+          <section className="stack-sm">
+            <h3>Historial de gastos del mes</h3>
+            {expenseHistory.length === 0 ? <p>No hay gastos registrados para este mes.</p> : null}
+            {expenseHistory.map((expense) => (
+              <div className="budget-line align-start" key={expense.id}>
+                <div>
+                  <strong>{expense.description || "Gasto sin descripción"}</strong>
+                  <p>
+                    {formatDisplayDate(expense.occurredAt)} · {expense.subcategory.name} · {expense.category.name} · {formatPaymentMethod(expense.paymentMethod)}
+                  </p>
+                </div>
+                <span className="pill danger">-${expense.amount.toFixed(2)}</span>
+              </div>
+            ))}
+          </section>
         </article>
       ) : null}
 

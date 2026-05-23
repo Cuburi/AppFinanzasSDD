@@ -1,15 +1,20 @@
 import type {
   ClosureActionInput,
   ClosureReview,
+  CashSummary,
   CreateMonthlyIncomeInput,
   CreatePocketInput,
   EditableTemplate,
+  ExpenseHistoryFilters,
+  ExpenseHistoryItem,
   Month,
   PocketListFilter,
+  RecordExpenseInput,
   SavingsPocket,
   UpdateMonthlyIncomeInput,
   Template,
   UpdatePocketInput,
+  WithdrawCashInput,
 } from "../types";
 
 const readJson = async <T>(response: Response): Promise<T> => {
@@ -103,7 +108,7 @@ export const api = {
     const payload = await readJson<{ month: Month | null }>(response);
     return payload.month;
   },
-  async recordExpense(input: { monthId: string; sourceSubcategoryId: string; amount: number; description?: string }): Promise<Month> {
+  async recordExpense(input: RecordExpenseInput): Promise<Month> {
     const response = await fetch(`/api/months/${input.monthId}/expenses`, {
       method: "POST",
       headers: {
@@ -113,10 +118,45 @@ export const api = {
         sourceSubcategoryId: input.sourceSubcategoryId,
         amount: input.amount,
         description: input.description,
+        occurredAt: input.occurredAt,
+        paymentMethod: input.paymentMethod,
       }),
     });
 
     return readJson<Month>(response);
+  },
+  async getExpenseHistory(monthId: string, filters: ExpenseHistoryFilters = {}): Promise<ExpenseHistoryItem[]> {
+    const params = new URLSearchParams();
+    if (filters.from) params.set("from", filters.from);
+    if (filters.to) params.set("to", filters.to);
+    if (filters.paymentMethod) params.set("paymentMethod", filters.paymentMethod);
+    if (filters.subcategoryId) params.set("subcategoryId", filters.subcategoryId);
+
+    const query = params.toString();
+    const response = await fetch(`/api/months/${monthId}/expenses${query ? `?${query}` : ""}`);
+    const payload = await readJson<{ expenses: ExpenseHistoryItem[] }>(response);
+
+    return payload.expenses;
+  },
+  async withdrawCash(input: WithdrawCashInput): Promise<Month> {
+    const response = await fetch(`/api/months/${input.monthId}/cash-withdrawals`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        amount: input.amount,
+        occurredAt: input.occurredAt,
+        description: input.description,
+      }),
+    });
+    const payload = await readJson<{ month: Month }>(response);
+
+    return payload.month;
+  },
+  async getCashSummary(monthId: string): Promise<CashSummary> {
+    const response = await fetch(`/api/months/${monthId}/cash`);
+    return readJson<CashSummary>(response);
   },
   async createMonthlyIncome(input: CreateMonthlyIncomeInput): Promise<Month> {
     const response = await fetch(`/api/months/${input.monthId}/incomes`, {

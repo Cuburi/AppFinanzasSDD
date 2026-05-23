@@ -14,6 +14,8 @@ const apiMock = vi.hoisted(() => ({
   updateMonthlyIncome: vi.fn(),
   deleteMonthlyIncome: vi.fn(),
   depositToPocket: vi.fn(),
+  withdrawCash: vi.fn(),
+  getExpenseHistory: vi.fn(),
 }));
 
 vi.mock("../lib/api", () => ({
@@ -41,6 +43,7 @@ const activeMonth: Month = {
   ],
   monthlyIncomeTotal: 1000,
   availableMoney: 375,
+  cashBalance: 80,
   categories: [
     {
       id: "cat-income",
@@ -80,6 +83,28 @@ describe("ActiveMonthPage", () => {
     apiMock.createMonthlyIncome.mockResolvedValue(activeMonth);
     apiMock.updateMonthlyIncome.mockResolvedValue(activeMonth);
     apiMock.deleteMonthlyIncome.mockResolvedValue(activeMonth);
+    apiMock.recordExpense.mockResolvedValue(activeMonth);
+    apiMock.withdrawCash.mockResolvedValue(activeMonth);
+    apiMock.getExpenseHistory.mockResolvedValue([
+      {
+        id: "expense-1",
+        occurredAt: "2026-05-12T00:00:00.000Z",
+        paymentMethod: "CASH",
+        amount: 20,
+        description: "Café",
+        category: { id: "cat-income", name: "Ingresos" },
+        subcategory: { id: "sub-bonus", name: "Bonus" },
+      },
+      {
+        id: "expense-2",
+        occurredAt: "2026-05-15T00:00:00.000Z",
+        paymentMethod: "NON_CASH",
+        amount: 35,
+        description: null,
+        category: { id: "cat-income", name: "Ingresos" },
+        subcategory: { id: "sub-bonus", name: "Bonus" },
+      },
+    ]);
   });
 
   it("uses an active-pocket selector for deposits instead of a manual pocket ID", async () => {
@@ -128,6 +153,84 @@ describe("ActiveMonthPage", () => {
     expect(screen.getByText("Disponible del mes: $375.00")).toBeInTheDocument();
     expect(screen.getByText("Sueldo")).toBeInTheDocument();
     expect(screen.getByText(/neto/)).toBeInTheDocument();
+  });
+
+  it("shows physical cash balance and month expense history", async () => {
+    render(<ActiveMonthPage />);
+
+    expect(await screen.findByText("Efectivo físico: $80.00")).toBeInTheDocument();
+    expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1");
+    expect(await screen.findByText("Café")).toBeInTheDocument();
+    expect(screen.getByText("12/5/2026 · Bonus · Ingresos · Efectivo")).toBeInTheDocument();
+    expect(screen.getByText("15/5/2026 · Bonus · Ingresos · No efectivo")).toBeInTheDocument();
+  });
+
+  it("records an expense with date and payment method", async () => {
+    const user = userEvent.setup();
+
+    render(<ActiveMonthPage />);
+
+    const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
+    if (!expenseForm) throw new Error("Missing expense form.");
+
+    await user.selectOptions(within(expenseForm).getByLabelText("Subcategoría del gasto"), "sub-bonus");
+    await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
+    fireEvent.change(within(expenseForm).getByLabelText("Fecha del gasto"), { target: { value: "2026-05-12" } });
+    await user.selectOptions(within(expenseForm).getByLabelText("Método de pago"), "CASH");
+    await user.type(within(expenseForm).getByLabelText("Descripción"), "Café");
+    await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
+
+    await waitFor(() =>
+      expect(apiMock.recordExpense).toHaveBeenCalledWith({
+        monthId: "month-1",
+        sourceSubcategoryId: "sub-bonus",
+        amount: 20,
+        description: "Café",
+        occurredAt: "2026-05-12",
+        paymentMethod: "CASH",
+      }),
+    );
+  });
+
+  it("keeps a successful expense mutation separate from a failed history refresh", async () => {
+    const user = userEvent.setup();
+    apiMock.getExpenseHistory.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error("No se pudo consultar el historial."));
+
+    render(<ActiveMonthPage />);
+
+    const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
+    if (!expenseForm) throw new Error("Missing expense form.");
+
+    await user.selectOptions(within(expenseForm).getByLabelText("Subcategoría del gasto"), "sub-bonus");
+    await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
+    await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
+
+    expect(await screen.findByText("Gasto registrado y saldos recalculados.")).toBeInTheDocument();
+    expect(screen.queryByText("No se pudo registrar el gasto.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No se pudo consultar el historial.")).not.toBeInTheDocument();
+  });
+
+  it("withdraws cash from monthly available money", async () => {
+    const user = userEvent.setup();
+
+    render(<ActiveMonthPage />);
+
+    const withdrawalForm = (await screen.findByRole("button", { name: "Retirar efectivo" })).closest("form");
+    if (!withdrawalForm) throw new Error("Missing withdrawal form.");
+
+    await user.type(within(withdrawalForm).getByLabelText("Monto a retirar", { selector: "input" }), "50");
+    fireEvent.change(within(withdrawalForm).getByLabelText("Fecha del retiro"), { target: { value: "2026-05-10" } });
+    await user.type(within(withdrawalForm).getByLabelText("Descripción del retiro"), "ATM");
+    await user.click(within(withdrawalForm).getByRole("button", { name: "Retirar efectivo" }));
+
+    await waitFor(() =>
+      expect(apiMock.withdrawCash).toHaveBeenCalledWith({
+        monthId: "month-1",
+        amount: 50,
+        occurredAt: "2026-05-10",
+        description: "ATM",
+      }),
+    );
   });
 
   it("creates, edits, and deletes monthly incomes through typed API calls", async () => {

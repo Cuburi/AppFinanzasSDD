@@ -84,6 +84,26 @@ Ejemplos del dominio:
 - Ahorros con propósito, como ropa o aseo, donde el saldo se deriva de movimientos.
 - Reportes futuros para detectar sobrantes, desfases y patrones de gasto.
 
+## Ciclo mensual: gastos, historial y efectivo
+
+El mes activo expone saldos calculados por backend: ingresos del mes, dinero disponible y efectivo físico. El efectivo no se guarda como saldo mutable; se deriva de movimientos de retiro, arrastre y gastos pagados en efectivo.
+
+### Endpoints principales
+
+| Endpoint | Semántica |
+|----------|-----------|
+| `POST /api/months/:id/expenses` | Registra un gasto con `sourceSubcategoryId`, `amount`, `occurredAt`, `paymentMethod` (`CASH` o `NON_CASH`) y `description` opcional. Los gastos en efectivo también reducen el efectivo físico. |
+| `GET /api/months/:id/expenses?from&to&paymentMethod&subcategoryId` | Lista el historial de gastos del mes con fecha, método de pago, categoría, subcategoría, monto y descripción. Los filtros son opcionales. |
+| `POST /api/months/:id/cash-withdrawals` | Registra un retiro de efectivo con `amount`, `occurredAt` y `description` opcional. Reduce el dinero disponible del mes y aumenta el efectivo físico. |
+| `GET /api/months/:id/cash` | Devuelve `cashBalance` y eventos de efectivo del mes. |
+
+Reglas clave:
+
+- `CASH_WITHDRAWAL` baja el dinero disponible y sube el efectivo físico.
+- `EXPENSE` con `paymentMethod: "CASH"` baja la subcategoría y el efectivo físico, pero no vuelve a bajar el dinero disponible.
+- `EXPENSE` con `paymentMethod: "NON_CASH"` baja la subcategoría y el dinero disponible.
+- Al abrir un mes nuevo, el efectivo positivo remanente del último mes cerrado se arrastra como efectivo inicial.
+
 ## Nota de aprendizaje
 
 Este repositorio está pensado como proyecto de aprendizaje técnico. Las decisiones se documentan de forma incremental para entender no solo qué se implementa, sino por qué se implementa de esa manera.

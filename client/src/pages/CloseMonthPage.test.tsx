@@ -27,6 +27,7 @@ const activeMonth: Month = {
   incomes: [],
   monthlyIncomeTotal: 0,
   availableMoney: 0,
+  cashBalance: 0,
   categories: [],
 };
 
