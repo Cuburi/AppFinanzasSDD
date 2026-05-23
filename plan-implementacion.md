@@ -11,23 +11,25 @@ Este plan refleja el estado real del MVP después del trabajo de ciclo mensual. 
 | Plantilla presupuestaria | ✅ Implementada | Categorías, subcategorías, presupuesto mensual y bolsillo por defecto. |
 | Ciclo mensual | ✅ Implementado | Abrir mes, snapshot de plantilla, mes activo, cierre y bloqueo de mes cerrado. |
 | Ingresos | ✅ Implementados | Alta, edición, eliminación y total mensual. |
-| Gastos | 🟡 Parcial | Registro de gasto y desfalco funcionan; falta fecha explícita, medio de pago y vista clara de historial mensual. |
+| Gastos | 🟡 Parcial | Registro de gasto con fecha, medio de pago, historial mensual y desfalco funcionan. Falta gastos recurrentes. |
 | Bolsillos / ahorros | 🟡 Parcial | Bolsillos con meta opcional, saldo, movimientos y depósitos. Falta automatización de excedentes al cumplir meta. |
 | Sobrantes y cierre | 🟡 Parcial | Revisión de cierre, sobrantes a bolsillo y cobertura de desfases; falta opción explícita de reiniciar sobrante en cero. |
-| Efectivo físico | ⬜ Pendiente | No hay flujo específico para retiros/gastos en efectivo. |
+| Efectivo físico | ✅ Implementado | Hay retiros, saldo de efectivo físico, gastos en efectivo sin doble descuento y arrastre positivo entre meses. |
 | Deudas | ⬜ Pendiente | No hay modelo ni módulo todavía. |
 | Reportes | ⬜ Pendiente | Hay datos base, pero falta módulo/página. |
 
-## Próximo foco recomendado
+## Último foco completado
 
-**Historial de gastos + efectivo físico** es el candidato más conectado al núcleo actual.
+**Historial de gastos + efectivo físico** quedó implementado como el último corte del ciclo mensual.
 
-Por qué:
+Qué cerró:
 
-- Cierra huecos del flujo que ya usamos todos los meses: registrar gastos, ver historial y entender disponible real.
-- Completa partes pendientes de HU-7, HU-8, HU-33 y HU-34 a HU-37.
-- Evita construir deudas encima de una base mensual que todavía no distingue efectivo físico ni medio de pago.
-- Es más transversal que Deudas, así que conviene hacerlo con SDD y cuidando fuerte la arquitectura de `monthly-cycle`.
+- Registro de gasto con fecha explícita y medio de pago.
+- Historial mensual de gastos.
+- Retiros de efectivo físico.
+- Saldo de efectivo físico derivado de movimientos.
+- Gasto en efectivo sin doble descontar el disponible mensual.
+- Arrastre positivo de efectivo al abrir un nuevo mes.
 
 **Control de Deudas** sigue siendo el mejor candidato si queremos una feature más aislada y menos riesgosa arquitectónicamente.
 
@@ -61,9 +63,9 @@ Por qué:
 
 - ✅ HU-31: Registrar múltiples fuentes de ingreso
 - ✅ HU-32: Ver total de ingresos del mes
-- 🟡 HU-33: Ver dinero disponible (ingresos + efectivo)
+- ✅ HU-33: Ver dinero disponible (ingresos + efectivo)
 
-> Nota: ingresos y disponible mensual existen. Falta sumar el concepto específico de efectivo físico.
+> Nota: ingresos, disponible mensual y efectivo físico existen. El efectivo se deriva de movimientos, no de un saldo mutable.
 
 ---
 
@@ -88,19 +90,21 @@ Por qué:
 
 ### 3.1 Registro de Gastos
 
-- 🟡 HU-7: Registrar gasto (monto, subcategoría, fecha y descripción opcional)
-- 🟡 HU-8: Ver historial de gastos del mes
+- ✅ HU-7: Registrar gasto (monto, subcategoría, fecha y descripción opcional)
+- ✅ HU-8: Ver historial de gastos del mes
 - ⬜ HU-9: Registrar gastos recurrentes mensuales
 - ✅ HU-10: Permitir saldo negativo (desfalco)
 
-> Nota: el registro de gasto descuenta disponibilidad y permite desfalco, pero todavía no permite elegir fecha ni medio de pago. Falta una pantalla/sección de historial mensual y gastos recurrentes.
+> Nota: el registro de gasto ya incluye fecha explícita, medio de pago, recalculo de saldos e historial mensual. Sigue pendiente HU-9: gastos recurrentes.
 
 ### 3.2 Control de Efectivo
 
-- ⬜ HU-34: Registrar retiros de efectivo
-- ⬜ HU-35: Ver efectivo actual y cómo suma al disponible total
-- ⬜ HU-36: Gasto en efectivo descuenta del disponible y del efectivo
-- ⬜ HU-37: Efectivo acumula mes a mes
+- ✅ HU-34: Registrar retiros de efectivo
+- ✅ HU-35: Ver efectivo actual y cómo suma al disponible total
+- ✅ HU-36: Gasto en efectivo descuenta del disponible y del efectivo
+- ✅ HU-37: Efectivo acumula mes a mes
+
+> Nota: el efectivo físico queda modelado como ledger derivado: retiros, gastos en efectivo y arrastre positivo entre meses.
 
 ---
 
@@ -187,7 +191,7 @@ Bolsillos / ahorros + depósitos
     ↓
 Cierre mensual + sobrantes/desfases
     ↓
-Próximo núcleo recomendado: historial de gastos + efectivo físico
+Historial de gastos + efectivo físico
     ↓
 Después: deudas, reportes, notificaciones, auth
 ```

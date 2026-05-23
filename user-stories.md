@@ -26,12 +26,12 @@ Este documento muestra el backlog funcional y el estado actual del MVP. La marca
 
 ## 3. Registro de Gastos
 
-- 🟡 **HU-7**: Como usuario, quiero registrar un gasto rápido indicando: monto, subcategoría, fecha y descripción opcional.
-- 🟡 **HU-8**: Como usuario, quiero ver el historial de gastos del mes actual.
+- ✅ **HU-7**: Como usuario, quiero registrar un gasto rápido indicando: monto, subcategoría, fecha y descripción opcional.
+- ✅ **HU-8**: Como usuario, quiero ver el historial de gastos del mes actual.
 - ⬜ **HU-9**: Como usuario, quiero registrar gastos recurrentes mensuales.
 - ✅ **HU-10**: Como usuario, quiero permitir que una subcategoría muestre saldo negativo (desfalco).
 
-> Estado: registrar gastos y recalcular saldos está implementado con monto, subcategoría y descripción. Falta capturar fecha del gasto desde UI/API y falta una vista clara de historial mensual para el usuario.
+> Estado: registrar gastos ya incluye monto, subcategoría, fecha, medio de pago y descripción opcional. El mes activo muestra historial mensual y recalcula saldos. Sigue pendiente HU-9: gastos recurrentes.
 
 ## 4. Dashboard Mensual
 
@@ -82,18 +82,18 @@ Este documento muestra el backlog funcional y el estado actual del MVP. La marca
 
 - ✅ **HU-31**: Como usuario, quiero registrar múltiples fuentes de ingreso (ej: "Salario", "Freelance") con su nombre y monto.
 - ✅ **HU-32**: Como usuario, quiero ver el total de ingresos del mes.
-- 🟡 **HU-33**: Como usuario, quiero ver el dinero disponible del mes (ingresos + efectivo).
+- ✅ **HU-33**: Como usuario, quiero ver el dinero disponible del mes (ingresos + efectivo).
 
-> Estado: ingresos mensuales implementados con alta, edición, eliminación y total mensual. El dinero disponible existe para el mes, pero todavía no incluye control de efectivo físico completo.
+> Estado: ingresos mensuales implementados con alta, edición, eliminación y total mensual. El dinero disponible y el efectivo físico se muestran en el mes activo.
 
 ## 10. Control de Efectivo
 
-- ⬜ **HU-34**: Como usuario, quiero registrar "retiros de efectivo" para apartar dinero de mi disponible a efectivo físico.
-- ⬜ **HU-35**: Como usuario, quiero ver mi efectivo actual y cómo suma a mi disponible total.
-- ⬜ **HU-36**: Como usuario, quiero que al registrar un gasto pagado en efectivo, se descuente tanto del disponible total como del efectivo.
-- ⬜ **HU-37**: Como usuario, quiero que el efectivo acumulado traspase al siguiente mes sumando al disponible.
+- ✅ **HU-34**: Como usuario, quiero registrar "retiros de efectivo" para apartar dinero de mi disponible a efectivo físico.
+- ✅ **HU-35**: Como usuario, quiero ver mi efectivo actual y cómo suma a mi disponible total.
+- ✅ **HU-36**: Como usuario, quiero que al registrar un gasto pagado en efectivo, se descuente tanto del disponible total como del efectivo.
+- ✅ **HU-37**: Como usuario, quiero que el efectivo acumulado traspase al siguiente mes sumando al disponible.
 
-> Estado: pendiente. Hoy hay movimientos hacia bolsillos/ahorros, pero no un flujo específico de efectivo físico.
+> Estado: implementado en el ciclo mensual. El efectivo físico se deriva de movimientos de retiro, gasto en efectivo y arrastre positivo entre meses; no se guarda como saldo mutable.
 
 ---
 
