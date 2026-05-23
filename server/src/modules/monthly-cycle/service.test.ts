@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MonthStatus, MovementType, Prisma } from "../../lib/prisma-client.js";
+import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../lib/prisma-client.js";
 
 import { createMonthlyCycleService, DomainError } from "./service.js";
 
@@ -512,6 +512,8 @@ test("recordExpense persists an expense and returns recalculated balances", asyn
     sourceSubcategoryId: subcategoryId,
     amount: 75,
     description: "Supermercado",
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
   });
   const movement = dbStub.getCapturedMovements()[0] as { data: { type: MovementType; sourceSubcategoryId: string; amount: Prisma.Decimal } };
 

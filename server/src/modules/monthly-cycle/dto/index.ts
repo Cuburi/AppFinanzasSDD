@@ -1,3 +1,4 @@
+export * from "./cash.dto.js";
 export * from "./closure.dto.js";
 export * from "./expenses.dto.js";
 export * from "./incomes.dto.js";

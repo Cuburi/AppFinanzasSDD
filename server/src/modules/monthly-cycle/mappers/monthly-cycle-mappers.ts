@@ -1,5 +1,6 @@
 import type { MonthView, TemplateView } from "../dto/index.js";
 import { calculateMonthBalances } from "../balance-calculator.js";
+import { calculateCashBalance } from "../shared/cash-ledger.js";
 import { decimalToNumber } from "../shared/money.js";
 import type { MonthRecord, TemplateCategoryRecord } from "../shared/service-types.js";
 
@@ -42,6 +43,7 @@ export const mapMonth = (month: MonthRecord): MonthView => {
     })),
     monthlyIncomeTotal: balances.monthlyIncomeTotal,
     availableMoney: balances.availableMoney,
+    cashBalance: calculateCashBalance(month.movements),
     categories: month.categories.map((category) => ({
       id: category.id,
       name: category.name,

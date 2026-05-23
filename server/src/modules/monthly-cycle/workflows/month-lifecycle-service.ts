@@ -1,7 +1,9 @@
-import { MonthStatus } from "../../../lib/prisma-client.js";
+import { MonthStatus, MovementType } from "../../../lib/prisma-client.js";
 
 import type { ClosureReviewView, MonthView, OpenMonthInput, TemplateInput } from "../dto/index.js";
 import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
+import { calculateCashBalance } from "../shared/cash-ledger.js";
+import { decimal } from "../shared/money.js";
 import { decimalToNumber } from "../shared/money.js";
 import { assertMonthIsMutable, assertTemplateDefaultPocketsAreActive, readMonthById, readTemplateCategories } from "../shared/month-queries.js";
 import { DomainError } from "../shared/service-errors.js";
@@ -55,7 +57,7 @@ export const createMonthLifecycleService = (db: MonthlyCycleDb) => ({
       assertTemplateHasSubcategories(templateInput);
       await assertTemplateDefaultPocketsAreActive(tx, templateInput);
 
-      return tx.month.create({
+      const createdMonth = await tx.month.create({
         data: {
           year: input.year,
           month: input.month,
@@ -79,6 +81,34 @@ export const createMonthLifecycleService = (db: MonthlyCycleDb) => ({
         },
         include: monthInclude,
       });
+
+      const priorClosedMonth = await tx.month.findFirst({
+        where: {
+          status: MonthStatus.CLOSED,
+          OR: [{ year: { lt: input.year } }, { year: input.year, month: { lt: input.month } }],
+        },
+        orderBy: [{ year: "desc" }, { month: "desc" }],
+        include: monthInclude,
+      });
+
+      if (priorClosedMonth && "categories" in priorClosedMonth) {
+        const carryover = calculateCashBalance((priorClosedMonth as MonthRecord).movements);
+        if (carryover > 0) {
+          await tx.movement.create({
+            data: {
+              type: MovementType.CASH_CARRYOVER_IN,
+              amount: decimal(carryover),
+              description: "Cash carryover from previous closed month",
+              occurredAt: new Date(Date.UTC(input.year, input.month - 1, 1)),
+              monthId: createdMonth.id,
+            },
+          });
+
+          return readMonthById(tx, createdMonth.id);
+        }
+      }
+
+      return createdMonth;
     });
 
     return mapMonth(month);

@@ -7,7 +7,9 @@ import {
   type RecordExpenseInput,
   type TemplateInput,
   type UpdateMonthlyIncomeInput,
+  type WithdrawCashInput,
 } from "./dto/index.js";
+import { createCashService } from "./workflows/cash-service.js";
 import { createClosureService, buildClosureReview } from "./workflows/closure-service.js";
 import { createIncomeService } from "./workflows/income-service.js";
 import { createMonthLifecycleService } from "./workflows/month-lifecycle-service.js";
@@ -23,6 +25,7 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
   const movementService = createMovementService(db);
   const incomeService = createIncomeService(db);
   const closureService = createClosureService(db);
+  const cashService = createCashService(db);
 
   return {
     getTemplate: templateService.getTemplate,
@@ -30,6 +33,7 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
     openMonth: monthLifecycleService.openMonth,
     getActiveMonth: monthLifecycleService.getActiveMonth,
     recordExpense: movementService.recordExpense,
+    withdrawCash: cashService.withdrawCash,
     depositToPocket: movementService.depositToPocket,
     createMonthlyIncome: incomeService.createMonthlyIncome,
     updateMonthlyIncome: incomeService.updateMonthlyIncome,
@@ -47,6 +51,7 @@ export const updateTemplate = (input: TemplateInput) => monthlyCycleService.upda
 export const openMonth = (input: OpenMonthInput) => monthlyCycleService.openMonth(input);
 export const getActiveMonth = () => monthlyCycleService.getActiveMonth();
 export const recordExpense = (input: RecordExpenseInput) => monthlyCycleService.recordExpense(input);
+export const withdrawCash = (input: WithdrawCashInput) => monthlyCycleService.withdrawCash(input);
 export const depositToPocket = (input: DepositToPocketInput) => monthlyCycleService.depositToPocket(input);
 export const createMonthlyIncome = (input: CreateMonthlyIncomeInput) => monthlyCycleService.createMonthlyIncome(input);
 export const updateMonthlyIncome = (input: UpdateMonthlyIncomeInput) => monthlyCycleService.updateMonthlyIncome(input);
