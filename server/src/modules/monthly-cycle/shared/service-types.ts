@@ -148,10 +148,10 @@ export type MonthlyCycleDb = {
         description?: string | null;
         paymentMethod?: PaymentMethod | null;
         monthId?: string | null;
-        sourceSubcategoryId?: string | null;
-        targetSubcategoryId?: string | null;
-        sourcePocketId?: string | null;
-        targetPocketId?: string | null;
+        sourceSubcategoryId: string | null;
+        targetSubcategoryId: string | null;
+        sourcePocketId: string | null;
+        targetPocketId: string | null;
       }>
     >;
     create(args: {
