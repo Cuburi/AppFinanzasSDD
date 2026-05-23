@@ -3,11 +3,14 @@ import { Router } from "express";
 import {
   parseCreateMonthlyIncomeInput,
   parseClosureActionInput,
+  parseCashSummaryInput,
   parseDepositToPocketInput,
+  parseExpenseHistoryQueryInput,
   parseOpenMonthInput,
   parseRecordExpenseInput,
   parseTemplateInput,
   parseUpdateMonthlyIncomeInput,
+  parseWithdrawCashInput,
 } from "./dto/index.js";
 import {
   DomainError,
@@ -18,9 +21,12 @@ import {
   depositToPocket,
   getActiveMonth,
   getClosureReview,
+  getCashSummary,
   getTemplate,
+  listExpenseHistory,
   openMonth,
   recordExpense,
+  withdrawCash,
   updateMonthlyIncome,
   updateTemplate,
 } from "./service.js";
@@ -77,6 +83,51 @@ export const monthlyCycleRouter = () => {
       const payload = parseRecordExpenseInput(request.params.id, request.body);
       const month = await recordExpense(payload);
       response.status(201).json(month);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.get("/months/:id/expenses", async (request, response) => {
+    try {
+      const payload = parseExpenseHistoryQueryInput(request.params.id, request.query);
+      const history = await listExpenseHistory(payload);
+      response.json(history);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.post("/months/:id/cash-withdrawals", async (request, response) => {
+    try {
+      const payload = parseWithdrawCashInput(request.params.id, request.body);
+      const result = await withdrawCash(payload);
+      response.status(201).json(result);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.get("/months/:id/cash", async (request, response) => {
+    try {
+      const payload = parseCashSummaryInput(request.params.id);
+      const summary = await getCashSummary(payload.monthId);
+      response.json(summary);
     } catch (error) {
       if (isDomainError(error)) {
         response.status(error.statusCode).json({ message: error.message });

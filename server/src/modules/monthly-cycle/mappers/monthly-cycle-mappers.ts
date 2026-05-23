@@ -1,4 +1,6 @@
-import type { MonthView, TemplateView } from "../dto/index.js";
+import { PaymentMethod } from "../../../lib/prisma-client.js";
+
+import type { CashSummaryView, ExpenseHistoryView, MonthView, TemplateView } from "../dto/index.js";
 import { calculateMonthBalances } from "../balance-calculator.js";
 import { calculateCashBalance } from "../shared/cash-ledger.js";
 import { decimalToNumber } from "../shared/money.js";
@@ -61,3 +63,52 @@ export const mapMonth = (month: MonthRecord): MonthView => {
     })),
   };
 };
+
+type MovementHistoryRecord = MonthRecord["movements"][number];
+
+const findSubcategoryContext = (month: MonthRecord, subcategoryId: string) => {
+  for (const category of month.categories) {
+    const subcategory = category.subcategories.find((candidate) => candidate.id === subcategoryId);
+    if (subcategory) {
+      return {
+        category: { id: category.id, name: category.name },
+        subcategory: { id: subcategory.id, name: subcategory.name },
+      };
+    }
+  }
+
+  return null;
+};
+
+export const mapExpenseHistory = (month: MonthRecord, movements: MovementHistoryRecord[]): ExpenseHistoryView => ({
+  expenses: movements.map((movement) => {
+    const sourceSubcategoryId = movement.sourceSubcategoryId ?? "";
+    const context = findSubcategoryContext(month, sourceSubcategoryId);
+
+    if (!context) {
+      throw new Error("Expense source subcategory was not found in the month snapshot.");
+    }
+
+    return {
+      id: movement.id ?? "",
+      occurredAt: (movement.occurredAt ?? month.openedAt).toISOString(),
+      paymentMethod: movement.paymentMethod ?? PaymentMethod.NON_CASH,
+      amount: decimalToNumber(movement.amount),
+      description: movement.description ?? null,
+      category: context.category,
+      subcategory: context.subcategory,
+    };
+  }),
+});
+
+export const mapCashSummary = (month: MonthRecord, movements: MovementHistoryRecord[]): CashSummaryView => ({
+  monthId: month.id,
+  cashBalance: calculateCashBalance(month.movements),
+  events: movements.map((movement) => ({
+    id: movement.id ?? "",
+    type: movement.type,
+    amount: decimalToNumber(movement.amount),
+    occurredAt: (movement.occurredAt ?? month.openedAt).toISOString(),
+    description: movement.description ?? null,
+  })),
+});

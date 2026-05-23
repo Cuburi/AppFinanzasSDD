@@ -139,6 +139,21 @@ export type MonthlyCycleDb = {
     }): Promise<MonthRecord>;
   };
   movement: {
+    findMany(args: unknown): Promise<
+      Array<{
+        id?: string;
+        type: MovementType;
+        amount: Prisma.Decimal;
+        occurredAt?: Date;
+        description?: string | null;
+        paymentMethod?: PaymentMethod | null;
+        monthId?: string | null;
+        sourceSubcategoryId: string | null;
+        targetSubcategoryId: string | null;
+        sourcePocketId: string | null;
+        targetPocketId: string | null;
+      }>
+    >;
     create(args: {
       data: {
         type: MovementType;

@@ -2,6 +2,7 @@ import { prisma } from "../../lib/prisma.js";
 import {
   type ClosureActionInput,
   type CreateMonthlyIncomeInput,
+  type ExpenseHistoryQueryInput,
   type OpenMonthInput,
   type DepositToPocketInput,
   type RecordExpenseInput,
@@ -11,6 +12,7 @@ import {
 } from "./dto/index.js";
 import { createCashService } from "./workflows/cash-service.js";
 import { createClosureService, buildClosureReview } from "./workflows/closure-service.js";
+import { createExpenseHistoryService } from "./workflows/expense-history-service.js";
 import { createIncomeService } from "./workflows/income-service.js";
 import { createMonthLifecycleService } from "./workflows/month-lifecycle-service.js";
 import { createMovementService } from "./workflows/movement-service.js";
@@ -26,6 +28,7 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
   const incomeService = createIncomeService(db);
   const closureService = createClosureService(db);
   const cashService = createCashService(db);
+  const expenseHistoryService = createExpenseHistoryService(db);
 
   return {
     getTemplate: templateService.getTemplate,
@@ -33,7 +36,9 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
     openMonth: monthLifecycleService.openMonth,
     getActiveMonth: monthLifecycleService.getActiveMonth,
     recordExpense: movementService.recordExpense,
+    listExpenseHistory: expenseHistoryService.listExpenseHistory,
     withdrawCash: cashService.withdrawCash,
+    getCashSummary: cashService.getCashSummary,
     depositToPocket: movementService.depositToPocket,
     createMonthlyIncome: incomeService.createMonthlyIncome,
     updateMonthlyIncome: incomeService.updateMonthlyIncome,
@@ -51,7 +56,9 @@ export const updateTemplate = (input: TemplateInput) => monthlyCycleService.upda
 export const openMonth = (input: OpenMonthInput) => monthlyCycleService.openMonth(input);
 export const getActiveMonth = () => monthlyCycleService.getActiveMonth();
 export const recordExpense = (input: RecordExpenseInput) => monthlyCycleService.recordExpense(input);
+export const listExpenseHistory = (input: ExpenseHistoryQueryInput) => monthlyCycleService.listExpenseHistory(input);
 export const withdrawCash = (input: WithdrawCashInput) => monthlyCycleService.withdrawCash(input);
+export const getCashSummary = (monthId: string) => monthlyCycleService.getCashSummary(monthId);
 export const depositToPocket = (input: DepositToPocketInput) => monthlyCycleService.depositToPocket(input);
 export const createMonthlyIncome = (input: CreateMonthlyIncomeInput) => monthlyCycleService.createMonthlyIncome(input);
 export const updateMonthlyIncome = (input: UpdateMonthlyIncomeInput) => monthlyCycleService.updateMonthlyIncome(input);

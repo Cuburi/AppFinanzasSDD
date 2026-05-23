@@ -11,6 +11,14 @@ export type RecordExpenseInput = {
   paymentMethod: PaymentMethod;
 };
 
+export type ExpenseHistoryQueryInput = {
+  monthId: string;
+  from?: string;
+  to?: string;
+  paymentMethod?: PaymentMethod;
+  subcategoryId?: string;
+};
+
 const readPaymentMethod = (value: unknown): PaymentMethod => {
   if (value === PaymentMethod.CASH || value === PaymentMethod.NON_CASH) {
     return value;
@@ -33,5 +41,18 @@ export const parseRecordExpenseInput = (monthId: string, payload: unknown): Reco
     description: readOptionalString(rawPayload.description),
     occurredAt: readIsoDateString(rawPayload.occurredAt, "Expense date"),
     paymentMethod: readPaymentMethod(rawPayload.paymentMethod),
+  };
+};
+
+export const parseExpenseHistoryQueryInput = (monthId: string, query: unknown): ExpenseHistoryQueryInput => {
+  const rawQuery = query && typeof query === "object" ? (query as Record<string, unknown>) : {};
+  const paymentMethod = rawQuery.paymentMethod === undefined ? undefined : readPaymentMethod(rawQuery.paymentMethod);
+
+  return {
+    monthId: readNonEmptyString(monthId, "Month id"),
+    from: rawQuery.from === undefined ? undefined : readIsoDateString(rawQuery.from, "From date"),
+    to: rawQuery.to === undefined ? undefined : readIsoDateString(rawQuery.to, "To date"),
+    paymentMethod,
+    subcategoryId: rawQuery.subcategoryId === undefined ? undefined : readNonEmptyString(rawQuery.subcategoryId, "Subcategory"),
   };
 };
