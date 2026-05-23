@@ -7,13 +7,10 @@ export type WithdrawCashInput = {
   description?: string | null;
 };
 
-<<<<<<< HEAD
 export type CashSummaryInput = {
   monthId: string;
 };
 
-=======
->>>>>>> master
 export const parseWithdrawCashInput = (monthId: string, payload: unknown): WithdrawCashInput => {
   if (!payload || typeof payload !== "object") {
     throw new Error("Cash withdrawal payload is required.");
@@ -28,10 +25,7 @@ export const parseWithdrawCashInput = (monthId: string, payload: unknown): Withd
     description: readOptionalString(rawPayload.description),
   };
 };
-<<<<<<< HEAD
 
 export const parseCashSummaryInput = (monthId: string): CashSummaryInput => ({
   monthId: readNonEmptyString(monthId, "Month id"),
 });
-=======
->>>>>>> master
