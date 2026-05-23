@@ -247,6 +247,34 @@ const createIntegrationDb = (initialTemplate?: TemplateCategoryState[]) => {
       },
     },
     movement: {
+      async findMany(args: {
+        where?: {
+          monthId?: string;
+          type?: MovementType | { in: MovementType[] };
+          paymentMethod?: PaymentMethod;
+          sourceSubcategoryId?: string;
+          occurredAt?: { gte?: Date; lte?: Date };
+        };
+      }) {
+        const typeMatches = (movement: MonthState["movements"][number]) => {
+          const typeFilter = args.where?.type;
+          if (!typeFilter) return true;
+          if (typeof typeFilter === "object" && "in" in typeFilter) return typeFilter.in.includes(movement.type);
+          return movement.type === typeFilter;
+        };
+
+        return capturedMovements.filter((movement) => {
+          const occurredAt = movement.occurredAt ?? new Date("2026-05-01T00:00:00.000Z");
+          return (
+            (!args.where?.monthId || movement.monthId === args.where.monthId) &&
+            typeMatches(movement) &&
+            (!args.where?.paymentMethod || movement.paymentMethod === args.where.paymentMethod) &&
+            (!args.where?.sourceSubcategoryId || movement.sourceSubcategoryId === args.where.sourceSubcategoryId) &&
+            (!args.where?.occurredAt?.gte || occurredAt >= args.where.occurredAt.gte) &&
+            (!args.where?.occurredAt?.lte || occurredAt <= args.where.occurredAt.lte)
+          );
+        });
+      },
       async create(args: {
         data: {
           type: MovementType;
@@ -729,6 +757,26 @@ test("service integration: cash expense is rejected when physical cash is insuff
       return true;
     },
   );
+});
+
+test("service integration: filters expense history by payment method, date range, and subcategory", async () => {
+  const { db } = createIntegrationDb([{ id: "template-category-1", name: "Base", sortOrder: 0, subcategories: [{ id: "template-food", name: "Comida", plannedAmount: money(300), defaultPocketId: "pocket-buffer", active: true, sortOrder: 0 }, { id: "template-transport", name: "Transporte", plannedAmount: money(200), defaultPocketId: "pocket-buffer", active: true, sortOrder: 1 }] }]);
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const foodId = month.categories[0]?.subcategories[0]?.id ?? "";
+  const transportId = month.categories[0]?.subcategories[1]?.id ?? "";
+  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 200, receivedAt: "2026-05-01T00:00:00.000Z" });
+  await service.withdrawCash({ monthId: month.id, amount: 60, occurredAt: "2026-05-02T00:00:00.000Z" });
+  await service.recordExpense({ monthId: month.id, sourceSubcategoryId: foodId, amount: 30, occurredAt: "2026-05-03T00:00:00.000Z", paymentMethod: PaymentMethod.CASH, description: "Feria" });
+  await service.recordExpense({ monthId: month.id, sourceSubcategoryId: transportId, amount: 20, occurredAt: "2026-05-20T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH, description: "Sube" });
+
+  const history = await service.listExpenseHistory({ monthId: month.id, from: "2026-05-01T00:00:00.000Z", to: "2026-05-10T23:59:59.999Z", paymentMethod: PaymentMethod.CASH, subcategoryId: foodId });
+
+  assert.equal(history.expenses.length, 1);
+  assert.equal(history.expenses[0]?.description, "Feria");
+  assert.equal(history.expenses[0]?.paymentMethod, PaymentMethod.CASH);
+  assert.equal(history.expenses[0]?.subcategory.id, foodId);
+  assert.equal(history.expenses[0]?.category.name, "Base");
 });
 
 test("service integration: opening next month creates cash carryover from latest prior closed month", async () => {

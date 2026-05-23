@@ -1,8 +1,8 @@
-import { MovementType } from "../../../lib/prisma-client.js";
+import { MovementType, PaymentMethod } from "../../../lib/prisma-client.js";
 
 import { calculateMonthBalances } from "../balance-calculator.js";
-import type { MonthView, WithdrawCashInput } from "../dto/index.js";
-import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
+import type { CashSummaryView, MonthView, WithdrawCashInput } from "../dto/index.js";
+import { mapCashSummary, mapMonth } from "../mappers/monthly-cycle-mappers.js";
 import { assertOccurredAtWithinMonth } from "../shared/cash-ledger.js";
 import { decimal } from "../shared/money.js";
 import { assertMonthIsMutable, readMonthById } from "../shared/month-queries.js";
@@ -48,5 +48,20 @@ export const createCashService = (db: MonthlyCycleDb) => ({
     });
 
     return { month: mapMonth(month) };
+  },
+
+  async getCashSummary(monthId: string): Promise<CashSummaryView> {
+    const month = await readMonthById(db, monthId);
+    const events = await db.movement.findMany({
+      where: { monthId, type: { in: [MovementType.CASH_WITHDRAWAL, MovementType.CASH_CARRYOVER_IN, MovementType.EXPENSE] } },
+      orderBy: { occurredAt: "asc" },
+    });
+
+    const cashEvents = events.filter(
+      (movement) =>
+        movement.type === MovementType.CASH_WITHDRAWAL || movement.type === MovementType.CASH_CARRYOVER_IN || movement.paymentMethod === PaymentMethod.CASH,
+    );
+
+    return mapCashSummary(month, cashEvents);
   },
 });
