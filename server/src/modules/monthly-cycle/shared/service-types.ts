@@ -1,4 +1,4 @@
-import { MonthStatus, MovementType, Prisma } from "../../../lib/prisma-client.js";
+import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../lib/prisma-client.js";
 
 export const templateInclude = {
   subcategories: {
@@ -69,8 +69,12 @@ export type MonthRecord = {
     }>;
   }>;
   movements: Array<{
+    id?: string;
     type: MovementType;
     amount: Prisma.Decimal;
+    occurredAt?: Date;
+    description?: string | null;
+    paymentMethod?: PaymentMethod | null;
     sourceSubcategoryId: string | null;
     targetSubcategoryId: string | null;
     sourcePocketId: string | null;
@@ -101,19 +105,14 @@ export type MonthlyCycleDb = {
     }): Promise<unknown>;
   };
   month: {
-    findFirst(args: {
-      where: { status: MonthStatus };
-      select?: { id: true; year: true; month: true };
-      orderBy?: { openedAt: "desc" };
-      include?: typeof monthInclude;
-    }): Promise<MonthRecord | { id: string; year: number; month: number } | null>;
+    findFirst(args: unknown): Promise<MonthRecord | { id: string; year: number; month: number } | null>;
     findUnique(args: unknown): Promise<unknown>;
     create(args: {
       data: {
         year: number;
         month: number;
-        status: MonthStatus;
-        categories: {
+          status: MonthStatus;
+          categories: {
           create: Array<{
             name: string;
             sortOrder: number;
@@ -126,7 +125,8 @@ export type MonthlyCycleDb = {
                 templateSubcategoryId: string;
                 sortOrder: number;
               }>;
-            };
+          };
+          movements?: { create: Array<{ type: MovementType; amount: Prisma.Decimal; description?: string | null; occurredAt?: Date }> };
           }>;
         };
       };
@@ -144,6 +144,8 @@ export type MonthlyCycleDb = {
         type: MovementType;
         amount: Prisma.Decimal;
         description?: string | null;
+        occurredAt?: Date;
+        paymentMethod?: PaymentMethod | null;
         monthId?: string | null;
         sourceSubcategoryId?: string | null;
         targetSubcategoryId?: string | null;

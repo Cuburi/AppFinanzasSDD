@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MonthStatus, MovementType, Prisma } from "../../lib/prisma-client.js";
+import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../lib/prisma-client.js";
 
 import { createMonthlyCycleService, DomainError } from "./service.js";
 
@@ -61,6 +61,9 @@ type MonthState = {
     sourcePocketId: string | null;
     targetPocketId: string | null;
     externalSourceLabel?: string | null;
+    occurredAt?: Date;
+    paymentMethod?: PaymentMethod | null;
+    id?: string;
   }>;
 };
 
@@ -94,6 +97,7 @@ const cloneMonth = (month: MonthState): MonthState => ({
   movements: month.movements.map((movement) => ({
     ...movement,
     amount: money(Number(movement.amount.toString())),
+    occurredAt: movement.occurredAt ? new Date(movement.occurredAt) : undefined,
   })),
 });
 
@@ -248,6 +252,8 @@ const createIntegrationDb = (initialTemplate?: TemplateCategoryState[]) => {
           type: MovementType;
           amount: Prisma.Decimal;
           description?: string | null;
+          occurredAt?: Date;
+          paymentMethod?: PaymentMethod | null;
           monthId?: string | null;
           sourceSubcategoryId?: string | null;
           targetSubcategoryId?: string | null;
@@ -256,11 +262,15 @@ const createIntegrationDb = (initialTemplate?: TemplateCategoryState[]) => {
           externalSourceLabel?: string | null;
         };
       }) {
+        const movementId = `movement-${nextId++}`;
         const movement = {
+          id: movementId,
           type: args.data.type,
           amount: args.data.amount,
           monthId: args.data.monthId ?? null,
           description: args.data.description ?? null,
+          occurredAt: args.data.occurredAt ?? new Date("2026-05-01T00:00:00.000Z"),
+          paymentMethod: args.data.paymentMethod ?? null,
           sourceSubcategoryId: args.data.sourceSubcategoryId ?? null,
           targetSubcategoryId: args.data.targetSubcategoryId ?? null,
           sourcePocketId: args.data.sourcePocketId ?? null,
@@ -274,7 +284,7 @@ const createIntegrationDb = (initialTemplate?: TemplateCategoryState[]) => {
           month.movements.push(movement);
         }
 
-        return { id: `movement-${nextId++}` };
+        return { id: movementId };
       },
     },
     monthlyIncome: {
@@ -380,7 +390,14 @@ test("service integration: closed months are immutable", async () => {
   await service.closeMonth(month.id);
 
   await assert.rejects(
-    () => service.recordExpense({ monthId: month.id, sourceSubcategoryId: subcategoryId, amount: 10 }),
+    () =>
+      service.recordExpense({
+        monthId: month.id,
+        sourceSubcategoryId: subcategoryId,
+        amount: 10,
+        occurredAt: "2026-05-10T00:00:00.000Z",
+        paymentMethod: PaymentMethod.NON_CASH,
+      }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
@@ -551,6 +568,8 @@ test("service integration: overspend is persisted and recalculates the month as 
     sourceSubcategoryId: subcategoryId,
     amount: 350,
     description: "Compra grande",
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
   });
   const movement = getCapturedMovements()[0];
 
@@ -592,7 +611,13 @@ test("service integration: deficit coverage from one subcategory persists a sing
   const surplusSourceId = month.categories[0]?.subcategories[0]?.id ?? "";
   const deficitTargetId = month.categories[0]?.subcategories[1]?.id ?? "";
 
-  await service.recordExpense({ monthId: month.id, sourceSubcategoryId: deficitTargetId, amount: 150 });
+  await service.recordExpense({
+    monthId: month.id,
+    sourceSubcategoryId: deficitTargetId,
+    amount: 150,
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+  });
   const review = await service.applyClosureAction({
     monthId: month.id,
     type: "DEFICIT_COVER_FROM_SUBCATEGORY",
@@ -629,4 +654,97 @@ test("service integration: template edits are readable after persistence", async
   assert.equal(template.categories[0]?.subcategories[0]?.name, "Supermercado");
   assert.equal(template.categories[0]?.subcategories[0]?.plannedAmount, 450);
   assert.equal(template.categories[0]?.subcategories[0]?.defaultPocketId, "pocket-buffer");
+});
+
+test("service integration: records non-cash expense with occurred date and exposes cash balance", async () => {
+  const { db, getCapturedMovements } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+
+  const updatedMonth = await service.recordExpense({ monthId: month.id, sourceSubcategoryId: subcategoryId, amount: 75, description: "Supermercado", occurredAt: "2026-05-17T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH });
+  const movement = getCapturedMovements()[0];
+
+  assert.equal(movement?.type, MovementType.EXPENSE);
+  assert.equal(movement?.paymentMethod, PaymentMethod.NON_CASH);
+  assert.equal(movement?.occurredAt?.toISOString(), "2026-05-17T00:00:00.000Z");
+  assert.equal(updatedMonth.availableMoney, -75);
+  assert.equal(updatedMonth.cashBalance, 0);
+});
+
+test("service integration: rejects expense dates outside the linked month", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+
+  await assert.rejects(
+    () => service.recordExpense({ monthId: month.id, sourceSubcategoryId: subcategoryId, amount: 10, occurredAt: "2026-06-01T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /inside the linked month/i);
+      return true;
+    },
+  );
+});
+
+test("service integration: withdraws cash only when available money is sufficient", async () => {
+  const { db, getCapturedMovements } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+
+  await assert.rejects(
+    () => service.withdrawCash({ monthId: month.id, amount: 50, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /insufficient available money/i);
+      return true;
+    },
+  );
+
+  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 100, receivedAt: "2026-05-05T00:00:00.000Z" });
+  const result = await service.withdrawCash({ monthId: month.id, amount: 40, occurredAt: "2026-05-10T00:00:00.000Z", description: "ATM" });
+  const withdrawal = getCapturedMovements().find((movement) => movement.type === MovementType.CASH_WITHDRAWAL);
+
+  assert.equal(withdrawal?.type, MovementType.CASH_WITHDRAWAL);
+  assert.equal(withdrawal?.description, "ATM");
+  assert.equal(result.month.availableMoney, 60);
+  assert.equal(result.month.cashBalance, 40);
+});
+
+test("service integration: cash expense is rejected when physical cash is insufficient", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+
+  await assert.rejects(
+    () => service.recordExpense({ monthId: month.id, sourceSubcategoryId: subcategoryId, amount: 25, occurredAt: "2026-05-11T00:00:00.000Z", paymentMethod: PaymentMethod.CASH }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /insufficient cash/i);
+      return true;
+    },
+  );
+});
+
+test("service integration: opening next month creates cash carryover from latest prior closed month", async () => {
+  const { db, getCapturedMovements } = createIntegrationDb([{ id: "template-category-cash", name: "Base", sortOrder: 0, subcategories: [{ id: "template-cash-food", name: "Comida", plannedAmount: money(20), defaultPocketId: "pocket-buffer", active: true, sortOrder: 0 }] }]);
+  const service = createMonthlyCycleService(db);
+  const may = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = may.categories[0]?.subcategories[0]?.id ?? "";
+  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 50, receivedAt: "2026-05-01T00:00:00.000Z" });
+  await service.withdrawCash({ monthId: may.id, amount: 50, occurredAt: "2026-05-02T00:00:00.000Z" });
+  await service.recordExpense({ monthId: may.id, sourceSubcategoryId: subcategoryId, amount: 20, occurredAt: "2026-05-03T00:00:00.000Z", paymentMethod: PaymentMethod.CASH });
+  await service.closeMonth(may.id);
+
+  const june = await service.openMonth({ year: 2026, month: 6 });
+  const carryover = getCapturedMovements().find((movement) => movement.type === MovementType.CASH_CARRYOVER_IN);
+
+  assert.equal(carryover?.monthId, june.id);
+  assert.equal(Number(carryover?.amount.toString()), 30);
+  assert.equal(june.cashBalance, 30);
 });

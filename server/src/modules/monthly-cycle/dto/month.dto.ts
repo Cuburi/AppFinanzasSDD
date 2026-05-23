@@ -29,6 +29,7 @@ export type MonthView = {
   incomes: MonthlyIncomeView[];
   monthlyIncomeTotal: number;
   availableMoney: number;
+  cashBalance: number;
   categories: MonthCategoryView[];
 };
 
