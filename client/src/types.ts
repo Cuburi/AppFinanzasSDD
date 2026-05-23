@@ -88,6 +88,61 @@ export type MonthlyIncome = {
   updatedAt: string;
 };
 
+export type PaymentMethod = "NON_CASH" | "CASH";
+
+export type RecordExpenseInput = {
+  monthId: string;
+  sourceSubcategoryId: string;
+  amount: number;
+  occurredAt: string;
+  paymentMethod: PaymentMethod;
+  description?: string;
+};
+
+export type ExpenseHistoryFilters = {
+  from?: string;
+  to?: string;
+  paymentMethod?: PaymentMethod;
+  subcategoryId?: string;
+};
+
+export type ExpenseHistoryItem = {
+  id: string;
+  occurredAt: string;
+  paymentMethod: PaymentMethod;
+  amount: number;
+  description: string | null;
+  category: {
+    id: string;
+    name: string;
+  };
+  subcategory: {
+    id: string;
+    name: string;
+  };
+};
+
+export type WithdrawCashInput = {
+  monthId: string;
+  amount: number;
+  occurredAt: string;
+  description?: string;
+};
+
+export type CashSummaryEvent = {
+  id: string;
+  type: "CASH_WITHDRAWAL" | "CASH_CARRYOVER_IN" | "EXPENSE";
+  amount: number;
+  occurredAt: string;
+  description: string | null;
+};
+
+export type CashSummary = {
+  monthId: string;
+  cashBalance: number;
+  events: CashSummaryEvent[];
+};
+
 export type CreateMonthlyIncomeInput = {
   monthId: string;
   sourceName: string;
@@ -115,6 +170,7 @@ export type Month = {
   incomes: MonthlyIncome[];
   monthlyIncomeTotal: number;
   availableMoney: number;
+  cashBalance: number;
   categories: MonthCategory[];
 };
 
