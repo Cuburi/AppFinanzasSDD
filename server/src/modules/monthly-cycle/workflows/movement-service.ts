@@ -15,7 +15,7 @@ export const createMovementService = (db: MonthlyCycleDb) => ({
       assertMonthIsMutable(existingMonth);
 
       if (!findMonthSubcategory(existingMonth, input.sourceSubcategoryId)) {
-        throw new DomainError(400, "Source subcategory does not belong to this month.");
+        throw new DomainError(404, "Subcategory was not found in this month.");
       }
 
       const occurredAt = new Date(input.occurredAt);
