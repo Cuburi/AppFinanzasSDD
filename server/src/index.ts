@@ -1,6 +1,7 @@
 import "./load-env.js";
 import express from "express";
 
+import { debtsRouter } from "./modules/debts/routes.js";
 import { monthlyCycleRouter } from "./modules/monthly-cycle/routes.js";
 import { pocketsRouter } from "./modules/pockets/routes.js";
 
@@ -8,6 +9,7 @@ const app = express();
 const port = Number(process.env.PORT ?? 3001);
 
 app.use(express.json());
+app.use("/api", debtsRouter());
 app.use("/api", pocketsRouter());
 app.use("/api", monthlyCycleRouter());
 
