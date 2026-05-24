@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
+import { routerFutureFlags } from "./router-future-flags";
 
 vi.mock("./pages/TemplatePage", () => ({ TemplatePage: () => <h2>Plantilla test</h2> }));
 vi.mock("./pages/ActiveMonthPage", () => ({ ActiveMonthPage: () => <h2>Mes activo test</h2> }));
@@ -17,7 +18,7 @@ afterEach(() => {
 describe("App pocket route", () => {
   it("exposes Bolsillos navigation and renders the pocket management route", () => {
     render(
-      <MemoryRouter initialEntries={["/pockets"]}>
+      <MemoryRouter future={routerFutureFlags} initialEntries={["/pockets"]}>
         <App />
       </MemoryRouter>,
     );
@@ -30,7 +31,7 @@ describe("App pocket route", () => {
 describe("App debt route", () => {
   it("exposes Deudas navigation and renders the debt management route", () => {
     render(
-      <MemoryRouter initialEntries={["/debts"]}>
+      <MemoryRouter future={routerFutureFlags} initialEntries={["/debts"]}>
         <App />
       </MemoryRouter>,
     );
