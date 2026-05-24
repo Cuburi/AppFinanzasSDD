@@ -2,6 +2,7 @@ import { Link, Navigate, Route, Routes } from "react-router-dom";
 
 import { ActiveMonthPage } from "./pages/ActiveMonthPage";
 import { CloseMonthPage } from "./pages/CloseMonthPage";
+import { DebtsPage } from "./pages/DebtsPage";
 import { PocketsPage } from "./pages/PocketsPage";
 import { TemplatePage } from "./pages/TemplatePage";
 
@@ -18,6 +19,7 @@ export default function App() {
           <Link to="/template">Plantilla</Link>
           <Link to="/active-month">Mes activo</Link>
           <Link to="/pockets">Bolsillos</Link>
+          <Link to="/debts">Deudas</Link>
           <Link to="/close-month">Cierre</Link>
         </nav>
       </header>
@@ -28,6 +30,7 @@ export default function App() {
           <Route path="/template" element={<TemplatePage />} />
           <Route path="/active-month" element={<ActiveMonthPage />} />
           <Route path="/pockets" element={<PocketsPage />} />
+          <Route path="/debts" element={<DebtsPage />} />
           <Route path="/close-month" element={<CloseMonthPage />} />
         </Routes>
       </main>

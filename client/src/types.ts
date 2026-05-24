@@ -46,6 +46,45 @@ export type SavingsPocket = {
   recentMovements?: SavingsPocketMovement[];
 };
 
+export type DebtDirection = "I_OWE" | "OWED_TO_ME";
+
+export type DebtStatus = "OPEN" | "PAID";
+
+export type DebtPaymentView = {
+  id: string;
+  amount: number;
+  paidAt: string;
+  notes: string | null;
+};
+
+export type DebtView = {
+  id: string;
+  direction: DebtDirection;
+  counterpartyName: string;
+  description: string | null;
+  totalAmount: number;
+  currency: string;
+  originDate: string;
+  remainingBalance: number;
+  status: DebtStatus;
+  payments: DebtPaymentView[];
+};
+
+export type CreateDebtInput = {
+  direction: DebtDirection;
+  counterpartyName: string;
+  totalAmount: number;
+  originDate: string;
+  description?: string | null;
+  currency?: string;
+};
+
+export type RegisterDebtPaymentInput = {
+  amount: number;
+  paidAt: string;
+  notes?: string | null;
+};
+
 export type PocketListFilter = "active" | "inactive" | "all";
 
 export type CreatePocketInput = {

@@ -2,13 +2,16 @@ import type {
   ClosureActionInput,
   ClosureReview,
   CashSummary,
+  CreateDebtInput,
   CreateMonthlyIncomeInput,
   CreatePocketInput,
+  DebtView,
   EditableTemplate,
   ExpenseHistoryFilters,
   ExpenseHistoryItem,
   Month,
   PocketListFilter,
+  RegisterDebtPaymentInput,
   RecordExpenseInput,
   SavingsPocket,
   UpdateMonthlyIncomeInput,
@@ -37,6 +40,34 @@ const readJson = async <T>(response: Response): Promise<T> => {
 };
 
 export const api = {
+  async getDebts(): Promise<DebtView[]> {
+    const response = await fetch("/api/debts");
+    const payload = await readJson<{ debts: DebtView[] }>(response);
+
+    return payload.debts;
+  },
+  async createDebt(input: CreateDebtInput): Promise<DebtView> {
+    const response = await fetch("/api/debts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+
+    return readJson<DebtView>(response);
+  },
+  async registerDebtPayment(id: string, input: RegisterDebtPaymentInput): Promise<DebtView> {
+    const response = await fetch(`/api/debts/${id}/payments`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+
+    return readJson<DebtView>(response);
+  },
   async getPockets(filter: PocketListFilter = "active"): Promise<SavingsPocket[]> {
     const activeQuery = filter === "all" ? "all" : String(filter === "active");
     const response = await fetch(`/api/pockets?active=${activeQuery}`);
