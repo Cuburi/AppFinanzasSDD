@@ -15,23 +15,23 @@ Este plan refleja el estado real del MVP después del trabajo de ciclo mensual. 
 | Bolsillos / ahorros | 🟡 Parcial | Bolsillos con meta opcional, saldo, movimientos y depósitos. Falta automatización de excedentes al cumplir meta. |
 | Sobrantes y cierre | 🟡 Parcial | Revisión de cierre, sobrantes a bolsillo y cobertura de desfases; falta opción explícita de reiniciar sobrante en cero. |
 | Efectivo físico | ✅ Implementado | Hay retiros, saldo de efectivo físico, gastos en efectivo sin doble descuento y arrastre positivo entre meses. |
-| Deudas | ⬜ Pendiente | No hay modelo ni módulo todavía. |
+| Deudas | ✅ Implementadas | Módulo independiente `debts`, API, ledger de pagos y UI básica `/debts`; COP-only y sin integración todavía con ciclo mensual/caja. |
 | Reportes | ⬜ Pendiente | Hay datos base, pero falta módulo/página. |
 
 ## Último foco completado
 
-**Historial de gastos + efectivo físico** quedó implementado como el último corte del ciclo mensual.
+**Control de Deudas** quedó implementado como feature aislada después del corte de historial de gastos + efectivo físico.
 
 Qué cerró:
 
-- Registro de gasto con fecha explícita y medio de pago.
-- Historial mensual de gastos.
-- Retiros de efectivo físico.
-- Saldo de efectivo físico derivado de movimientos.
-- Gasto en efectivo sin doble descontar el disponible mensual.
-- Arrastre positivo de efectivo al abrir un nuevo mes.
+- Modelo `Debt`/`DebtPayment` y migración Prisma.
+- Dirección explícita: deudas que yo debo y deudas que me deben.
+- Registro de pagos parciales/totales con saldo y estado derivados desde ledger.
+- API `/api/debts` y `/api/debts/:id/payments`.
+- Página básica `/debts` para listar, crear y registrar pagos.
+- Verificación SDD final en PASS.
 
-**Control de Deudas** sigue siendo el mejor candidato si queremos una feature más aislada y menos riesgosa arquitectónicamente.
+**Siguiente candidato razonable**: reportes básicos o notificaciones, porque ya hay datos de gastos, saldos, efectivo y deudas. Auth sigue fuera del MVP técnico actual.
 
 ---
 
@@ -127,12 +127,12 @@ Qué cerró:
 
 ### 5.1 Control de Deudas
 
-- ⬜ HU-14: Registrar deudas que YO debo (nombre, valor total, pagado, fecha límite)
-- ⬜ HU-15: Registrar deudas que ME deben (fecha límite opcional)
-- ⬜ HU-16: Marcar pagos parciales o totales
-- ⬜ HU-17: Ver saldo restante de cada deuda
+- ✅ HU-14: Registrar deudas que YO debo (nombre, valor total, pagado, fecha límite)
+- ✅ HU-15: Registrar deudas que ME deben (fecha límite opcional)
+- ✅ HU-16: Marcar pagos parciales o totales
+- ✅ HU-17: Ver saldo restante de cada deuda
 
-> Corte recomendado si queremos bajo riesgo: implementar este bloque como módulo independiente `debts`.
+> Nota: implementado como módulo independiente `debts`, sin acoplarse todavía a `monthly-cycle`. El MVP es COP-only y usa ledger de pagos para derivar saldo/estado.
 
 ### 5.2 Ahorros con Propósito
 
@@ -193,7 +193,9 @@ Cierre mensual + sobrantes/desfases
     ↓
 Historial de gastos + efectivo físico
     ↓
-Después: deudas, reportes, notificaciones, auth
+Control de deudas
+    ↓
+Después: reportes, notificaciones, auth
 ```
 
 ---

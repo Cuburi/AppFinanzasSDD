@@ -26,7 +26,7 @@ Tambien reportes utiles como que categorias siempre me sobra dinero o categorias
 
 3. **Dashboard Mensual** - Vista del mes: presupuesto total vs gastado. Indicador visual por subcategoría (disponible/desfalco).
 
-4. **Control de Deudas** - Registrar deudas (nombre, valor total, pagado, fecha límite). Marcar pagos parciales/totales.
+4. **Control de Deudas** - Registrar deudas que yo debo o que me deben, con valor total, fecha límite opcional, pagos parciales/totales, saldo restante y estado derivado. Implementado como MVP COP-only; falta integración futura con caja/ciclo mensual.
 
 5. **Ahorros con Propósito** - Registrar ahorros con destino (ej: "Ropa", "Aseo"). Asignar monto mensual. Ver progreso acumulado.
 

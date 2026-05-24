@@ -43,12 +43,12 @@ Este documento muestra el backlog funcional y el estado actual del MVP. La marca
 
 ## 5. Control de Deudas
 
-- ⬜ **HU-14**: Como usuario, quiero registrar deudas que YO debo (nombre, valor total, pagado, fecha límite).
-- ⬜ **HU-15**: Como usuario, quiero registrar deudas que ME deben a mí (nombre, valor total, pagado, fecha límite opcional).
-- ⬜ **HU-16**: Como usuario, quiero marcar pagos parciales o totales de mis deudas.
-- ⬜ **HU-17**: Como usuario, quiero ver el saldo restante de cada deuda.
+- ✅ **HU-14**: Como usuario, quiero registrar deudas que YO debo (nombre, valor total, pagado, fecha límite).
+- ✅ **HU-15**: Como usuario, quiero registrar deudas que ME deben a mí (nombre, valor total, pagado, fecha límite opcional).
+- ✅ **HU-16**: Como usuario, quiero marcar pagos parciales o totales de mis deudas.
+- ✅ **HU-17**: Como usuario, quiero ver el saldo restante de cada deuda.
 
-> Estado: no hay modelo ni módulo de deudas todavía. Es un buen candidato para la próxima funcionalidad aislada.
+> Estado: implementado como módulo independiente `debts`, con modelo `Debt`/`DebtPayment`, dirección explícita (`I_OWE` / `OWED_TO_ME`), pagos parciales, saldo restante derivado, estado `OPEN`/`PAID`, API `/api/debts` y página básica `/debts`. MVP limitado a COP; todavía no se integra con caja/ciclo mensual ni recordatorios.
 
 ## 6. Ahorros con Propósito
 
