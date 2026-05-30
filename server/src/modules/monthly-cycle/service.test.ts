@@ -53,6 +53,7 @@ type MonthFixture = {
   }>;
   movements: Array<{
     type: MovementType;
+    paymentMethod?: PaymentMethod | null;
     amount: Prisma.Decimal;
     sourceSubcategoryId: string | null;
     targetSubcategoryId: string | null;
@@ -859,4 +860,103 @@ test("closeMonth rejects pending closure balances and closes after explicit move
 
   assert.equal(closedMonth.status, MonthStatus.CLOSED);
   assert.ok(closedMonth.closedAt);
+});
+
+test("getBasicReport returns summary totals, spending ranking, and positive or negative subcategory balances", async () => {
+  const month = buildCreatedMonth(
+    [
+      {
+        id: "cat-living",
+        name: "Living",
+        sortOrder: 0,
+        subcategories: [
+          { id: "sub-food", name: "Food", plannedAmount: amount(200), defaultPocketId: null, active: true, sortOrder: 0 },
+          { id: "sub-rent", name: "Rent", plannedAmount: amount(500), defaultPocketId: null, active: true, sortOrder: 1 },
+        ],
+      },
+    ],
+    2026,
+    5,
+  );
+  const [food, rent] = month.categories[0]?.subcategories ?? [];
+  if (!food || !rent) throw new Error("Missing report fixture subcategories.");
+
+  month.incomes.push({
+    id: "income-1",
+    monthId: month.id,
+    sourceName: "Salary",
+    amount: amount(1000),
+    receivedAt: new Date("2026-05-05T00:00:00.000Z"),
+    notes: null,
+    createdAt: new Date("2026-05-05T00:00:00.000Z"),
+    updatedAt: new Date("2026-05-05T00:00:00.000Z"),
+  });
+  month.movements.push(
+    {
+      type: MovementType.EXPENSE,
+      amount: amount(250.555),
+      paymentMethod: PaymentMethod.NON_CASH,
+      sourceSubcategoryId: food.id,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+    {
+      type: MovementType.EXPENSE,
+      amount: amount(100),
+      paymentMethod: PaymentMethod.CASH,
+      sourceSubcategoryId: rent.id,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+    {
+      type: MovementType.POCKET_DEPOSIT_FROM_SUBCATEGORY,
+      amount: amount(25),
+      sourceSubcategoryId: rent.id,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: "pocket-1",
+    },
+  );
+  const dbStub = createDbStub({ monthById: month });
+  const report = await createMonthlyCycleService(dbStub.db).getBasicReport(month.id);
+
+  assert.deepEqual(report.summary, {
+    monthId: month.id,
+    year: 2026,
+    month: 5,
+    status: MonthStatus.ACTIVE,
+    monthlyIncomeTotal: 1000,
+    availableMoney: 724.44,
+    cashBalance: -100,
+    totalPlanned: 700,
+    totalSpentCash: 100,
+    totalSpentNonCash: 250.56,
+  });
+  assert.deepEqual(
+    report.topSpendingSubcategories.map((item) => ({ name: item.subcategoryName, amount: item.amount })),
+    [
+      { name: "Food", amount: 250.56 },
+      { name: "Rent", amount: 100 },
+    ],
+  );
+  assert.deepEqual(report.deficitSubcategories.map((item) => ({ name: item.subcategoryName, amount: item.amount })), [
+    { name: "Food", amount: -50.56 },
+  ]);
+  assert.deepEqual(report.surplusSubcategories.map((item) => ({ name: item.subcategoryName, amount: item.amount })), [
+    { name: "Rent", amount: 375 },
+  ]);
+  assert.equal(dbStub.getCapturedMovements().length, 0);
+});
+
+test("getBasicReport returns zero totals and empty lists for an empty month", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 6);
+  const report = await createMonthlyCycleService(createDbStub({ monthById: month }).db).getBasicReport(month.id);
+
+  assert.equal(report.summary.monthlyIncomeTotal, 0);
+  assert.equal(report.summary.availableMoney, 0);
+  assert.equal(report.summary.totalSpentCash, 0);
+  assert.equal(report.summary.totalSpentNonCash, 0);
+  assert.deepEqual(report.topSpendingSubcategories, []);
 });

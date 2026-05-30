@@ -1,4 +1,5 @@
 import { MovementType, PaymentMethod, Prisma } from "../../lib/prisma-client.js";
+import { decimalToNumber, roundMoney } from "./shared/money.js";
 
 type MonthShape = {
   incomes?: Array<{
@@ -20,10 +21,6 @@ type MonthShape = {
     targetPocketId: string | null;
   }>;
 };
-
-const decimalToNumber = (value: Prisma.Decimal): number => Number(value.toString());
-
-const roundMoney = (value: number) => Number(value.toFixed(2));
 
 export const calculateMonthBalances = (month: MonthShape) => {
   const subcategoryBalances = new Map<string, number>();
