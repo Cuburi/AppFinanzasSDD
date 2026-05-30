@@ -4,6 +4,7 @@ import { ActiveMonthPage } from "./pages/ActiveMonthPage";
 import { CloseMonthPage } from "./pages/CloseMonthPage";
 import { DebtsPage } from "./pages/DebtsPage";
 import { PocketsPage } from "./pages/PocketsPage";
+import { ReportsPage } from "./pages/ReportsPage";
 import { TemplatePage } from "./pages/TemplatePage";
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
           <Link to="/pockets">Bolsillos</Link>
           <Link to="/debts">Deudas</Link>
           <Link to="/close-month">Cierre</Link>
+          <Link to="/reports">Reports</Link>
         </nav>
       </header>
 
@@ -32,6 +34,7 @@ export default function App() {
           <Route path="/pockets" element={<PocketsPage />} />
           <Route path="/debts" element={<DebtsPage />} />
           <Route path="/close-month" element={<CloseMonthPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
         </Routes>
       </main>
     </div>

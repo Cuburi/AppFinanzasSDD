@@ -1,6 +1,7 @@
 import type {
   ClosureActionInput,
   ClosureReview,
+  BasicMonthlyReport,
   CashSummary,
   CreateDebtInput,
   CreateMonthlyIncomeInput,
@@ -188,6 +189,10 @@ export const api = {
   async getCashSummary(monthId: string): Promise<CashSummary> {
     const response = await fetch(`/api/months/${monthId}/cash`);
     return readJson<CashSummary>(response);
+  },
+  async getBasicReport(monthId: string): Promise<BasicMonthlyReport> {
+    const response = await fetch(`/api/months/${monthId}/reports/basic`);
+    return readJson<BasicMonthlyReport>(response);
   },
   async createMonthlyIncome(input: CreateMonthlyIncomeInput): Promise<Month> {
     const response = await fetch(`/api/months/${input.monthId}/incomes`, {
