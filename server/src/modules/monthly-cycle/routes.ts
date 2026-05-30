@@ -6,6 +6,7 @@ import {
   parseCashSummaryInput,
   parseDepositToPocketInput,
   parseExpenseHistoryQueryInput,
+  parseBasicReportInput,
   parseOpenMonthInput,
   parseRecordExpenseInput,
   parseTemplateInput,
@@ -22,6 +23,7 @@ import {
   getActiveMonth,
   getClosureReview,
   getCashSummary,
+  getBasicReport,
   getTemplate,
   listExpenseHistory,
   openMonth,
@@ -35,7 +37,15 @@ const isDomainError = (error: unknown): error is DomainError => error instanceof
 
 const readMessage = (error: unknown) => (error instanceof Error ? error.message : "Unexpected error.");
 
-export const monthlyCycleRouter = () => {
+type MonthlyCycleRouteService = {
+  getBasicReport(monthId: string): ReturnType<typeof getBasicReport>;
+};
+
+const defaultMonthlyCycleRouteService: MonthlyCycleRouteService = {
+  getBasicReport,
+};
+
+export const monthlyCycleRouter = (service: MonthlyCycleRouteService = defaultMonthlyCycleRouteService) => {
   const router = Router();
 
   router.get("/template", async (_request, response) => {
@@ -98,6 +108,21 @@ export const monthlyCycleRouter = () => {
       const payload = parseExpenseHistoryQueryInput(request.params.id, request.query);
       const history = await listExpenseHistory(payload);
       response.json(history);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.get("/months/:id/reports/basic", async (request, response) => {
+    try {
+      const payload = parseBasicReportInput(request.params.id);
+      const report = await service.getBasicReport(payload.monthId);
+      response.json(report);
     } catch (error) {
       if (isDomainError(error)) {
         response.status(error.statusCode).json({ message: error.message });

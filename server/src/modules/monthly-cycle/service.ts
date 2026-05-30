@@ -5,6 +5,7 @@ import {
   type ExpenseHistoryQueryInput,
   type OpenMonthInput,
   type DepositToPocketInput,
+  type BasicReportInput,
   type RecordExpenseInput,
   type TemplateInput,
   type UpdateMonthlyIncomeInput,
@@ -16,6 +17,7 @@ import { createExpenseHistoryService } from "./workflows/expense-history-service
 import { createIncomeService } from "./workflows/income-service.js";
 import { createMonthLifecycleService } from "./workflows/month-lifecycle-service.js";
 import { createMovementService } from "./workflows/movement-service.js";
+import { createReportsService } from "./workflows/reports-service.js";
 import { createTemplateService } from "./workflows/template-service.js";
 import type { MonthlyCycleDb } from "./shared/service-types.js";
 
@@ -29,6 +31,7 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
   const closureService = createClosureService(db);
   const cashService = createCashService(db);
   const expenseHistoryService = createExpenseHistoryService(db);
+  const reportsService = createReportsService(db);
 
   return {
     getTemplate: templateService.getTemplate,
@@ -37,6 +40,7 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
     getActiveMonth: monthLifecycleService.getActiveMonth,
     recordExpense: movementService.recordExpense,
     listExpenseHistory: expenseHistoryService.listExpenseHistory,
+    getBasicReport: reportsService.getBasicReport,
     withdrawCash: cashService.withdrawCash,
     getCashSummary: cashService.getCashSummary,
     depositToPocket: movementService.depositToPocket,
@@ -57,6 +61,7 @@ export const openMonth = (input: OpenMonthInput) => monthlyCycleService.openMont
 export const getActiveMonth = () => monthlyCycleService.getActiveMonth();
 export const recordExpense = (input: RecordExpenseInput) => monthlyCycleService.recordExpense(input);
 export const listExpenseHistory = (input: ExpenseHistoryQueryInput) => monthlyCycleService.listExpenseHistory(input);
+export const getBasicReport = (monthId: BasicReportInput["monthId"]) => monthlyCycleService.getBasicReport(monthId);
 export const withdrawCash = (input: WithdrawCashInput) => monthlyCycleService.withdrawCash(input);
 export const getCashSummary = (monthId: string) => monthlyCycleService.getCashSummary(monthId);
 export const depositToPocket = (input: DepositToPocketInput) => monthlyCycleService.depositToPocket(input);
