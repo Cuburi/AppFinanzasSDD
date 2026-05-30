@@ -182,6 +182,34 @@ export type CashSummary = {
   events: CashSummaryEvent[];
 };
 
+export type BasicReportSummary = {
+  monthId: string;
+  year: number;
+  month: number;
+  status: "ACTIVE" | "CLOSED";
+  monthlyIncomeTotal: number;
+  availableMoney: number;
+  cashBalance: number;
+  totalPlanned: number;
+  totalSpentCash: number;
+  totalSpentNonCash: number;
+};
+
+export type BasicReportSubcategory = {
+  subcategoryId: string;
+  subcategoryName: string;
+  categoryId: string;
+  categoryName: string;
+  amount: number;
+};
+
+export type BasicMonthlyReport = {
+  summary: BasicReportSummary;
+  topSpendingSubcategories: BasicReportSubcategory[];
+  surplusSubcategories: BasicReportSubcategory[];
+  deficitSubcategories: BasicReportSubcategory[];
+};
+
 export type CreateMonthlyIncomeInput = {
   monthId: string;
   sourceName: string;

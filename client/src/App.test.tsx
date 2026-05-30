@@ -10,6 +10,7 @@ vi.mock("./pages/ActiveMonthPage", () => ({ ActiveMonthPage: () => <h2>Mes activ
 vi.mock("./pages/CloseMonthPage", () => ({ CloseMonthPage: () => <h2>Cierre test</h2> }));
 vi.mock("./pages/PocketsPage", () => ({ PocketsPage: () => <h2>Gestión de bolsillos test</h2> }));
 vi.mock("./pages/DebtsPage", () => ({ DebtsPage: () => <h2>Control de deudas test</h2> }));
+vi.mock("./pages/ReportsPage", () => ({ ReportsPage: () => <h2>Basic reports test</h2> }));
 
 afterEach(() => {
   cleanup();
@@ -38,5 +39,18 @@ describe("App debt route", () => {
 
     expect(screen.getByRole("link", { name: "Deudas" })).toHaveAttribute("href", "/debts");
     expect(screen.getByRole("heading", { name: "Control de deudas test" })).toBeInTheDocument();
+  });
+});
+
+describe("App reports route", () => {
+  it("exposes Reports navigation and renders the reports route", () => {
+    render(
+      <MemoryRouter future={routerFutureFlags} initialEntries={["/reports"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("href", "/reports");
+    expect(screen.getByRole("heading", { name: "Basic reports test" })).toBeInTheDocument();
   });
 });

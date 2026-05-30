@@ -157,4 +157,53 @@ describe("monthly cash and expense api", () => {
     });
     expect(fetch).toHaveBeenNthCalledWith(2, "/api/months/month-1/cash");
   });
+
+  it("reads the basic monthly report from the month report endpoint", async () => {
+    const reportPayload = {
+      summary: {
+        monthId: "month-1",
+        year: 2026,
+        month: 5,
+        status: "ACTIVE",
+        monthlyIncomeTotal: 3200,
+        availableMoney: 850,
+        cashBalance: 120,
+        totalPlanned: 2100,
+        totalSpentCash: 75,
+        totalSpentNonCash: 225,
+      },
+      topSpendingSubcategories: [
+        {
+          subcategoryId: "sub-groceries",
+          subcategoryName: "Groceries",
+          categoryId: "cat-living",
+          categoryName: "Living",
+          amount: 225,
+        },
+      ],
+      surplusSubcategories: [
+        {
+          subcategoryId: "sub-savings",
+          subcategoryName: "Savings",
+          categoryId: "cat-future",
+          categoryName: "Future",
+          amount: 300,
+        },
+      ],
+      deficitSubcategories: [
+        {
+          subcategoryId: "sub-rent",
+          subcategoryName: "Rent",
+          categoryId: "cat-home",
+          categoryName: "Home",
+          amount: -50,
+        },
+      ],
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(reportPayload), { status: 200 }));
+
+    await expect(api.getBasicReport("month-1")).resolves.toEqual(reportPayload);
+
+    expect(fetch).toHaveBeenCalledWith("/api/months/month-1/reports/basic");
+  });
 });
