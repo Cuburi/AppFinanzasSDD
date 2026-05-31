@@ -2,11 +2,21 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 import { api } from "../lib/api";
+import { Button, Card, SectionHeader, StatusPill } from "../components/ui";
 import type { DebtDirection, DebtView } from "../types";
 
 const formatMoney = (amount: number, currency: string) => `${currency} $${amount.toFixed(2)}`;
 
 const directionLabel = (direction: DebtDirection) => (direction === "I_OWE" ? "Yo debo" : "Me deben");
+
+const debtStatusTone = (debt: DebtView) => {
+  if (debt.status === "PAID") return "success";
+  return debt.direction === "I_OWE" ? "danger" : "warning";
+};
+
+const debtBalanceTone = (debt: DebtView) => (debt.remainingBalance > 0 ? "warning" : "success");
+
+const debtBalanceLabel = (debt: DebtView) => (debt.remainingBalance > 0 ? "Saldo pendiente" : "Saldo liquidado");
 
 const parseOptionalText = (value: string) => {
   const trimmed = value.trim();
@@ -96,14 +106,9 @@ export const DebtsPage = () => {
 
   return (
     <section className="page stack-lg">
-      <header className="page-header">
-        <div>
-          <h1>Deudas</h1>
-          <p>Registrá deudas y pagos en COP sin afectar el ciclo mensual.</p>
-        </div>
-      </header>
+      <SectionHeader title="Deudas" description="Registrá deudas y pagos en COP sin afectar el ciclo mensual." />
 
-      <article className="card stack-md">
+      <Card aria-label="Crear deuda" className="stack-md">
         <h2>Crear deuda</h2>
         <form className="row gap-sm wrap align-start" onSubmit={createDebt}>
           <label className="field small-field">
@@ -129,16 +134,16 @@ export const DebtsPage = () => {
             <span>Descripción</span>
             <input value={description} onChange={(event) => setDescription(event.target.value)} />
           </label>
-          <button className="button primary" disabled={submitting} type="submit">
+          <Button disabled={submitting} type="submit">
             Crear deuda
-          </button>
+          </Button>
         </form>
-      </article>
+      </Card>
 
       {message ? <p className="success">{message}</p> : null}
       {error ? <p className="error">{error}</p> : null}
 
-      <article className="card stack-md">
+      <Card aria-label="Listado de deudas" className="stack-md">
         <h2>Listado</h2>
         {loading ? <p>Cargando deudas...</p> : null}
         {!loading && debts.length === 0 ? <p>No hay deudas registradas.</p> : null}
@@ -152,9 +157,13 @@ export const DebtsPage = () => {
                   <p>{directionLabel(debt.direction)}</p>
                 </div>
                 <p>{debt.description ?? "Sin descripción"}</p>
-                <span className="pill">Estado: {debt.status}</span>
+                <StatusPill tone={debtStatusTone(debt)} aria-label={`${debtStatusTone(debt) === "danger" ? "Danger" : debtStatusTone(debt) === "warning" ? "Warning" : "Success"}: ${directionLabel(debt.direction)} · ${debt.status}`}>
+                  Estado: {debt.status}
+                </StatusPill>
                 <p>Total: {formatMoney(debt.totalAmount, debt.currency)}</p>
-                <p>Saldo: {formatMoney(debt.remainingBalance, debt.currency)}</p>
+                <StatusPill tone={debtBalanceTone(debt)} aria-label={`${debtBalanceTone(debt) === "warning" ? "Warning" : "Success"}: ${debtBalanceLabel(debt)} ${formatMoney(debt.remainingBalance, debt.currency)}`}>
+                  Saldo: {formatMoney(debt.remainingBalance, debt.currency)}
+                </StatusPill>
                 <div>
                   <strong>Pagos</strong>
                   {debt.payments.length > 0 ? (
@@ -197,15 +206,15 @@ export const DebtsPage = () => {
                     <span>Notas del pago</span>
                     <input value={paymentNotes[debt.id] ?? ""} onChange={(event) => setPaymentNotes((current) => ({ ...current, [debt.id]: event.target.value }))} />
                   </label>
-                  <button className="button primary" disabled={submitting} onClick={() => void registerPayment(debt)} type="button">
+                  <Button disabled={submitting} onClick={() => void registerPayment(debt)} type="button">
                     Registrar pago
-                  </button>
+                  </Button>
                 </form>
               ) : null}
             </article>
           ))}
         </div>
-      </article>
+      </Card>
     </section>
   );
 };

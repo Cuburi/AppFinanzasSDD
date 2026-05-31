@@ -149,16 +149,26 @@ describe("ActiveMonthPage", () => {
   it("renders backend-computed income totals and available money", async () => {
     render(<ActiveMonthPage />);
 
-    expect(await screen.findByText("Ingresos: $1000.00")).toBeInTheDocument();
-    expect(screen.getByText("Disponible del mes: $375.00")).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Ingresos del mes" })).toHaveTextContent("$1000.00");
+    expect(screen.getByRole("region", { name: "Disponible del mes" })).toHaveTextContent("$375.00");
     expect(screen.getByText("Sueldo")).toBeInTheDocument();
     expect(screen.getByText(/neto/)).toBeInTheDocument();
+  });
+
+  it("exposes negative monthly balances as semantic risk instead of color-only pills", async () => {
+    apiMock.getActiveMonth.mockResolvedValueOnce({ ...activeMonth, availableMoney: -125, cashBalance: -15 });
+
+    render(<ActiveMonthPage />);
+
+    expect(await screen.findByRole("region", { name: "Disponible del mes" })).toHaveTextContent("$-125.00");
+    expect(screen.getByRole("region", { name: "Efectivo físico" })).toHaveTextContent("$-15.00");
+    expect(screen.getAllByText("Negative trend")).toHaveLength(2);
   });
 
   it("shows physical cash balance and month expense history", async () => {
     render(<ActiveMonthPage />);
 
-    expect(await screen.findByText("Efectivo físico: $80.00")).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Efectivo físico" })).toHaveTextContent("$80.00");
     expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1");
     expect(await screen.findByText("Café")).toBeInTheDocument();
     expect(screen.getByText("12/5/2026 · Bonus · Ingresos · Efectivo")).toBeInTheDocument();

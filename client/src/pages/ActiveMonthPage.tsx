@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
+import { Button, Card, KpiCard, SectionHeader, StatusPill } from "../components/ui";
 import type { ExpenseHistoryItem, Month, MonthlyIncome, PaymentMethod, SavingsPocket } from "../types";
 
 const now = new Date();
@@ -8,6 +9,7 @@ const now = new Date();
 const formatMonthDate = (month: Month) => `${month.year}-${String(month.month).padStart(2, "0")}-01`;
 const formatDisplayDate = (value: string) => new Date(value).toLocaleDateString("es-AR", { timeZone: "UTC" });
 const formatPaymentMethod = (paymentMethod: PaymentMethod) => (paymentMethod === "CASH" ? "Efectivo" : "No efectivo");
+const balanceTrend = (amount: number) => (amount < 0 ? "negative" : amount > 0 ? "positive" : "neutral");
 
 export const ActiveMonthPage = () => {
   const [activeMonth, setActiveMonth] = useState<Month | null>(null);
@@ -258,14 +260,9 @@ export const ActiveMonthPage = () => {
 
   return (
     <section className="page stack-lg">
-      <header className="page-header">
-        <div>
-          <h1>Mes activo</h1>
-          <p>Abrí manualmente un mes nuevo. La API bloquea abrir un segundo mes mientras exista uno activo.</p>
-        </div>
-      </header>
+      <SectionHeader title="Mes activo" description="Abrí manualmente un mes nuevo. La API bloquea abrir un segundo mes mientras exista uno activo." />
 
-      <article className="card stack-md">
+      <Card aria-label="Abrir mes manualmente" className="stack-md">
         <h2>Abrir mes manualmente</h2>
 
         <form className="row gap-sm wrap" onSubmit={handleOpenMonth}>
@@ -279,26 +276,26 @@ export const ActiveMonthPage = () => {
             <input min="1" max="12" step="1" type="number" value={month} onChange={(event) => setMonth(event.target.value)} />
           </label>
 
-          <button className="button primary" disabled={submitting} type="submit">
+          <Button disabled={submitting} type="submit">
             {submitting ? "Abriendo..." : "Abrir mes"}
-          </button>
+          </Button>
         </form>
 
         {message ? <p className="success">{message}</p> : null}
         {error ? <p className="error">{error}</p> : null}
-      </article>
+      </Card>
 
       {activeMonth ? (
-        <article className="card stack-md">
+        <Card aria-label="Ingresos y saldos del mes" className="stack-md">
           <div>
             <h2>Ingresos del mes</h2>
             <p>El dinero disponible lo calcula la API con ingresos, gastos y depósitos a bolsillos.</p>
           </div>
 
-          <div className="row gap-sm wrap">
-            <span className="pill success">Ingresos: ${activeMonth.monthlyIncomeTotal.toFixed(2)}</span>
-            <span className={activeMonth.availableMoney < 0 ? "pill danger" : "pill success"}>Disponible del mes: ${activeMonth.availableMoney.toFixed(2)}</span>
-            <span className={activeMonth.cashBalance < 0 ? "pill danger" : "pill success"}>Efectivo físico: ${activeMonth.cashBalance.toFixed(2)}</span>
+          <div className="dashboard-kpi-grid">
+            <KpiCard label="Ingresos del mes" value={`$${activeMonth.monthlyIncomeTotal.toFixed(2)}`} trend={balanceTrend(activeMonth.monthlyIncomeTotal)} />
+            <KpiCard label="Disponible del mes" value={`$${activeMonth.availableMoney.toFixed(2)}`} trend={balanceTrend(activeMonth.availableMoney)} />
+            <KpiCard label="Efectivo físico" value={`$${activeMonth.cashBalance.toFixed(2)}`} trend={balanceTrend(activeMonth.cashBalance)} />
           </div>
 
           {canMutateActiveMonth ? (
@@ -319,13 +316,13 @@ export const ActiveMonthPage = () => {
                 <span>Notas</span>
                 <input value={incomeNotes} onChange={(event) => setIncomeNotes(event.target.value)} />
               </label>
-              <button className="button primary" disabled={submitting} type="submit">
+              <Button disabled={submitting} type="submit">
                 {editingIncomeId ? "Actualizar ingreso" : "Registrar ingreso"}
-              </button>
+              </Button>
               {editingIncomeId ? (
-                <button className="button secondary" disabled={submitting} onClick={() => resetIncomeForm()} type="button">
+                <Button variant="secondary" disabled={submitting} onClick={() => resetIncomeForm()} type="button">
                   Cancelar edición
-                </button>
+                </Button>
               ) : null}
             </form>
           ) : (
@@ -343,26 +340,26 @@ export const ActiveMonthPage = () => {
                   </p>
                 </div>
                 <div className="row gap-sm wrap">
-                  <span className="pill success">${income.amount.toFixed(2)}</span>
+                  <StatusPill tone="success">Ingreso ${income.amount.toFixed(2)}</StatusPill>
                   {canMutateActiveMonth ? (
                     <>
-                      <button className="button secondary" disabled={submitting} onClick={() => startEditingIncome(income)} type="button">
+                      <Button variant="secondary" disabled={submitting} onClick={() => startEditingIncome(income)} type="button">
                         Editar ingreso
-                      </button>
-                      <button className="button tertiary" disabled={submitting} onClick={() => void handleDeleteIncome(income)} type="button">
+                      </Button>
+                      <Button variant="tertiary" disabled={submitting} onClick={() => void handleDeleteIncome(income)} type="button">
                         Eliminar ingreso
-                      </button>
+                      </Button>
                     </>
                   ) : null}
                 </div>
               </div>
             ))}
           </div>
-        </article>
+        </Card>
       ) : null}
 
       {activeMonth ? (
-        <article className="card stack-md">
+        <Card aria-label="Operación diaria" className="stack-md">
           <h2>Operación diaria</h2>
 
           <form className="row gap-sm wrap" onSubmit={handleExpense}>
@@ -396,9 +393,9 @@ export const ActiveMonthPage = () => {
               <span>Descripción</span>
               <input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} />
             </label>
-            <button className="button primary" disabled={submitting} type="submit">
+            <Button disabled={submitting} type="submit">
               Registrar gasto
-            </button>
+            </Button>
           </form>
 
           <form className="row gap-sm wrap" onSubmit={handleCashWithdrawal}>
@@ -414,9 +411,9 @@ export const ActiveMonthPage = () => {
               <span>Descripción del retiro</span>
               <input value={withdrawalDescription} onChange={(event) => setWithdrawalDescription(event.target.value)} />
             </label>
-            <button className="button primary" disabled={submitting || !canMutateActiveMonth} type="submit">
+            <Button disabled={submitting || !canMutateActiveMonth} type="submit">
               Retirar efectivo
-            </button>
+            </Button>
           </form>
 
           <form className="row gap-sm wrap" onSubmit={handleDeposit}>
@@ -450,9 +447,9 @@ export const ActiveMonthPage = () => {
               <span>Origen externo</span>
               <input disabled={Boolean(depositSourceSubcategoryId)} value={depositExternalSource} onChange={(event) => setDepositExternalSource(event.target.value)} />
             </label>
-            <button className="button primary" disabled={submitting} type="submit">
+            <Button disabled={submitting} type="submit">
               Depositar en bolsillo
-            </button>
+            </Button>
           </form>
 
           <section className="stack-sm">
@@ -466,19 +463,19 @@ export const ActiveMonthPage = () => {
                     {formatDisplayDate(expense.occurredAt)} · {expense.subcategory.name} · {expense.category.name} · {formatPaymentMethod(expense.paymentMethod)}
                   </p>
                 </div>
-                <span className="pill danger">-${expense.amount.toFixed(2)}</span>
+                <StatusPill tone="danger">Gasto -${expense.amount.toFixed(2)}</StatusPill>
               </div>
             ))}
           </section>
-        </article>
+        </Card>
       ) : null}
 
-      <article className="card stack-md">
+      <Card aria-label="Snapshot del mes activo" className="stack-md">
         <div className="row between wrap">
           <h2>Snapshot del mes activo</h2>
-          <button className="button secondary" onClick={() => void refresh()} type="button">
+          <Button variant="secondary" onClick={() => void refresh()} type="button">
             Refrescar
-          </button>
+          </Button>
         </div>
 
         {activeMonth ? (
@@ -503,9 +500,9 @@ export const ActiveMonthPage = () => {
                           <p>Planificado: ${subcategory.plannedAmount.toFixed(2)}</p>
                         </div>
 
-                        <span className={subcategory.available < 0 ? "pill danger" : "pill success"}>
+                        <StatusPill tone={subcategory.available < 0 ? "danger" : "success"}>
                           Disponible: ${subcategory.available.toFixed(2)}
-                        </span>
+                        </StatusPill>
                       </div>
                     ))}
                   </div>
@@ -516,7 +513,7 @@ export const ActiveMonthPage = () => {
         ) : (
           <p>Todavía no hay un mes activo.</p>
         )}
-      </article>
+      </Card>
     </section>
   );
 };

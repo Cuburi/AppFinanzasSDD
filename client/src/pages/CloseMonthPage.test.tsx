@@ -96,6 +96,28 @@ describe("CloseMonthPage", () => {
     expect(apiMock.closeMonth).not.toHaveBeenCalled();
   });
 
+  it("labels closure blockers and ready states with semantic finance status roles", async () => {
+    apiMock.getClosureReview.mockResolvedValue(pendingReview);
+
+    render(<CloseMonthPage />);
+
+    expect(await screen.findByRole("status", { name: "Warning: Cierre bloqueado" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Success: Sobrante $125.00" })).toBeInTheDocument();
+  });
+
+  it("labels available-money deficits as danger without relying on color alone", async () => {
+    apiMock.getClosureReview.mockResolvedValue({
+      ...pendingReview,
+      pendingSurpluses: [],
+      availableMoney: -90,
+      availableMoneyBlocker: "DEFICIT",
+    });
+
+    render(<CloseMonthPage />);
+
+    expect(await screen.findByRole("status", { name: "Danger: Dinero disponible en déficit" })).toBeInTheDocument();
+  });
+
   it("enables closing only after registering the explicit closure action", async () => {
     const user = userEvent.setup();
     apiMock.getClosureReview.mockResolvedValueOnce(pendingReview).mockResolvedValueOnce(cleanReview);
