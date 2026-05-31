@@ -1,0 +1,72 @@
+
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AppFinanzasSDD — sistema visual seleccionado</title>
+<style>
+:root{--bg:#070b16;--surface:#111827;--fg:#f6f8ef;--muted:#9aa8b7;--line:rgba(225,238,255,.13);--lime:#b8ff44;--violet:#8f6bff}
+*{box-sizing:border-box}
+body{margin:0;background:#050812;color:var(--fg);font-family:"Aptos","Segoe UI",system-ui,sans-serif}
+.wrap{padding:34px;max-width:1540px;margin:0 auto}
+.hero{display:flex;justify-content:space-between;gap:28px;align-items:end;margin-bottom:24px}
+.hero h1{font-size:48px;letter-spacing:-.06em;line-height:.98;margin:0}
+.hero p{max-width:780px;color:var(--muted);font-size:17px;line-height:1.45}
+.tag{display:inline-flex;margin-bottom:10px;color:#10170b;background:var(--lime);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:950;letter-spacing:.08em;text-transform:uppercase}
+.grid{display:grid;grid-template-columns:1fr;gap:22px}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.04));border:1px solid var(--line);border-radius:28px;padding:16px;box-shadow:0 20px 70px rgba(0,0,0,.25)}
+.meta{display:flex;justify-content:space-between;gap:14px;align-items:start;padding:6px 6px 16px}
+.meta h2{margin:0;font-size:22px;letter-spacing:-.035em}
+.meta p{margin:6px 0 0;color:var(--muted);line-height:1.35}
+.open{color:#10170b;background:var(--lime);border-radius:999px;padding:10px 14px;text-decoration:none;font-weight:900;white-space:nowrap}
+.viewport{width:100%;border-radius:20px;overflow:hidden;background:#000;border:1px solid var(--line)}
+.desktop{height:calc((100vw - 100px)/1440*940);max-height:940px}
+.mobile{height:900px;display:grid;place-items:center;background:radial-gradient(circle at center,rgba(143,107,255,.12),transparent 50%),#03050b}
+.guide{height:calc((100vw - 100px)/1440*940);max-height:940px}
+iframe{border:0;display:block}
+.desktop iframe,.guide iframe{width:1440px;height:940px;transform-origin:top left;transform:scale(calc((100vw - 100px)/1440))}
+.mobile iframe{width:438px;height:900px}
+.mini{display:grid;grid-template-columns:390px 1fr;gap:22px}
+.mini .viewport{height:900px}
+@media(min-width:1180px){.mini{grid-template-columns:460px 1fr}.mini .guide iframe{transform:scale(calc((100vw - 584px)/1440))}.mini .guide{height:900px}}
+@media(max-width:900px){.hero{display:block}.mini{grid-template-columns:1fr}.desktop iframe,.guide iframe{transform:scale(calc((100vw - 68px)/1440))}.desktop,.guide{height:calc((100vw - 68px)/1440*940)}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<section class="hero">
+<div>
+<span class="tag">Base seleccionada</span>
+<h1>AppFinanzasSDD: sistema visual production-ready</h1>
+<p>Dirección dark premium con CTA lima, guía violeta y tono humano de finanzas diarias. Incluye dashboard desktop, versión mobile y una guía UI pequeña para llevar a React.</p>
+</div>
+</section>
+<section class="grid">
+<article class="card">
+<div class="meta">
+<div><h2>01 Dashboard desktop refinado</h2><p>Jerarquía más escaneable: estado del mes, Registrar gasto, balance, progreso, acciones, gastos y alerta de deuda.</p></div>
+<a class="open" href="screens/06-production-desktop.html">Abrir</a>
+</div>
+<div class="viewport desktop"><iframe src="screens/06-production-desktop.html"></iframe></div>
+</article>
+<section class="mini">
+<article class="card">
+<div class="meta">
+<div><h2>02 Mobile</h2><p>La misma prioridad de producto adaptada a uso diario con CTA dominante y navegación inferior.</p></div>
+<a class="open" href="screens/07-production-mobile.html">Abrir</a>
+</div>
+<div class="viewport mobile"><iframe src="screens/07-production-mobile.html"></iframe></div>
+</article>
+<article class="card">
+<div class="meta">
+<div><h2>03 Guía UI</h2><p>Tokens, tipografía, tarjetas, botones, badges y estados financieros: Vas bien, Atención, Zona roja.</p></div>
+<a class="open" href="screens/08-ui-style-guide.html">Abrir</a>
+</div>
+<div class="viewport guide"><iframe src="screens/08-ui-style-guide.html"></iframe></div>
+</article>
+</section>
+</section>
+</main>
+</body>
+</html>
