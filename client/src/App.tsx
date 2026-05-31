@@ -11,12 +11,13 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div>
+        <div className="app-brand">
           <p className="eyebrow">AppFinanzas · MVP 1</p>
-          <h1>Core Monthly Cycle</h1>
+          <h1>Finance command center</h1>
+          <p>Core monthly cycle, budgets, debt, and reporting in one premium workspace.</p>
         </div>
 
-        <nav className="nav">
+        <nav aria-label="Primary sections" className="nav">
           <Link to="/template">Plantilla</Link>
           <Link to="/active-month">Mes activo</Link>
           <Link to="/pockets">Bolsillos</Link>
@@ -26,7 +27,7 @@ export default function App() {
         </nav>
       </header>
 
-      <main>
+      <main className="app-main">
         <Routes>
           <Route path="/" element={<Navigate replace to="/template" />} />
           <Route path="/template" element={<TemplatePage />} />
