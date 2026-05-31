@@ -107,7 +107,7 @@ describe("DebtsPage", () => {
         description: null,
       }),
     );
-    expect(await screen.findByText("Deuda creada."));
+    expect(await screen.findByText("Deuda creada.")).toBeInTheDocument();
     expect(screen.getByText("Carlos")).toBeInTheDocument();
     expect(screen.getByText("Me deben")).toBeInTheDocument();
   });
@@ -133,7 +133,7 @@ describe("DebtsPage", () => {
         notes: "Final payment",
       }),
     );
-    expect(await screen.findByText("Pago registrado."));
+    expect(await screen.findByText("Pago registrado.")).toBeInTheDocument();
     expect(within(debtCard).getByText("Estado: PAID")).toBeInTheDocument();
     expect(within(debtCard).getByText("Saldo: COP $0.00")).toBeInTheDocument();
   });
