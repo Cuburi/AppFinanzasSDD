@@ -1,3 +1,4 @@
+import { Children, isValidElement } from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 
 import type { Tone } from "./Card";
@@ -15,15 +16,24 @@ export type StatusPillProps = HTMLAttributes<HTMLSpanElement> & {
   tone?: Tone;
 };
 
+function textFromNode(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textFromNode).join(" ").replace(/\s+/g, " ").trim();
+  if (isValidElement<{ children?: ReactNode }>(node)) return textFromNode(node.props.children);
+
+  return "";
+}
+
 export function StatusPill({ children, className, tone = "neutral", ...props }: StatusPillProps) {
-  const text = typeof children === "string" || typeof children === "number" ? String(children) : "Status";
+  const { "aria-label": ariaLabel, ...restProps } = props;
+  const text = textFromNode(Children.toArray(children)) || "Status";
 
   return (
     <span
-      aria-label={`${toneLabels[tone]}: ${text}`}
+      aria-label={ariaLabel ?? `${toneLabels[tone]}: ${text}`}
       className={cx("pill", tone, className)}
       role="status"
-      {...props}
+      {...restProps}
     >
       {children}
     </span>
