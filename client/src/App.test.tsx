@@ -53,4 +53,18 @@ describe("App reports route", () => {
     expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("href", "/reports");
     expect(screen.getByRole("heading", { name: "Basic reports test" })).toBeInTheDocument();
   });
+
+  it("keeps the premium app shell accessible while preserving reports navigation", () => {
+    render(
+      <MemoryRouter future={routerFutureFlags} initialEntries={["/reports"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("banner")).toHaveTextContent("Finance command center");
+    expect(screen.getByRole("navigation", { name: "Primary sections" })).toContainElement(
+      screen.getByRole("link", { name: "Reports" }),
+    );
+    expect(screen.getByRole("main")).toContainElement(screen.getByRole("heading", { name: "Basic reports test" }));
+  });
 });

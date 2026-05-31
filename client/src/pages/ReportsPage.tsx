@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 
+import { Card, KpiCard, SectionHeader, StatusPill } from "../components/ui";
 import { api } from "../lib/api";
 import type { BasicMonthlyReport, BasicReportSubcategory, Month } from "../types";
 
 const formatMonthLabel = (report: BasicMonthlyReport) => `${report.summary.year}-${String(report.summary.month).padStart(2, "0")}`;
 const formatMoney = (amount: number) => `${amount < 0 ? "-" : ""}$${Math.abs(amount).toFixed(2)}`;
+const balanceTrend = (amount: number) => (amount < 0 ? "negative" : "positive");
 
 type ReportSectionProps = {
   title: string;
@@ -13,8 +15,8 @@ type ReportSectionProps = {
 };
 
 const ReportSubcategorySection = ({ title, emptyMessage, items }: ReportSectionProps) => (
-  <section aria-label={title} className="card stack-sm">
-    <h2>{title}</h2>
+  <Card aria-label={title} className="stack-sm">
+    <SectionHeader title={title} />
     {items.length === 0 ? <p>{emptyMessage}</p> : null}
     <div className="stack-sm">
       {items.map((item) => (
@@ -28,7 +30,7 @@ const ReportSubcategorySection = ({ title, emptyMessage, items }: ReportSectionP
         </article>
       ))}
     </div>
-  </section>
+  </Card>
 );
 
 export const ReportsPage = () => {
@@ -89,22 +91,49 @@ export const ReportsPage = () => {
     <section className="page stack-lg">
       <header className="page-header">
         <div>
+          <p className="eyebrow">Reports dashboard</p>
           <h1>Basic Reports</h1>
           <p>Active month: {formatMonthLabel(report)} · {report.summary.status}</p>
         </div>
       </header>
 
-      <article className="card stack-md">
-        <h2>Summary</h2>
-        <div className="row gap-sm wrap">
-          <span className="pill success">Monthly income: {formatMoney(report.summary.monthlyIncomeTotal)}</span>
-          <span className={report.summary.availableMoney < 0 ? "pill danger" : "pill success"}>Available money: {formatMoney(report.summary.availableMoney)}</span>
-          <span className={report.summary.cashBalance < 0 ? "pill danger" : "pill success"}>Cash balance: {formatMoney(report.summary.cashBalance)}</span>
-          <span className="pill">Total planned: {formatMoney(report.summary.totalPlanned)}</span>
-          <span className="pill danger">Cash spending: {formatMoney(report.summary.totalSpentCash)}</span>
-          <span className="pill danger">Non-cash spending: {formatMoney(report.summary.totalSpentNonCash)}</span>
+      <Card aria-label="Summary" className="stack-md">
+        <SectionHeader
+          description="Current active month totals, spending pressure, and available balances."
+          title="Summary"
+        />
+        <div className="dashboard-kpi-grid">
+          <KpiCard
+            detail="Income booked for the active month"
+            label="Monthly income"
+            trend="positive"
+            value={formatMoney(report.summary.monthlyIncomeTotal)}
+          />
+          <KpiCard
+            detail="Money available after planning"
+            label="Available money"
+            trend={balanceTrend(report.summary.availableMoney)}
+            value={formatMoney(report.summary.availableMoney)}
+          />
+          <KpiCard
+            detail="Cash position for spending"
+            label="Cash balance"
+            trend={balanceTrend(report.summary.cashBalance)}
+            value={formatMoney(report.summary.cashBalance)}
+          />
         </div>
-      </article>
+        <div className="row gap-sm wrap">
+          <StatusPill aria-label={`Neutral: Total planned ${formatMoney(report.summary.totalPlanned)}`}>
+            Total planned: {formatMoney(report.summary.totalPlanned)}
+          </StatusPill>
+          <StatusPill aria-label={`Danger: Cash spending ${formatMoney(report.summary.totalSpentCash)}`} tone="danger">
+            Cash spending: {formatMoney(report.summary.totalSpentCash)}
+          </StatusPill>
+          <StatusPill aria-label={`Danger: Non-cash spending ${formatMoney(report.summary.totalSpentNonCash)}`} tone="danger">
+            Non-cash spending: {formatMoney(report.summary.totalSpentNonCash)}
+          </StatusPill>
+        </div>
+      </Card>
 
       <ReportSubcategorySection title="Top spending subcategories" emptyMessage="No spending recorded for this active month." items={report.topSpendingSubcategories} />
       <ReportSubcategorySection title="Surplus subcategories" emptyMessage="No surplus subcategories for this active month." items={report.surplusSubcategories} />
