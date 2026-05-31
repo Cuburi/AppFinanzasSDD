@@ -64,6 +64,17 @@ describe("DebtsPage", () => {
     expect(screen.getByText("Initial payment · COP $100000.00")).toBeInTheDocument();
   });
 
+  it("exposes open debt risk and paid debt completion through semantic status labels", async () => {
+    apiMock.getDebts.mockResolvedValueOnce([debtToPay, { ...paidDebt, id: "debt-rent-paid" }]);
+
+    render(<DebtsPage />);
+
+    expect(await screen.findByRole("status", { name: "Danger: Yo debo · OPEN" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Success: Yo debo · PAID" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Warning: Saldo pendiente COP $200000.00" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Success: Saldo liquidado COP $0.00" })).toBeInTheDocument();
+  });
+
   it("creates a debt and keeps it visible in the MVP list", async () => {
     const user = userEvent.setup();
     const createdDebt: DebtView = {

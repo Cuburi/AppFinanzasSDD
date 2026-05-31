@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
+import { Button, Card, SectionHeader, StatusPill } from "../components/ui";
 import type { PocketListFilter, SavingsPocket } from "../types";
 
 const formatMoney = (amount: number) => `$${amount.toFixed(2)}`;
@@ -20,15 +21,15 @@ type PocketFilterButtonsProps = {
 
 const PocketFilterButtons = ({ currentFilter, onChange }: PocketFilterButtonsProps) => (
   <div className="row gap-sm wrap">
-    <button className="button secondary" disabled={currentFilter === "active"} onClick={() => onChange("active")} type="button">
+    <Button variant="secondary" disabled={currentFilter === "active"} onClick={() => onChange("active")} type="button">
       Activos
-    </button>
-    <button className="button secondary" disabled={currentFilter === "inactive"} onClick={() => onChange("inactive")} type="button">
+    </Button>
+    <Button variant="secondary" disabled={currentFilter === "inactive"} onClick={() => onChange("inactive")} type="button">
       Inactivos
-    </button>
-    <button className="button secondary" disabled={currentFilter === "all"} onClick={() => onChange("all")} type="button">
+    </Button>
+    <Button variant="secondary" disabled={currentFilter === "all"} onClick={() => onChange("all")} type="button">
       Todos
-    </button>
+    </Button>
   </div>
 );
 
@@ -168,14 +169,9 @@ export const PocketsPage = () => {
 
   return (
     <section className="page stack-lg">
-      <header className="page-header">
-        <div>
-          <h1>Bolsillos</h1>
-          <p>Gestioná bolsillos activos e inactivos sin borrar el historial de movimientos.</p>
-        </div>
-      </header>
+      <SectionHeader title="Bolsillos" description="Gestioná bolsillos activos e inactivos sin borrar el historial de movimientos." />
 
-      <article className="card stack-md">
+      <Card aria-label="Crear bolsillo" className="stack-md">
         <h2>Crear bolsillo</h2>
         <form className="row gap-sm wrap" onSubmit={createPocket}>
           <label className="field">
@@ -186,16 +182,16 @@ export const PocketsPage = () => {
             <span>Meta opcional</span>
             <input min="0" step="0.01" type="number" value={newPocketGoal} onChange={(event) => setNewPocketGoal(event.target.value)} />
           </label>
-          <button className="button primary" disabled={submitting} type="submit">
+          <Button disabled={submitting} type="submit">
             Crear bolsillo
-          </button>
+          </Button>
         </form>
-      </article>
+      </Card>
 
       {message ? <p className="success">{message}</p> : null}
       {error ? <p className="error">{error}</p> : null}
 
-      <article className="card stack-md">
+      <Card aria-label="Listado de bolsillos" className="stack-md">
         <div className="row between wrap">
           <h2>Listado</h2>
           <PocketFilterButtons currentFilter={filter} onChange={(nextFilter) => void changeFilter(nextFilter)} />
@@ -210,9 +206,11 @@ export const PocketsPage = () => {
               <div className="stack-sm grow">
                 <div>
                   <strong>{pocket.name}</strong>
-                  <p>{pocket.active ? "Activo" : "Inactivo"}</p>
+                  <StatusPill tone={pocket.active ? "success" : "neutral"}>{pocket.active ? "Activo" : "Inactivo"}</StatusPill>
                 </div>
-                <span className="pill success">Balance: {formatMoney(pocket.balance)}</span>
+                <StatusPill tone={pocket.balance > 0 ? "success" : "neutral"} aria-label={`${pocket.balance > 0 ? "Success" : "Neutral"}: Balance ${formatMoney(pocket.balance)}`}>
+                  Balance: {formatMoney(pocket.balance)}
+                </StatusPill>
                 <p>{pocket.goalAmount === null ? "Sin meta definida" : `Meta: ${formatMoney(pocket.goalAmount)}`}</p>
 
                 <PocketMovements pocket={pocket} />
@@ -236,19 +234,19 @@ export const PocketsPage = () => {
                     onChange={(event) => setEditGoals((current) => ({ ...current, [pocket.id]: event.target.value }))}
                   />
                 </label>
-                <button className="button primary" disabled={submitting} onClick={() => void updatePocket(pocket)} type="button">
+                <Button disabled={submitting} onClick={() => void updatePocket(pocket)} type="button">
                   Guardar cambios
-                </button>
+                </Button>
                 {pocket.active ? (
-                  <button className="button tertiary" disabled={submitting} onClick={() => void deactivatePocket(pocket)} type="button">
+                  <Button variant="tertiary" disabled={submitting} onClick={() => void deactivatePocket(pocket)} type="button">
                     Desactivar
-                  </button>
+                  </Button>
                 ) : null}
               </form>
             </article>
           ))}
         </div>
-      </article>
+      </Card>
     </section>
   );
 };

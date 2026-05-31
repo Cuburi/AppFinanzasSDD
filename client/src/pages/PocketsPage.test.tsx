@@ -66,10 +66,13 @@ describe("PocketsPage", () => {
     expect(screen.getByText("Balance: $250.00")).toBeInTheDocument();
     expect(screen.getByText("Meta: $1000.00")).toBeInTheDocument();
     expect(screen.getByText("Ahorro inicial · Entrada $250.00")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Success: Activo" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Success: Balance $250.00" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Inactivos" }));
 
     expect(await screen.findByText("Viaje")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Neutral: Inactivo" })).toBeInTheDocument();
     expect(screen.getByText("Sin meta definida")).toBeInTheDocument();
     expect(screen.getByText("Sin movimientos recientes.")).toBeInTheDocument();
     expect(apiMock.getPockets).toHaveBeenLastCalledWith("inactive");
