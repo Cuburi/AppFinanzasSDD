@@ -104,3 +104,15 @@ Este documento muestra el backlog funcional y el estado actual del MVP. La marca
 - Integración con bancos
 - Respaldo/exportación de datos
 - Multi-usuario
+
+## Deuda técnica / Calidad a no perder de vista
+
+Estos puntos no bloquean el MVP actual, pero quedaron como warnings del SDD visual y conviene tratarlos antes de escalar mucho más el frontend.
+
+- ⬜ **QT-1**: Agregar validación real de accesibilidad visual en navegador para contraste, foco por teclado y navegación visual.
+- ⬜ **QT-2**: Agregar una prueba real de viewport/responsive para detectar overflow horizontal en mobile/tablet.
+- ⬜ **QT-3**: Configurar reporte de coverage para conocer la cobertura real del frontend.
+- ⬜ **QT-4**: Configurar lint para detectar patrones inconsistentes antes de PR.
+- ⬜ **QT-5**: Revisar assertions débiles restantes en tests y convertirlas a matchers explícitos.
+
+> Estado: el SDD `implement-visual-system-dashboard` pasó verificación con warnings. Los contratos actuales están cubiertos por Vitest y build, pero falta tooling más maduro tipo browser/E2E, coverage y lint.
