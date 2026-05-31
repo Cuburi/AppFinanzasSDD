@@ -18,10 +18,13 @@
   --color-primary-contrast: #f8fafc;
   --color-success: #34d399;
   --color-success-bg: rgba(16, 185, 129, 0.14);
+  --color-success-border: rgba(52, 211, 153, 0.38);
   --color-warning: #fbbf24;
   --color-warning-bg: rgba(251, 191, 36, 0.14);
+  --color-warning-border: rgba(251, 191, 36, 0.42);
   --color-danger: #fb7185;
   --color-danger-bg: rgba(251, 113, 133, 0.14);
+  --color-danger-border: rgba(251, 113, 133, 0.42);
   --color-neutral-bg: rgba(148, 163, 184, 0.14);
   --font-size-kpi: clamp(1.6rem, 4vw, 2.4rem);
   --space-1: 0.35rem;
@@ -253,19 +256,19 @@ select {
 
 .pill.success {
   background: var(--color-success-bg);
-  border-color: rgba(52, 211, 153, 0.38);
+  border-color: var(--color-success-border);
   color: var(--color-success);
 }
 
 .pill.warning {
   background: var(--color-warning-bg);
-  border-color: rgba(251, 191, 36, 0.42);
+  border-color: var(--color-warning-border);
   color: var(--color-warning);
 }
 
 .pill.danger {
   background: var(--color-danger-bg);
-  border-color: rgba(251, 113, 133, 0.42);
+  border-color: var(--color-danger-border);
   color: var(--color-danger);
 }
 
@@ -328,6 +331,10 @@ select {
 }
 
 @media (max-width: 768px) {
+  .app-shell {
+    padding-inline: var(--space-2);
+  }
+
   .app-header,
   .page-header,
   .section-header,
