@@ -40,6 +40,18 @@ describe("visual system primitives", () => {
     );
   });
 
+  it("derives semantic status labels from nested finance state copy", () => {
+    render(
+      <StatusPill tone="danger">
+        <strong>Cash</strong> spending
+      </StatusPill>,
+    );
+
+    expect(screen.getByRole("status", { name: "Danger: Cash spending" })).toHaveTextContent(
+      "Cash spending",
+    );
+  });
+
   it("renders section headers with an optional action inside the labelled header", () => {
     render(
       <SectionHeader

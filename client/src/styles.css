@@ -52,7 +52,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -94,6 +95,7 @@ input {
   background: linear-gradient(135deg, rgba(96, 165, 250, 0.13), rgba(17, 24, 39, 0.82)),
     var(--color-surface);
   box-shadow: var(--shadow-card);
+  min-width: 0;
 }
 
 .app-brand {
@@ -140,6 +142,7 @@ input {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
   padding: var(--space-3);
+  min-width: 0;
 }
 
 .field {
@@ -147,7 +150,9 @@ input {
   gap: var(--space-1);
 }
 
-.field input {
+.field input,
+.field select {
+  max-width: 100%;
   width: 100%;
   padding: 0.65rem var(--space-2);
   border: 1px solid var(--color-border-strong);
@@ -277,6 +282,8 @@ input {
   border-radius: var(--radius-sm);
   padding: var(--space-2);
   background: var(--color-surface-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .eyebrow {
@@ -325,6 +332,11 @@ input {
   .page-header,
   .section-header,
   .budget-line {
+    flex-direction: column;
+  }
+
+  .row {
+    align-items: stretch;
     flex-direction: column;
   }
 
