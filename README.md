@@ -29,7 +29,7 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
 
 - Node.js
 - pnpm vía Corepack
-- PostgreSQL
+- Docker Desktop para la base de datos local PostgreSQL
 
 ## Configuración local
 
@@ -46,7 +46,29 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
    cp .env.example .env
    ```
 
-3. Ajustar `DATABASE_URL` si tu PostgreSQL local usa otro usuario, contraseña, host o base de datos.
+   En PowerShell también podés usar:
+
+   ```powershell
+   Copy-Item -LiteralPath ".env.example" -Destination ".env"
+   ```
+
+3. Levantar PostgreSQL local con Docker:
+
+   ```bash
+   pnpm db:up
+   ```
+
+   La base queda disponible para Prisma, la app y DataGrip en:
+
+   ```txt
+   Host: localhost
+   Port: 5433
+   Database: appfinanzas
+   User: postgres
+   Password: postgres
+   ```
+
+   El puerto `5433` evita conflictos con instalaciones locales de PostgreSQL que ya usen `5432`.
 
 4. Ejecutar Prisma:
 
@@ -66,6 +88,10 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
 | Comando | Descripción |
 |---------|-------------|
 | `pnpm dev` | Levanta frontend y backend en paralelo desde la raíz. |
+| `pnpm db:up` | Levanta PostgreSQL local con Docker y espera a que esté listo. |
+| `pnpm db:down` | Detiene el contenedor PostgreSQL sin borrar los datos locales. |
+| `pnpm db:reset` | Reinicia PostgreSQL borrando el volumen local. **Destruye los datos locales.** |
+| `pnpm local:setup` | Valida `.env.example`, levanta PostgreSQL, genera Prisma Client y ejecuta migraciones. |
 | `pnpm --dir client dev` | Levanta solo el frontend. |
 | `pnpm --dir server dev` | Levanta solo el backend. |
 | `pnpm --dir server test` | Ejecuta las pruebas del backend. |

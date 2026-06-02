@@ -3,9 +3,13 @@ dist/
 .atl/
 *.http
 monthly-income-pr-plan.md
+
+# Local environment files. Root `.env` is created from `.env.example` and stays untracked.
 .env
 .env.*
 !.env.example
+prisma/.env
+
 client/node_modules/
 server/node_modules/
 client/dist/
