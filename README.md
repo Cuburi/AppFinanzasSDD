@@ -70,18 +70,66 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
 
    El puerto `5433` evita conflictos con instalaciones locales de PostgreSQL que ya usen `5432`.
 
-4. Ejecutar Prisma:
+4. Ejecutar Prisma sobre una base limpia:
 
    ```bash
    pnpm prisma:generate
    pnpm prisma:migrate
    ```
 
+   La base queda intencionalmente limpia. Esta app está pensada para uso local con tus datos reales de finanzas personales, así que no hay seed demo ni datos falsos: cargá meses, ingresos, gastos, bolsillos y deudas desde la app.
+
 5. Levantar cliente y servidor juntos:
 
    ```bash
    pnpm dev
    ```
+
+   O levantarlos en terminales separadas:
+
+   ```bash
+   pnpm --dir server dev
+   pnpm --dir client dev
+   ```
+
+6. Smoke checks locales:
+
+   ```bash
+   curl http://localhost:3001/health
+   curl http://localhost:5173/api/health
+   curl http://localhost:3001/api/months/active
+   curl http://localhost:3001/api/pockets
+   curl http://localhost:3001/api/debts
+   ```
+
+   Los dos primeros validan API + conexión a base de datos. Con una base limpia, `/api/months/active` devuelve `{ "month": null }` hasta que abras un mes; `/api/pockets` y `/api/debts` devuelven listas vacías hasta que cargues tus datos reales.
+
+### Reset local
+
+Para descartar datos locales y volver a aplicar migraciones:
+
+```bash
+pnpm prisma:reset
+```
+
+Si querés borrar también el volumen Docker local:
+
+```bash
+pnpm db:reset
+pnpm prisma:migrate
+```
+
+Ambos caminos destruyen datos locales. No los uses contra bases compartidas o productivas.
+
+### Manual PostgreSQL fallback
+
+Docker es el camino recomendado. Si Docker no está disponible, instalá PostgreSQL manualmente y creá una base que coincida con `.env.example`:
+
+```txt
+postgresql://postgres:postgres@localhost:5433/appfinanzas?schema=public
+```
+
+Si usás otro host, puerto, usuario o contraseña, ajustá el `DATABASE_URL` del `.env` raíz antes de correr `pnpm prisma:migrate`. No crees `prisma/.env`: el `.env` raíz es la fuente de verdad local.
 
 ## Scripts principales
 
@@ -91,11 +139,13 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
 | `pnpm db:up` | Levanta PostgreSQL local con Docker y espera a que esté listo. |
 | `pnpm db:down` | Detiene el contenedor PostgreSQL sin borrar los datos locales. |
 | `pnpm db:reset` | Reinicia PostgreSQL borrando el volumen local. **Destruye los datos locales.** |
-| `pnpm local:setup` | Valida `.env.example`, levanta PostgreSQL, genera Prisma Client y ejecuta migraciones. |
+| `pnpm local:setup` | Valida `.env.example`, levanta PostgreSQL, genera Prisma Client y ejecuta migraciones sobre una base limpia. |
+| `pnpm local:check-readme` | Valida que el README mantenga el checklist local mínimo. |
 | `pnpm --dir client dev` | Levanta solo el frontend. |
 | `pnpm --dir server dev` | Levanta solo el backend. |
 | `pnpm --dir server test` | Ejecuta las pruebas del backend. |
 | `pnpm prisma:migrate` | Ejecuta migraciones Prisma usando `prisma/schema.prisma`. |
+| `pnpm prisma:reset` | Resetea la base local vía Prisma y aplica migraciones. **Destruye los datos locales.** |
 | `pnpm prisma:studio` | Abre Prisma Studio. |
 
 ## Dominio funcional
