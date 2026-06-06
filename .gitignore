@@ -8,6 +8,8 @@ monthly-income-pr-plan.md
 .env
 .env.*
 !.env.example
+!.env.dev.example
+!.env.personal.example
 prisma/.env
 
 client/node_modules/

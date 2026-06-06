@@ -3,10 +3,10 @@ import { readFileSync } from 'node:fs';
 const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
 
 const requiredSnippets = [
-  'cp .env.example .env',
-  'pnpm db:up',
-  'pnpm prisma:generate',
-  'pnpm prisma:migrate',
+  'pnpm env:dev',
+  'pnpm db:dev:up',
+  'pnpm prisma:dev:generate',
+  'pnpm prisma:dev:migrate',
   'pnpm --dir server dev',
   'pnpm --dir client dev',
   'curl http://localhost:3001/health',
@@ -14,9 +14,13 @@ const requiredSnippets = [
   'curl http://localhost:3001/api/months/active',
   'curl http://localhost:3001/api/pockets',
   'curl http://localhost:3001/api/debts',
-  'pnpm prisma:reset',
-  'pnpm db:reset',
+  'pnpm prisma:dev:reset',
+  'pnpm db:dev:reset',
+  'pnpm db:personal:reset',
+  'CONFIRM_PERSONAL_RESET=RESET_APPFINANZAS_PERSONAL',
   'Manual PostgreSQL fallback',
+  'los comandos Prisma guardados esperan dev en `localhost:5433` y personal en `localhost:5434`',
+  'Una topología distinta requiere cambiar deliberadamente los guards/scripts de perfiles',
   'La base queda intencionalmente limpia.',
   'no hay seed demo ni datos falsos',
   'cargá meses, ingresos, gastos, bolsillos y deudas desde la app.',
@@ -24,12 +28,25 @@ const requiredSnippets = [
   '/api/pockets` y `/api/debts` devuelven listas vacías',
 ];
 
-const missing = requiredSnippets.filter((snippet) => !readme.includes(snippet));
+const forbiddenSnippets = [
+  'pnpm db:up',
+  'pnpm prisma:generate',
+  'pnpm prisma:migrate',
+  'pnpm prisma:reset',
+  'pnpm db:reset',
+  'Si usás otro host, puerto, usuario o contraseña',
+];
 
-if (missing.length > 0) {
+const missing = requiredSnippets.filter((snippet) => !readme.includes(snippet));
+const forbidden = forbiddenSnippets.filter((snippet) => readme.includes(snippet));
+
+if (missing.length > 0 || forbidden.length > 0) {
   console.error('README local setup checklist is missing required entries:');
   for (const snippet of missing) {
     console.error(`- ${snippet}`);
+  }
+  for (const snippet of forbidden) {
+    console.error(`- remove ambiguous command reference: ${snippet}`);
   }
   process.exit(1);
 }

@@ -2,16 +2,24 @@
   "packageManager": "pnpm@11.1.2",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "db:up": "docker compose up --wait postgres",
-    "db:down": "docker compose down",
-    "db:reset": "docker compose down -v && docker compose up --wait postgres",
-    "local:check-env": "node scripts/check-local-env-example.mjs",
+    "env:dev": "node scripts/use-env-profile.mjs dev",
+    "env:personal": "node scripts/use-env-profile.mjs personal",
+    "db:dev:up": "docker compose up --wait postgres-dev",
+    "db:dev:down": "docker compose stop postgres-dev",
+    "db:dev:reset": "docker compose stop postgres-dev && docker compose rm -f -v postgres-dev && docker compose up --wait postgres-dev",
+    "db:personal:up": "docker compose up --wait postgres-personal",
+    "db:personal:down": "docker compose stop postgres-personal",
+    "db:personal:reset": "node scripts/guard-personal-reset.mjs",
+    "local:check-env": "node scripts/check-local-env-example.mjs && node scripts/check-personal-reset-guard.mjs",
     "local:check-readme": "node scripts/check-readme-local-setup.mjs",
-    "local:setup": "pnpm local:check-env && pnpm db:up && pnpm prisma:generate && pnpm prisma:migrate",
-    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
-    "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
-    "prisma:reset": "prisma migrate reset --schema prisma/schema.prisma --force",
-    "prisma:studio": "prisma studio --schema prisma/schema.prisma"
+    "local:setup": "pnpm local:check-env && pnpm env:dev && pnpm db:dev:up && pnpm prisma:dev:generate && pnpm prisma:dev:migrate",
+    "prisma:dev:generate": "node scripts/run-prisma-with-profile.mjs dev -- generate --schema prisma/schema.prisma",
+    "prisma:dev:migrate": "node scripts/run-prisma-with-profile.mjs dev -- migrate dev --schema prisma/schema.prisma",
+    "prisma:dev:reset": "node scripts/run-prisma-with-profile.mjs dev -- migrate reset --schema prisma/schema.prisma --force",
+    "prisma:dev:studio": "node scripts/run-prisma-with-profile.mjs dev -- studio --schema prisma/schema.prisma",
+    "prisma:personal:generate": "node scripts/run-prisma-with-profile.mjs personal -- generate --schema prisma/schema.prisma",
+    "prisma:personal:migrate": "node scripts/run-prisma-with-profile.mjs personal -- migrate deploy --schema prisma/schema.prisma",
+    "prisma:personal:studio": "node scripts/run-prisma-with-profile.mjs personal -- studio --schema prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3"
