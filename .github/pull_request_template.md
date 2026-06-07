@@ -2,6 +2,12 @@
 
 - [ ] This PR links an approved issue or SDD change.
 
+## Target branch
+
+- [ ] Feature PR targets `dev`.
+- [ ] Promotion PR moves `dev` to `master` after `dev` is stable.
+- [ ] Direct pushes to `dev` and `master` remain blocked by branch protection.
+
 ## Type label
 
 - [ ] Exactly one `type:*` label is applied.

@@ -98,6 +98,8 @@ const requiredGitignoreLines = ['!.env.dev.example', '!.env.personal.example'];
 
 const requiredPullRequestTemplateSnippets = [
   'Approved issue',
+  'Feature PR targets `dev`',
+  'Promotion PR moves `dev` to `master`',
   'Exactly one `type:*` label',
   'CI is green',
   'Tests and docs',

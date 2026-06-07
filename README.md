@@ -158,24 +158,27 @@ No crees `prisma/.env`: el `.env` raíz es la fuente de verdad local. Por seguri
 
 ## Branch release policy
 
-La estrategia actual es trunk-based: las ramas de trabajo entran por PR aprobado hacia `master`; no usamos release branches hasta que una necesidad real de estabilización lo justifique.
+La estrategia actual: `master` simula producción estable y `dev` es la rama de integración/staging. Las ramas de trabajo entran por PR aprobado hacia `dev`; cuando `dev` tiene un avance estable, se promueve con un PR de promoción desde `dev` hacia `master`. No usamos release branches hasta que una necesidad real de estabilización lo justifique.
 
 Checklist de rama y PR:
 
 - Nombrar ramas como `feat|fix|docs|chore|refactor|test|build|ci|perf|style|revert/<slug>`.
 - Vincular un issue aprobado o cambio SDD aprobado antes de pedir review.
 - Aplicar exactamente un label `type:*` por PR.
-- Mantener CI verde antes de mergear a `master`.
+- Mantener CI verde antes de mergear una rama de trabajo a `dev`.
 - Si el cambio supera el presupuesto de review de 400 líneas, partirlo en PRs encadenados con tests/docs por unidad.
+- Promover solo avances estables con PR de promoción desde `dev` hacia `master`.
+- Configurar protecciones para bloquear pushes directos a `dev` y `master`; `master` debe tener reglas más estrictas porque representa el estado estable/personal-promovible.
 
-La promoción a uso personal no es automática por estar en `master`: requiere validación dev y una decisión explícita. Hasta cerrar el formato final de tags, usá el placeholder `personal-YYYY.MM.DD` para marcar el punto de promoción personal.
+La promoción personal ocurre después del PR `dev` -> `master`, no después de cada PR de feature. Requiere validación dev y una decisión explícita. Hasta cerrar el formato final de tags, usá el placeholder `personal-YYYY.MM.DD` para marcar el punto de promoción personal.
 
 ## Personal promotion checklist
 
 Antes de usar un cambio con datos personales diarios:
 
-- [ ] Confirmar que el PR fue aprobado y mergeado a `master`.
-- [ ] Confirmar CI verde en `master`, incluyendo branch release readiness.
+- [ ] Confirmar que el PR de feature fue aprobado y mergeado a `dev`.
+- [ ] Confirmar que el PR de promoción `dev` -> `master` fue aprobado y mergeado.
+- [ ] Confirmar CI verde en `dev` y en el PR de promoción hacia `master`, incluyendo branch release readiness.
 - [ ] Validar primero en dev con `pnpm env:dev`, `pnpm db:dev:up`, migraciones y smoke checks.
 - [ ] Crear o anotar el tag/checklist de promoción `personal-YYYY.MM.DD`.
 - [ ] Activar personal explícitamente con `pnpm env:personal`.
