@@ -1,22 +1,42 @@
 services:
-  postgres:
+  postgres-dev:
     image: postgres:16-alpine
-    container_name: appfinanzas-postgres
+    container_name: appfinanzas-postgres-dev
     restart: unless-stopped
     environment:
-      POSTGRES_DB: appfinanzas
+      POSTGRES_DB: appfinanzas_dev
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
       - "5433:5432"
     volumes:
-      - appfinanzas_postgres_data:/var/lib/postgresql/data
+      - appfinanzas_postgres_dev_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d appfinanzas"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d appfinanzas_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-personal:
+    image: postgres:16-alpine
+    container_name: appfinanzas-postgres-personal
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: appfinanzas_personal
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - appfinanzas_postgres_personal_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d appfinanzas_personal"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
 
 volumes:
-  appfinanzas_postgres_data:
+  appfinanzas_postgres_dev_data:
+  appfinanzas_postgres_personal_data:

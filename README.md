@@ -52,10 +52,11 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
    Copy-Item -LiteralPath ".env.example" -Destination ".env"
    ```
 
-3. Levantar PostgreSQL local con Docker:
+3. Activar el perfil dev y levantar PostgreSQL local con Docker:
 
    ```bash
-   pnpm db:up
+   pnpm env:dev
+   pnpm db:dev:up
    ```
 
    La base queda disponible para Prisma, la app y DataGrip en:
@@ -63,18 +64,18 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
    ```txt
    Host: localhost
    Port: 5433
-   Database: appfinanzas
+   Database: appfinanzas_dev
    User: postgres
    Password: postgres
    ```
 
    El puerto `5433` evita conflictos con instalaciones locales de PostgreSQL que ya usen `5432`.
 
-4. Ejecutar Prisma sobre una base limpia:
+4. Ejecutar Prisma sobre la base dev limpia:
 
    ```bash
-   pnpm prisma:generate
-   pnpm prisma:migrate
+   pnpm prisma:dev:generate
+   pnpm prisma:dev:migrate
    ```
 
    La base queda intencionalmente limpia. Esta app está pensada para uso local con tus datos reales de finanzas personales, así que no hay seed demo ni datos falsos: cargá meses, ingresos, gastos, bolsillos y deudas desde la app.
@@ -106,47 +107,54 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
 
 ### Reset local
 
-Para descartar datos locales y volver a aplicar migraciones:
+Para descartar datos dev y volver a aplicar migraciones:
 
 ```bash
-pnpm prisma:reset
+pnpm prisma:dev:reset
 ```
 
-Si querés borrar también el volumen Docker local:
+Si querés borrar también el volumen Docker dev:
 
 ```bash
-pnpm db:reset
-pnpm prisma:migrate
+pnpm db:dev:reset
+pnpm prisma:dev:migrate
 ```
 
-Ambos caminos destruyen datos locales. No los uses contra bases compartidas o productivas.
+Ambos caminos destruyen solo datos del perfil dev. Para borrar datos personales tenés que usar el comando explícito `pnpm db:personal:reset` con `CONFIRM_PERSONAL_RESET=RESET_APPFINANZAS_PERSONAL`; no lo uses salvo que quieras destruir tu base diaria.
 
 ### Manual PostgreSQL fallback
 
-Docker es el camino recomendado. Si Docker no está disponible, instalá PostgreSQL manualmente y creá una base que coincida con `.env.example`:
+Docker es el camino recomendado. Si Docker no está disponible, instalá PostgreSQL manualmente y creá una base dev que coincida con `.env.example`:
 
 ```txt
-postgresql://postgres:postgres@localhost:5433/appfinanzas?schema=public
+postgresql://postgres:postgres@localhost:5433/appfinanzas_dev?schema=public
 ```
 
-Si usás otro host, puerto, usuario o contraseña, ajustá el `DATABASE_URL` del `.env` raíz antes de correr `pnpm prisma:migrate`. No crees `prisma/.env`: el `.env` raíz es la fuente de verdad local.
+No crees `prisma/.env`: el `.env` raíz es la fuente de verdad local. Por seguridad, los comandos Prisma guardados esperan dev en `localhost:5433` y personal en `localhost:5434`; no prometen puertos custom por edición casual de `.env`. Una topología distinta requiere cambiar deliberadamente los guards/scripts de perfiles antes de correr comandos Prisma guardados.
 
 ## Scripts principales
 
 | Comando | Descripción |
 |---------|-------------|
 | `pnpm dev` | Levanta frontend y backend en paralelo desde la raíz. |
-| `pnpm db:up` | Levanta PostgreSQL local con Docker y espera a que esté listo. |
-| `pnpm db:down` | Detiene el contenedor PostgreSQL sin borrar los datos locales. |
-| `pnpm db:reset` | Reinicia PostgreSQL borrando el volumen local. **Destruye los datos locales.** |
+| `pnpm env:dev` | Copia el perfil dev a `.env`; es el perfil por defecto para desarrollo. |
+| `pnpm env:personal` | Copia el perfil personal a `.env`; usalo solo para uso diario intencional. |
+| `pnpm db:dev:up` | Levanta PostgreSQL dev con Docker y espera a que esté listo. |
+| `pnpm db:dev:down` | Detiene el contenedor PostgreSQL dev sin borrar datos. |
+| `pnpm db:dev:reset` | Reinicia PostgreSQL dev borrando su volumen. **Destruye datos dev.** |
+| `pnpm db:personal:up` | Levanta PostgreSQL personal explícitamente. |
+| `pnpm db:personal:reset` | Reseteo personal guardado por `CONFIRM_PERSONAL_RESET=RESET_APPFINANZAS_PERSONAL`. **Destruye datos personales.** |
 | `pnpm local:setup` | Valida `.env.example`, levanta PostgreSQL, genera Prisma Client y ejecuta migraciones sobre una base limpia. |
 | `pnpm local:check-readme` | Valida que el README mantenga el checklist local mínimo. |
 | `pnpm --dir client dev` | Levanta solo el frontend. |
 | `pnpm --dir server dev` | Levanta solo el backend. |
 | `pnpm --dir server test` | Ejecuta las pruebas del backend. |
-| `pnpm prisma:migrate` | Ejecuta migraciones Prisma usando `prisma/schema.prisma`. |
-| `pnpm prisma:reset` | Resetea la base local vía Prisma y aplica migraciones. **Destruye los datos locales.** |
-| `pnpm prisma:studio` | Abre Prisma Studio. |
+| `pnpm prisma:dev:generate` | Genera Prisma Client forzando la base dev. |
+| `pnpm prisma:dev:migrate` | Ejecuta migraciones Prisma contra dev usando `prisma/schema.prisma`. |
+| `pnpm prisma:dev:reset` | Resetea la base dev vía Prisma y aplica migraciones. **Destruye datos dev.** |
+| `pnpm prisma:dev:studio` | Abre Prisma Studio contra dev. |
+| `pnpm prisma:personal:migrate` | Aplica migraciones desplegables contra personal de forma explícita. |
+| `pnpm prisma:personal:studio` | Abre Prisma Studio contra personal de forma explícita. |
 
 ## Dominio funcional
 
