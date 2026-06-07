@@ -11,6 +11,7 @@
     "db:personal:down": "docker compose stop postgres-personal",
     "db:personal:reset": "node scripts/guard-personal-reset.mjs",
     "local:check-env": "node scripts/check-local-env-example.mjs && node scripts/check-personal-reset-guard.mjs",
+    "local:check-pr-governance": "node scripts/check-pr-governance.contract.mjs",
     "local:check-readme": "node scripts/check-readme-local-setup.mjs",
     "local:setup": "pnpm local:check-env && pnpm env:dev && pnpm db:dev:up && pnpm prisma:dev:generate && pnpm prisma:dev:migrate",
     "prisma:dev:generate": "node scripts/run-prisma-with-profile.mjs dev -- generate --schema prisma/schema.prisma",

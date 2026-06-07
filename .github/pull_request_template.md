@@ -1,6 +1,7 @@
 ## Approved issue
 
 - [ ] This PR links an approved issue or SDD change.
+- [ ] Body includes `Refs #N`, `Closes #N`, `Fixes #N`, `Resolves #N`, `SDD:`, or `SDD change`.
 
 ## Target branch
 
