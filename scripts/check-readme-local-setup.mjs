@@ -26,6 +26,20 @@ const requiredSnippets = [
   'cargá meses, ingresos, gastos, bolsillos y deudas desde la app.',
   '/api/months/active` devuelve `{ "month": null }`',
   '/api/pockets` y `/api/debts` devuelven listas vacías',
+  '## Branch release policy',
+  'feat|fix|docs|chore|refactor|test|build|ci|perf|style|revert/<slug>',
+  'exactamente un label `type:*`',
+  'PR aprobado hacia `master`',
+  'personal-YYYY.MM.DD',
+  '## Personal promotion checklist',
+  'Validar primero en dev',
+  'Confirmar CI verde en `master`',
+  'Activar personal explícitamente con `pnpm env:personal`',
+  '## Docker isolation verification',
+  'docker compose up --wait postgres-dev postgres-personal',
+  'docker compose exec postgres-personal psql',
+  'pnpm db:dev:reset',
+  'El volumen personal debe seguir intacto',
 ];
 
 const forbiddenSnippets = [
