@@ -10,10 +10,14 @@ const serverPackageJson = JSON.parse(
 const ciWorkflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
 const dockerCompose = readFileSync(new URL('../docker-compose.yml', import.meta.url), 'utf8');
 const gitignore = readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
+const pullRequestTemplatePath = new URL('../.github/pull_request_template.md', import.meta.url);
 
 const envDevExample = existsSync(envDevExamplePath) ? readFileSync(envDevExamplePath, 'utf8') : '';
 const envPersonalExample = existsSync(envPersonalExamplePath)
   ? readFileSync(envPersonalExamplePath, 'utf8')
+  : '';
+const pullRequestTemplate = existsSync(pullRequestTemplatePath)
+  ? readFileSync(pullRequestTemplatePath, 'utf8')
   : '';
 
 const requiredLines = [
@@ -79,12 +83,30 @@ const forbiddenServerPrismaScripts = [
   'prisma:studio',
 ];
 
-const requiredCiSnippets = ['pnpm env:dev', 'pnpm prisma:dev:generate'];
+const requiredCiSnippets = [
+  'Branch release readiness',
+  'pnpm local:check-env',
+  'pnpm local:check-readme',
+  'pnpm env:dev',
+  'pnpm prisma:dev:generate',
+];
 const forbiddenCiSnippets = ['pnpm prisma:generate'];
 const ciDevProfileIndex = ciWorkflow.indexOf('pnpm env:dev');
 const ciPrismaDevGenerateIndex = ciWorkflow.indexOf('pnpm prisma:dev:generate');
 
 const requiredGitignoreLines = ['!.env.dev.example', '!.env.personal.example'];
+
+const requiredPullRequestTemplateSnippets = [
+  'Approved issue',
+  'Feature PR targets `dev`',
+  'Promotion PR moves `dev` to `master`',
+  'Exactly one `type:*` label',
+  'CI is green',
+  'Tests and docs',
+  'DB profile safety',
+  '`pnpm env:dev`',
+  '`pnpm env:personal`',
+];
 
 const missing = [
   ...[...requiredLines, ...requiredNotes]
@@ -122,6 +144,10 @@ const missing = [
   ...requiredGitignoreLines
     .filter((line) => !gitignore.includes(line))
     .map((line) => `.gitignore: ${line}`),
+  ...(!existsSync(pullRequestTemplatePath) ? ['missing .github/pull_request_template.md'] : []),
+  ...requiredPullRequestTemplateSnippets
+    .filter((snippet) => !pullRequestTemplate.includes(snippet))
+    .map((snippet) => `.github/pull_request_template.md: ${snippet}`),
 ];
 
 if (missing.length > 0) {

@@ -156,6 +156,49 @@ No crees `prisma/.env`: el `.env` raíz es la fuente de verdad local. Por seguri
 | `pnpm prisma:personal:migrate` | Aplica migraciones desplegables contra personal de forma explícita. |
 | `pnpm prisma:personal:studio` | Abre Prisma Studio contra personal de forma explícita. |
 
+## Branch release policy
+
+La estrategia actual: `master` simula producción estable y `dev` es la rama de integración/staging. Las ramas de trabajo entran por PR aprobado hacia `dev`; cuando `dev` tiene un avance estable, se promueve con un PR de promoción desde `dev` hacia `master`. No usamos release branches hasta que una necesidad real de estabilización lo justifique.
+
+Checklist de rama y PR:
+
+- Nombrar ramas como `feat|fix|docs|chore|refactor|test|build|ci|perf|style|revert/<slug>`.
+- Vincular un issue aprobado o cambio SDD aprobado antes de pedir review.
+- Aplicar exactamente un label `type:*` por PR.
+- Mantener CI verde antes de mergear una rama de trabajo a `dev`.
+- Si el cambio supera el presupuesto de review de 400 líneas, partirlo en PRs encadenados con tests/docs por unidad.
+- Promover solo avances estables con PR de promoción desde `dev` hacia `master`.
+- Configurar protecciones para bloquear pushes directos a `dev` y `master`; `master` debe tener reglas más estrictas porque representa el estado estable/personal-promovible.
+
+La promoción personal ocurre después del PR `dev` -> `master`, no después de cada PR de feature. Requiere validación dev y una decisión explícita. Hasta cerrar el formato final de tags, usá el placeholder `personal-YYYY.MM.DD` para marcar el punto de promoción personal.
+
+## Personal promotion checklist
+
+Antes de usar un cambio con datos personales diarios:
+
+- [ ] Confirmar que el PR de feature fue aprobado y mergeado a `dev`.
+- [ ] Confirmar que el PR de promoción `dev` -> `master` fue aprobado y mergeado.
+- [ ] Confirmar CI verde en `dev` y en el PR de promoción hacia `master`, incluyendo branch release readiness.
+- [ ] Validar primero en dev con `pnpm env:dev`, `pnpm db:dev:up`, migraciones y smoke checks.
+- [ ] Crear o anotar el tag/checklist de promoción `personal-YYYY.MM.DD`.
+- [ ] Activar personal explícitamente con `pnpm env:personal`.
+- [ ] Aplicar solo comandos personales explícitos, como `pnpm prisma:personal:migrate` o `pnpm prisma:personal:studio`.
+- [ ] No correr resets personales salvo decisión consciente con `pnpm db:personal:reset` y `CONFIRM_PERSONAL_RESET=RESET_APPFINANZAS_PERSONAL`.
+
+## Docker isolation verification
+
+Verificación manual esperada para confirmar que dev y personal están aislados:
+
+```bash
+pnpm env:dev
+docker compose up --wait postgres-dev postgres-personal
+docker compose exec postgres-personal psql -U postgres -d appfinanzas_personal -c "CREATE TABLE IF NOT EXISTS isolation_marker (id int primary key); INSERT INTO isolation_marker (id) VALUES (1) ON CONFLICT DO NOTHING;"
+pnpm db:dev:reset
+docker compose exec postgres-personal psql -U postgres -d appfinanzas_personal -c "SELECT id FROM isolation_marker WHERE id = 1;"
+```
+
+El volumen personal debe seguir intacto: el último comando tiene que devolver la fila `1`. Si Docker no está disponible, no reemplaces esta prueba con un reset manual sobre personal; dejá documentada la limitación y corré la verificación cuando Docker esté disponible.
+
 ## Dominio funcional
 
 La app busca resolver un problema concreto: saber cuánto dinero queda disponible durante el mes en cada subcategoría de gasto, y diferenciar gasto real de dinero reservado para objetivos futuros.
