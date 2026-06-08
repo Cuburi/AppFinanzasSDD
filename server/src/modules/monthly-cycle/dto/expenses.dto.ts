@@ -11,6 +11,15 @@ export type RecordExpenseInput = {
   paymentMethod: PaymentMethod;
 };
 
+export type UpdateExpenseInput = RecordExpenseInput & {
+  expenseId: string;
+};
+
+export type DeleteExpenseInput = {
+  monthId: string;
+  expenseId: string;
+};
+
 export type ExpenseHistoryQueryInput = {
   monthId: string;
   from?: string;
@@ -43,6 +52,20 @@ export const parseRecordExpenseInput = (monthId: string, payload: unknown): Reco
     paymentMethod: readPaymentMethod(rawPayload.paymentMethod),
   };
 };
+
+export const parseUpdateExpenseInput = (monthId: string, expenseId: string, payload: unknown): UpdateExpenseInput => {
+  const recordInput = parseRecordExpenseInput(monthId, payload);
+
+  return {
+    ...recordInput,
+    expenseId: readNonEmptyString(expenseId, "Expense id"),
+  };
+};
+
+export const parseDeleteExpenseInput = (monthId: string, expenseId: string): DeleteExpenseInput => ({
+  monthId: readNonEmptyString(monthId, "Month id"),
+  expenseId: readNonEmptyString(expenseId, "Expense id"),
+});
 
 export const parseExpenseHistoryQueryInput = (monthId: string, query: unknown): ExpenseHistoryQueryInput => {
   const rawQuery = query && typeof query === "object" ? (query as Record<string, unknown>) : {};

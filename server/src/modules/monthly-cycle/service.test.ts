@@ -52,9 +52,13 @@ type MonthFixture = {
     }>;
   }>;
   movements: Array<{
+    id?: string;
     type: MovementType;
+    monthId?: string | null;
     paymentMethod?: PaymentMethod | null;
     amount: Prisma.Decimal;
+    description?: string | null;
+    occurredAt?: Date;
     sourceSubcategoryId: string | null;
     targetSubcategoryId: string | null;
     sourcePocketId: string | null;
@@ -136,6 +140,8 @@ const createDbStub = ({
   let capturedCreateArgs: unknown;
   const capturedMovements: unknown[] = [];
   const capturedIncomes: unknown[] = [];
+  const capturedMovementUpdates: unknown[] = [];
+  const capturedMovementDeletes: unknown[] = [];
 
   const db: any = {
     async $transaction<T>(callback: (tx: typeof db) => Promise<T>) {
@@ -184,6 +190,9 @@ const createDbStub = ({
       },
     },
     movement: {
+      async findUnique(args: { where: { id: string } }) {
+        return monthById?.movements.find((movement) => movement.id === args.where.id) ?? null;
+      },
       async create(args: unknown) {
         capturedMovements.push(args);
         const movement = args as {
@@ -199,8 +208,10 @@ const createDbStub = ({
 
         if (monthById && movement.data?.type && movement.data.amount) {
           monthById.movements.push({
+            id: `movement-${capturedMovements.length}`,
             type: movement.data.type,
             amount: movement.data.amount,
+            monthId: monthById.id,
             sourceSubcategoryId: movement.data.sourceSubcategoryId ?? null,
             targetSubcategoryId: movement.data.targetSubcategoryId ?? null,
             sourcePocketId: movement.data.sourcePocketId ?? null,
@@ -209,6 +220,28 @@ const createDbStub = ({
         }
 
         return { id: `movement-${capturedMovements.length}` };
+      },
+      async update(args: {
+        where: { id: string };
+        data: {
+          amount?: Prisma.Decimal;
+          description?: string | null;
+          occurredAt?: Date;
+          paymentMethod?: PaymentMethod;
+          sourceSubcategoryId?: string;
+        };
+      }) {
+        capturedMovementUpdates.push(args);
+        const movement = monthById?.movements.find((candidate) => candidate.id === args.where.id);
+        if (movement) Object.assign(movement, args.data);
+        return movement ?? null;
+      },
+      async delete(args: { where: { id: string } }) {
+        capturedMovementDeletes.push(args);
+        if (monthById) {
+          monthById.movements = monthById.movements.filter((movement) => movement.id !== args.where.id);
+        }
+        return {};
       },
     },
     monthlyIncome: {
@@ -258,6 +291,8 @@ const createDbStub = ({
     db,
     getCapturedCreateArgs: () => capturedCreateArgs,
     getCapturedMovements: () => capturedMovements,
+    getCapturedMovementUpdates: () => capturedMovementUpdates,
+    getCapturedMovementDeletes: () => capturedMovementDeletes,
     getCapturedIncomes: () => capturedIncomes,
     setCreatedMonth: (value: MonthFixture) => {
       monthToReturn = value;
@@ -522,6 +557,239 @@ test("recordExpense persists an expense and returns recalculated balances", asyn
   assert.equal(movement.data.sourceSubcategoryId, subcategoryId);
   assert.equal(Number(movement.data.amount.toString()), 75);
   assert.equal(updatedMonth.categories[0]?.subcategories[0]?.available, 175);
+});
+
+test("updateExpense persists active-month expense changes and recalculates balances", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  month.movements.push(
+    {
+      id: "withdrawal-1",
+      type: MovementType.CASH_WITHDRAWAL,
+      monthId: month.id,
+      amount: amount(200),
+      occurredAt: new Date("2026-05-09T00:00:00.000Z"),
+      sourceSubcategoryId: null,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+    {
+      id: "expense-1",
+      type: MovementType.EXPENSE,
+      monthId: month.id,
+      amount: amount(75),
+      description: "Old market",
+      occurredAt: new Date("2026-05-10T00:00:00.000Z"),
+      paymentMethod: PaymentMethod.CASH,
+      sourceSubcategoryId: subcategoryId,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+  );
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const updatedMonth = await service.updateExpense({
+    monthId: month.id,
+    expenseId: "expense-1",
+    sourceSubcategoryId: subcategoryId,
+    amount: 125,
+    description: "Updated market",
+    occurredAt: "2026-05-11T00:00:00.000Z",
+    paymentMethod: PaymentMethod.CASH,
+  });
+  const updateArgs = dbStub.getCapturedMovementUpdates()[0] as {
+    where: { id: string };
+    data: { amount: Prisma.Decimal; description: string | null; occurredAt: Date; paymentMethod: PaymentMethod; sourceSubcategoryId: string };
+  };
+
+  assert.equal(updateArgs.where.id, "expense-1");
+  assert.equal(Number(updateArgs.data.amount.toString()), 125);
+  assert.equal(updateArgs.data.description, "Updated market");
+  assert.equal(updateArgs.data.occurredAt.toISOString(), "2026-05-11T00:00:00.000Z");
+  assert.equal(updateArgs.data.paymentMethod, PaymentMethod.CASH);
+  assert.equal(updateArgs.data.sourceSubcategoryId, subcategoryId);
+  assert.equal(updatedMonth.categories[0]?.subcategories[0]?.available, 125);
+  assert.equal(updatedMonth.cashBalance, 75);
+});
+
+test("updateExpense rejects cash changes that would exceed physical cash", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  month.movements.push(
+    {
+      id: "withdrawal-1",
+      type: MovementType.CASH_WITHDRAWAL,
+      monthId: month.id,
+      amount: amount(40),
+      occurredAt: new Date("2026-05-09T00:00:00.000Z"),
+      sourceSubcategoryId: null,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+    {
+      id: "expense-1",
+      type: MovementType.EXPENSE,
+      monthId: month.id,
+      amount: amount(20),
+      occurredAt: new Date("2026-05-10T00:00:00.000Z"),
+      paymentMethod: PaymentMethod.CASH,
+      sourceSubcategoryId: subcategoryId,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+  );
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  await assert.rejects(
+    () =>
+      service.updateExpense({
+        monthId: month.id,
+        expenseId: "expense-1",
+        sourceSubcategoryId: subcategoryId,
+        amount: 45,
+        occurredAt: "2026-05-10T00:00:00.000Z",
+        paymentMethod: PaymentMethod.CASH,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /insufficient cash/i);
+      return true;
+    },
+  );
+
+  assert.equal(dbStub.getCapturedMovementUpdates().length, 0);
+});
+
+test("deleteExpense removes only active-month expenses and recalculates balances", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  month.movements.push(
+    {
+      id: "withdrawal-1",
+      type: MovementType.CASH_WITHDRAWAL,
+      monthId: month.id,
+      amount: amount(100),
+      occurredAt: new Date("2026-05-09T00:00:00.000Z"),
+      sourceSubcategoryId: null,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+    {
+      id: "expense-1",
+      type: MovementType.EXPENSE,
+      monthId: month.id,
+      amount: amount(75),
+      occurredAt: new Date("2026-05-10T00:00:00.000Z"),
+      paymentMethod: PaymentMethod.CASH,
+      sourceSubcategoryId: subcategoryId,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+  );
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const updatedMonth = await service.deleteExpense(month.id, "expense-1");
+  const deleteArgs = dbStub.getCapturedMovementDeletes()[0] as { where: { id: string } };
+
+  assert.equal(deleteArgs.where.id, "expense-1");
+  assert.equal(updatedMonth.categories[0]?.subcategories[0]?.available, 250);
+  assert.equal(updatedMonth.cashBalance, 100);
+});
+
+test("updateExpense and deleteExpense reject expenses that belong to closed months", async () => {
+  const month = { ...buildCreatedMonth(templateFixture(), 2026, 5), status: MonthStatus.CLOSED };
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  month.movements.push({
+    id: "expense-1",
+    type: MovementType.EXPENSE,
+    monthId: month.id,
+    amount: amount(75),
+    occurredAt: new Date("2026-05-10T00:00:00.000Z"),
+    paymentMethod: PaymentMethod.NON_CASH,
+    sourceSubcategoryId: subcategoryId,
+    targetSubcategoryId: null,
+    sourcePocketId: null,
+    targetPocketId: null,
+  });
+  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+
+  await assert.rejects(
+    () =>
+      service.updateExpense({
+        monthId: month.id,
+        expenseId: "expense-1",
+        sourceSubcategoryId: subcategoryId,
+        amount: 90,
+        occurredAt: "2026-05-10T00:00:00.000Z",
+        paymentMethod: PaymentMethod.NON_CASH,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /closed months are immutable/i);
+      return true;
+    },
+  );
+
+  await assert.rejects(() => service.deleteExpense(month.id, "expense-1"), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 409);
+    assert.match(error.message, /closed months are immutable/i);
+    return true;
+  });
+});
+
+test("updateExpense and deleteExpense reject movements outside the active month expense ledger", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  month.movements.push({
+    id: "foreign-expense",
+    type: MovementType.EXPENSE,
+    monthId: "month-other",
+    amount: amount(75),
+    occurredAt: new Date("2026-05-10T00:00:00.000Z"),
+    paymentMethod: PaymentMethod.NON_CASH,
+    sourceSubcategoryId: subcategoryId,
+    targetSubcategoryId: null,
+    sourcePocketId: null,
+    targetPocketId: null,
+  });
+  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+
+  await assert.rejects(
+    () =>
+      service.updateExpense({
+        monthId: month.id,
+        expenseId: "foreign-expense",
+        sourceSubcategoryId: subcategoryId,
+        amount: 90,
+        occurredAt: "2026-05-10T00:00:00.000Z",
+        paymentMethod: PaymentMethod.NON_CASH,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 404);
+      assert.match(error.message, /expense was not found in this month/i);
+      return true;
+    },
+  );
+
+  await assert.rejects(() => service.deleteExpense(month.id, "foreign-expense"), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 404);
+    assert.match(error.message, /expense was not found in this month/i);
+    return true;
+  });
 });
 
 test("createMonthlyIncome persists active-month income and recalculates available money", async () => {

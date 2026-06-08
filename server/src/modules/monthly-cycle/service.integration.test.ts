@@ -247,6 +247,9 @@ const createIntegrationDb = (initialTemplate?: TemplateCategoryState[]) => {
       },
     },
     movement: {
+      async findUnique(args: { where: { id: string } }) {
+        return capturedMovements.find((movement) => movement.id === args.where.id) ?? null;
+      },
       async findMany(args: {
         where?: {
           monthId?: string;
@@ -313,6 +316,29 @@ const createIntegrationDb = (initialTemplate?: TemplateCategoryState[]) => {
         }
 
         return { id: movementId };
+      },
+      async update(args: {
+        where: { id: string };
+        data: {
+          amount?: Prisma.Decimal;
+          description?: string | null;
+          occurredAt?: Date;
+          paymentMethod?: PaymentMethod;
+          sourceSubcategoryId?: string;
+        };
+      }) {
+        const movement = capturedMovements.find((candidate) => candidate.id === args.where.id);
+        if (!movement) throw new Error("Movement missing in integration stub.");
+        Object.assign(movement, args.data);
+        return movement;
+      },
+      async delete(args: { where: { id: string } }) {
+        const index = capturedMovements.findIndex((movement) => movement.id === args.where.id);
+        if (index >= 0) capturedMovements.splice(index, 1);
+        for (const month of months) {
+          month.movements = month.movements.filter((movement) => movement.id !== args.where.id);
+        }
+        return {};
       },
     },
     monthlyIncome: {
@@ -857,6 +883,154 @@ test("service integration: cash expense is rejected when physical cash is insuff
       return true;
     },
   );
+});
+
+test("service integration: updates active-month expenses and recalculates balances", async () => {
+  const { db, getCapturedMovements } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 200, receivedAt: "2026-05-01T00:00:00.000Z" });
+  await service.withdrawCash({ monthId: month.id, amount: 200, occurredAt: "2026-05-02T00:00:00.000Z" });
+  await service.recordExpense({
+    monthId: month.id,
+    sourceSubcategoryId: subcategoryId,
+    amount: 75,
+    description: "Supermercado",
+    occurredAt: "2026-05-17T00:00:00.000Z",
+    paymentMethod: PaymentMethod.CASH,
+  });
+  const expenseId = getCapturedMovements().find((movement) => movement.type === MovementType.EXPENSE)?.id ?? "";
+
+  const updatedMonth = await service.updateExpense({
+    monthId: month.id,
+    expenseId,
+    sourceSubcategoryId: subcategoryId,
+    amount: 120,
+    description: "Supermercado corregido",
+    occurredAt: "2026-05-18T00:00:00.000Z",
+    paymentMethod: PaymentMethod.CASH,
+  });
+  const updatedMovement = getCapturedMovements().find((movement) => movement.id === expenseId);
+
+  assert.equal(Number(updatedMovement?.amount.toString()), 120);
+  assert.equal(updatedMovement?.description, "Supermercado corregido");
+  assert.equal(updatedMovement?.occurredAt?.toISOString(), "2026-05-18T00:00:00.000Z");
+  assert.equal(updatedMonth.availableMoney, 0);
+  assert.equal(updatedMonth.cashBalance, 80);
+  assert.equal(updatedMonth.categories[0]?.subcategories[0]?.available, 180);
+});
+
+test("service integration: deletes active-month expenses and recalculates balances", async () => {
+  const { db, getCapturedMovements } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 100, receivedAt: "2026-05-01T00:00:00.000Z" });
+  await service.withdrawCash({ monthId: month.id, amount: 100, occurredAt: "2026-05-02T00:00:00.000Z" });
+  await service.recordExpense({
+    monthId: month.id,
+    sourceSubcategoryId: subcategoryId,
+    amount: 75,
+    occurredAt: "2026-05-17T00:00:00.000Z",
+    paymentMethod: PaymentMethod.CASH,
+  });
+  const expenseId = getCapturedMovements().find((movement) => movement.type === MovementType.EXPENSE)?.id ?? "";
+
+  const updatedMonth = await service.deleteExpense(month.id, expenseId);
+
+  assert.equal(getCapturedMovements().some((movement) => movement.id === expenseId), false);
+  assert.equal(updatedMonth.availableMoney, 0);
+  assert.equal(updatedMonth.cashBalance, 100);
+  assert.equal(updatedMonth.categories[0]?.subcategories[0]?.available, 300);
+});
+
+test("service integration: rejects expense corrections for expenses that belong to closed months", async () => {
+  const { db, getCapturedMovements } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const may = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = may.categories[0]?.subcategories[0]?.id ?? "";
+  await service.recordExpense({
+    monthId: may.id,
+    sourceSubcategoryId: subcategoryId,
+    amount: 50,
+    occurredAt: "2026-05-17T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+  });
+  const expenseId = getCapturedMovements()[0]?.id ?? "";
+  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01T00:00:00.000Z" });
+  await service.applyClosureAction({ monthId: may.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategoryId });
+  await service.closeMonth(may.id);
+
+  await assert.rejects(
+    () =>
+      service.updateExpense({
+        monthId: may.id,
+        expenseId,
+        sourceSubcategoryId: subcategoryId,
+        amount: 55,
+        occurredAt: "2026-05-17T00:00:00.000Z",
+        paymentMethod: PaymentMethod.NON_CASH,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /closed months are immutable/i);
+      return true;
+    },
+  );
+
+  await assert.rejects(() => service.deleteExpense(may.id, expenseId), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 409);
+    assert.match(error.message, /closed months are immutable/i);
+    return true;
+  });
+});
+
+test("service integration: rejects foreign expense ids from another month", async () => {
+  const { db, getCapturedMovements } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const may = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = may.categories[0]?.subcategories[0]?.id ?? "";
+  await service.recordExpense({
+    monthId: may.id,
+    sourceSubcategoryId: subcategoryId,
+    amount: 50,
+    occurredAt: "2026-05-17T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+  });
+  const expenseId = getCapturedMovements()[0]?.id ?? "";
+  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01T00:00:00.000Z" });
+  await service.applyClosureAction({ monthId: may.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategoryId });
+  await service.closeMonth(may.id);
+  const june = await service.openMonth({ year: 2026, month: 6 });
+  const juneSubcategoryId = june.categories[0]?.subcategories[0]?.id ?? "";
+
+  await assert.rejects(
+    () =>
+      service.updateExpense({
+        monthId: june.id,
+        expenseId,
+        sourceSubcategoryId: juneSubcategoryId,
+        amount: 55,
+        occurredAt: "2026-06-17T00:00:00.000Z",
+        paymentMethod: PaymentMethod.NON_CASH,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 404);
+      assert.match(error.message, /expense was not found in this month/i);
+      return true;
+    },
+  );
+
+  await assert.rejects(() => service.deleteExpense(june.id, expenseId), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 404);
+    assert.match(error.message, /expense was not found in this month/i);
+    return true;
+  });
 });
 
 test("service integration: filters expense history by payment method, date range, and subcategory", async () => {

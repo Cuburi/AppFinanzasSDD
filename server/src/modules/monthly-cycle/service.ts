@@ -8,6 +8,7 @@ import {
   type BasicReportInput,
   type RecordExpenseInput,
   type TemplateInput,
+  type UpdateExpenseInput,
   type UpdateMonthlyIncomeInput,
   type WithdrawCashInput,
 } from "./dto/index.js";
@@ -39,6 +40,8 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
     openMonth: monthLifecycleService.openMonth,
     getActiveMonth: monthLifecycleService.getActiveMonth,
     recordExpense: movementService.recordExpense,
+    updateExpense: movementService.updateExpense,
+    deleteExpense: movementService.deleteExpense,
     listExpenseHistory: expenseHistoryService.listExpenseHistory,
     getBasicReport: reportsService.getBasicReport,
     withdrawCash: cashService.withdrawCash,
@@ -60,6 +63,8 @@ export const updateTemplate = (input: TemplateInput) => monthlyCycleService.upda
 export const openMonth = (input: OpenMonthInput) => monthlyCycleService.openMonth(input);
 export const getActiveMonth = () => monthlyCycleService.getActiveMonth();
 export const recordExpense = (input: RecordExpenseInput) => monthlyCycleService.recordExpense(input);
+export const updateExpense = (input: UpdateExpenseInput) => monthlyCycleService.updateExpense(input);
+export const deleteExpense = (monthId: string, expenseId: string) => monthlyCycleService.deleteExpense(monthId, expenseId);
 export const listExpenseHistory = (input: ExpenseHistoryQueryInput) => monthlyCycleService.listExpenseHistory(input);
 export const getBasicReport = (monthId: BasicReportInput["monthId"]) => monthlyCycleService.getBasicReport(monthId);
 export const withdrawCash = (input: WithdrawCashInput) => monthlyCycleService.withdrawCash(input);

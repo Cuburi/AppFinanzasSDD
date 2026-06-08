@@ -72,6 +72,7 @@ export type MonthRecord = {
     id?: string;
     type: MovementType;
     amount: Prisma.Decimal;
+    monthId?: string | null;
     occurredAt?: Date;
     description?: string | null;
     paymentMethod?: PaymentMethod | null;
@@ -139,6 +140,7 @@ export type MonthlyCycleDb = {
     }): Promise<MonthRecord>;
   };
   movement: {
+    findUnique(args: { where: { id: string } }): Promise<MonthRecord["movements"][number] | null>;
     findMany(args: unknown): Promise<
       Array<{
         id?: string;
@@ -169,6 +171,17 @@ export type MonthlyCycleDb = {
         externalSourceLabel?: string | null;
       };
     }): Promise<unknown>;
+    update(args: {
+      where: { id: string };
+      data: {
+        amount?: Prisma.Decimal;
+        description?: string | null;
+        occurredAt?: Date;
+        paymentMethod?: PaymentMethod;
+        sourceSubcategoryId?: string;
+      };
+    }): Promise<unknown>;
+    delete(args: { where: { id: string } }): Promise<unknown>;
   };
   monthlyIncome: {
     findUnique(args: { where: { id: string } }): Promise<MonthlyIncomeRecord | null>;
