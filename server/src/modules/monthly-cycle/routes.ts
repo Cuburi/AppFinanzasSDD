@@ -5,11 +5,13 @@ import {
   parseClosureActionInput,
   parseCashSummaryInput,
   parseDepositToPocketInput,
+  parseDeleteExpenseInput,
   parseExpenseHistoryQueryInput,
   parseBasicReportInput,
   parseOpenMonthInput,
   parseRecordExpenseInput,
   parseTemplateInput,
+  parseUpdateExpenseInput,
   parseUpdateMonthlyIncomeInput,
   parseWithdrawCashInput,
 } from "./dto/index.js";
@@ -18,6 +20,7 @@ import {
   applyClosureAction,
   closeMonth,
   createMonthlyIncome,
+  deleteExpense,
   deleteMonthlyIncome,
   depositToPocket,
   getActiveMonth,
@@ -28,6 +31,7 @@ import {
   listExpenseHistory,
   openMonth,
   recordExpense,
+  updateExpense,
   withdrawCash,
   updateMonthlyIncome,
   updateTemplate,
@@ -39,13 +43,18 @@ const readMessage = (error: unknown) => (error instanceof Error ? error.message 
 
 type MonthlyCycleRouteService = {
   getBasicReport(monthId: string): ReturnType<typeof getBasicReport>;
+  updateExpense(input: Parameters<typeof updateExpense>[0]): ReturnType<typeof updateExpense>;
+  deleteExpense(monthId: string, expenseId: string): ReturnType<typeof deleteExpense>;
 };
 
 const defaultMonthlyCycleRouteService: MonthlyCycleRouteService = {
   getBasicReport,
+  updateExpense,
+  deleteExpense,
 };
 
-export const monthlyCycleRouter = (service: MonthlyCycleRouteService = defaultMonthlyCycleRouteService) => {
+export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteService> = {}) => {
+  const service = { ...defaultMonthlyCycleRouteService, ...serviceOverrides };
   const router = Router();
 
   router.get("/template", async (_request, response) => {
@@ -93,6 +102,36 @@ export const monthlyCycleRouter = (service: MonthlyCycleRouteService = defaultMo
       const payload = parseRecordExpenseInput(request.params.id, request.body);
       const month = await recordExpense(payload);
       response.status(201).json(month);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.patch("/months/:id/expenses/:expenseId", async (request, response) => {
+    try {
+      const payload = parseUpdateExpenseInput(request.params.id, request.params.expenseId, request.body);
+      const month = await service.updateExpense(payload);
+      response.json(month);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.delete("/months/:id/expenses/:expenseId", async (request, response) => {
+    try {
+      const payload = parseDeleteExpenseInput(request.params.id, request.params.expenseId);
+      const month = await service.deleteExpense(payload.monthId, payload.expenseId);
+      response.json(month);
     } catch (error) {
       if (isDomainError(error)) {
         response.status(error.statusCode).json({ message: error.message });
