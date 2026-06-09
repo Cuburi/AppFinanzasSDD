@@ -9,7 +9,9 @@ import {
   type RecordExpenseInput,
   type TemplateInput,
   type UpdateExpenseInput,
+  type UpdateMonthCategoryInput,
   type UpdateMonthlyIncomeInput,
+  type UpdateMonthSubcategoryInput,
   type WithdrawCashInput,
 } from "./dto/index.js";
 import { createCashService } from "./workflows/cash-service.js";
@@ -17,6 +19,7 @@ import { createClosureService, buildClosureReview } from "./workflows/closure-se
 import { createExpenseHistoryService } from "./workflows/expense-history-service.js";
 import { createIncomeService } from "./workflows/income-service.js";
 import { createMonthLifecycleService } from "./workflows/month-lifecycle-service.js";
+import { createMonthStructureService } from "./workflows/month-structure-service.js";
 import { createMovementService } from "./workflows/movement-service.js";
 import { createReportsService } from "./workflows/reports-service.js";
 import { createTemplateService } from "./workflows/template-service.js";
@@ -33,6 +36,7 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
   const cashService = createCashService(db);
   const expenseHistoryService = createExpenseHistoryService(db);
   const reportsService = createReportsService(db);
+  const monthStructureService = createMonthStructureService(db);
 
   return {
     getTemplate: templateService.getTemplate,
@@ -42,6 +46,10 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
     recordExpense: movementService.recordExpense,
     updateExpense: movementService.updateExpense,
     deleteExpense: movementService.deleteExpense,
+    updateMonthCategory: monthStructureService.updateMonthCategory,
+    deleteMonthCategory: monthStructureService.deleteMonthCategory,
+    updateMonthSubcategory: monthStructureService.updateMonthSubcategory,
+    deleteMonthSubcategory: monthStructureService.deleteMonthSubcategory,
     listExpenseHistory: expenseHistoryService.listExpenseHistory,
     getBasicReport: reportsService.getBasicReport,
     withdrawCash: cashService.withdrawCash,
@@ -65,6 +73,11 @@ export const getActiveMonth = () => monthlyCycleService.getActiveMonth();
 export const recordExpense = (input: RecordExpenseInput) => monthlyCycleService.recordExpense(input);
 export const updateExpense = (input: UpdateExpenseInput) => monthlyCycleService.updateExpense(input);
 export const deleteExpense = (monthId: string, expenseId: string) => monthlyCycleService.deleteExpense(monthId, expenseId);
+export const updateMonthCategory = (input: UpdateMonthCategoryInput) => monthlyCycleService.updateMonthCategory(input);
+export const deleteMonthCategory = (monthId: string, categoryId: string) => monthlyCycleService.deleteMonthCategory(monthId, categoryId);
+export const updateMonthSubcategory = (input: UpdateMonthSubcategoryInput) => monthlyCycleService.updateMonthSubcategory(input);
+export const deleteMonthSubcategory = (monthId: string, subcategoryId: string) =>
+  monthlyCycleService.deleteMonthSubcategory(monthId, subcategoryId);
 export const listExpenseHistory = (input: ExpenseHistoryQueryInput) => monthlyCycleService.listExpenseHistory(input);
 export const getBasicReport = (monthId: BasicReportInput["monthId"]) => monthlyCycleService.getBasicReport(monthId);
 export const withdrawCash = (input: WithdrawCashInput) => monthlyCycleService.withdrawCash(input);

@@ -183,6 +183,17 @@ export type MonthlyCycleDb = {
     }): Promise<unknown>;
     delete(args: { where: { id: string } }): Promise<unknown>;
   };
+  monthCategory: {
+    update(args: { where: { id: string }; data: { name: string } }): Promise<unknown>;
+    delete(args: { where: { id: string } }): Promise<unknown>;
+  };
+  monthSubcategory: {
+    update(args: {
+      where: { id: string };
+      data: { name: string; plannedAmount: Prisma.Decimal; defaultPocketId?: string | null };
+    }): Promise<unknown>;
+    delete(args: { where: { id: string } }): Promise<unknown>;
+  };
   monthlyIncome: {
     findUnique(args: { where: { id: string } }): Promise<MonthlyIncomeRecord | null>;
     create(args: {

@@ -6,13 +6,17 @@ import {
   parseCashSummaryInput,
   parseDepositToPocketInput,
   parseDeleteExpenseInput,
+  parseDeleteMonthCategoryInput,
+  parseDeleteMonthSubcategoryInput,
   parseExpenseHistoryQueryInput,
   parseBasicReportInput,
   parseOpenMonthInput,
   parseRecordExpenseInput,
   parseTemplateInput,
   parseUpdateExpenseInput,
+  parseUpdateMonthCategoryInput,
   parseUpdateMonthlyIncomeInput,
+  parseUpdateMonthSubcategoryInput,
   parseWithdrawCashInput,
 } from "./dto/index.js";
 import {
@@ -21,7 +25,9 @@ import {
   closeMonth,
   createMonthlyIncome,
   deleteExpense,
+  deleteMonthCategory,
   deleteMonthlyIncome,
+  deleteMonthSubcategory,
   depositToPocket,
   getActiveMonth,
   getClosureReview,
@@ -32,8 +38,10 @@ import {
   openMonth,
   recordExpense,
   updateExpense,
+  updateMonthCategory,
   withdrawCash,
   updateMonthlyIncome,
+  updateMonthSubcategory,
   updateTemplate,
 } from "./service.js";
 
@@ -45,12 +53,20 @@ type MonthlyCycleRouteService = {
   getBasicReport(monthId: string): ReturnType<typeof getBasicReport>;
   updateExpense(input: Parameters<typeof updateExpense>[0]): ReturnType<typeof updateExpense>;
   deleteExpense(monthId: string, expenseId: string): ReturnType<typeof deleteExpense>;
+  updateMonthCategory(input: Parameters<typeof updateMonthCategory>[0]): ReturnType<typeof updateMonthCategory>;
+  deleteMonthCategory(monthId: string, categoryId: string): ReturnType<typeof deleteMonthCategory>;
+  updateMonthSubcategory(input: Parameters<typeof updateMonthSubcategory>[0]): ReturnType<typeof updateMonthSubcategory>;
+  deleteMonthSubcategory(monthId: string, subcategoryId: string): ReturnType<typeof deleteMonthSubcategory>;
 };
 
 const defaultMonthlyCycleRouteService: MonthlyCycleRouteService = {
   getBasicReport,
   updateExpense,
   deleteExpense,
+  updateMonthCategory,
+  deleteMonthCategory,
+  updateMonthSubcategory,
+  deleteMonthSubcategory,
 };
 
 export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteService> = {}) => {
@@ -131,6 +147,66 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
     try {
       const payload = parseDeleteExpenseInput(request.params.id, request.params.expenseId);
       const month = await service.deleteExpense(payload.monthId, payload.expenseId);
+      response.json(month);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.patch("/months/:id/categories/:categoryId", async (request, response) => {
+    try {
+      const payload = parseUpdateMonthCategoryInput(request.params.id, request.params.categoryId, request.body);
+      const month = await service.updateMonthCategory(payload);
+      response.json(month);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.delete("/months/:id/categories/:categoryId", async (request, response) => {
+    try {
+      const payload = parseDeleteMonthCategoryInput(request.params.id, request.params.categoryId);
+      const month = await service.deleteMonthCategory(payload.monthId, payload.categoryId);
+      response.json(month);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.patch("/months/:id/subcategories/:subcategoryId", async (request, response) => {
+    try {
+      const payload = parseUpdateMonthSubcategoryInput(request.params.id, request.params.subcategoryId, request.body);
+      const month = await service.updateMonthSubcategory(payload);
+      response.json(month);
+    } catch (error) {
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+
+      response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.delete("/months/:id/subcategories/:subcategoryId", async (request, response) => {
+    try {
+      const payload = parseDeleteMonthSubcategoryInput(request.params.id, request.params.subcategoryId);
+      const month = await service.deleteMonthSubcategory(payload.monthId, payload.subcategoryId);
       response.json(month);
     } catch (error) {
       if (isDomainError(error)) {

@@ -341,6 +341,42 @@ const createIntegrationDb = (initialTemplate?: TemplateCategoryState[]) => {
         return {};
       },
     },
+    monthCategory: {
+      async update(args: { where: { id: string }; data: { name: string } }) {
+        const category = months.flatMap((month) => month.categories).find((candidate) => candidate.id === args.where.id);
+        if (!category) throw new Error("Month category missing in integration stub.");
+        category.name = args.data.name;
+        return category;
+      },
+      async delete(args: { where: { id: string } }) {
+        for (const month of months) {
+          month.categories = month.categories.filter((category) => category.id !== args.where.id);
+        }
+        return {};
+      },
+    },
+    monthSubcategory: {
+      async update(args: {
+        where: { id: string };
+        data: { name: string; plannedAmount: Prisma.Decimal; defaultPocketId?: string | null };
+      }) {
+        const subcategory = months
+          .flatMap((month) => month.categories)
+          .flatMap((category) => category.subcategories)
+          .find((candidate) => candidate.id === args.where.id);
+        if (!subcategory) throw new Error("Month subcategory missing in integration stub.");
+        Object.assign(subcategory, args.data);
+        return subcategory;
+      },
+      async delete(args: { where: { id: string } }) {
+        for (const month of months) {
+          for (const category of month.categories) {
+            category.subcategories = category.subcategories.filter((subcategory) => subcategory.id !== args.where.id);
+          }
+        }
+        return {};
+      },
+    },
     monthlyIncome: {
       async findUnique(args: { where: { id: string } }) {
         return months.flatMap((month) => month.incomes).find((income) => income.id === args.where.id) ?? null;
@@ -1029,6 +1065,116 @@ test("service integration: rejects foreign expense ids from another month", asyn
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 404);
     assert.match(error.message, /expense was not found in this month/i);
+    return true;
+  });
+});
+
+test("service integration: category and subcategory edits mutate only the active-month snapshot", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const categoryId = month.categories[0]?.id ?? "";
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+
+  const categoryEdited = await service.updateMonthCategory({ monthId: month.id, categoryId, name: "Variables" });
+  const subcategoryEdited = await service.updateMonthSubcategory({
+    monthId: month.id,
+    subcategoryId,
+    name: "Supermercado",
+    plannedAmount: 450,
+    defaultPocketId: "pocket-buffer",
+  });
+  const template = await service.getTemplate();
+
+  assert.equal(categoryEdited.categories[0]?.name, "Variables");
+  assert.equal(subcategoryEdited.categories[0]?.subcategories[0]?.name, "Supermercado");
+  assert.equal(subcategoryEdited.categories[0]?.subcategories[0]?.plannedAmount, 450);
+  assert.equal(template.categories[0]?.name, "Base");
+  assert.equal(template.categories[0]?.subcategories[0]?.name, "Comida");
+  assert.equal(template.categories[0]?.subcategories[0]?.plannedAmount, 300);
+});
+
+test("service integration: deletes empty subcategories before deleting their category", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const categoryId = month.categories[0]?.id ?? "";
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+
+  await assert.rejects(() => service.deleteMonthCategory(month.id, categoryId), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 409);
+    assert.match(error.message, /delete subcategories first/i);
+    return true;
+  });
+
+  const withoutSubcategory = await service.deleteMonthSubcategory(month.id, subcategoryId);
+  const withoutCategory = await service.deleteMonthCategory(month.id, categoryId);
+
+  assert.equal(withoutSubcategory.categories[0]?.subcategories.length, 0);
+  assert.equal(withoutCategory.categories.some((category) => category.id === categoryId), false);
+});
+
+test("service integration: rejects deleting movement-linked month structure nodes", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const categoryId = month.categories[0]?.id ?? "";
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  await service.recordExpense({
+    monthId: month.id,
+    sourceSubcategoryId: subcategoryId,
+    amount: 30,
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+  });
+
+  await assert.rejects(() => service.deleteMonthSubcategory(month.id, subcategoryId), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 409);
+    assert.match(error.message, /associated movements/i);
+    return true;
+  });
+
+  await assert.rejects(() => service.deleteMonthCategory(month.id, categoryId), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 409);
+    assert.match(error.message, /delete subcategories first/i);
+    return true;
+  });
+});
+
+test("service integration: month structure corrections reject closed months and missing nodes", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01T00:00:00.000Z" });
+  await service.applyClosureAction({ monthId: month.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategoryId });
+  await service.closeMonth(month.id);
+
+  await assert.rejects(
+    () => service.updateMonthSubcategory({ monthId: month.id, subcategoryId, name: "Closed", plannedAmount: 300 }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /closed months are immutable/i);
+      return true;
+    },
+  );
+
+  const nextMonth = await service.openMonth({ year: 2026, month: 6 });
+  await assert.rejects(() => service.updateMonthCategory({ monthId: nextMonth.id, categoryId: "missing-category", name: "Missing" }), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 404);
+    assert.match(error.message, /category was not found/i);
+    return true;
+  });
+
+  await assert.rejects(() => service.deleteMonthSubcategory(nextMonth.id, "missing-subcategory"), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 404);
+    assert.match(error.message, /subcategory was not found/i);
     return true;
   });
 });
