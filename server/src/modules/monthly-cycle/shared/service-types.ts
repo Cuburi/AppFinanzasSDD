@@ -103,7 +103,18 @@ export type MonthlyCycleDb = {
           }>;
         };
       };
-    }): Promise<unknown>;
+    }): Promise<{ id: string }>;
+  };
+  templateSubcategory: {
+    create(args: {
+      data: {
+        categoryId: string;
+        name: string;
+        plannedAmount: Prisma.Decimal;
+        defaultPocketId: string | null;
+        sortOrder: number;
+      };
+    }): Promise<{ id: string }>;
   };
   month: {
     findFirst(args: unknown): Promise<MonthRecord | { id: string; year: number; month: number } | null>;
@@ -184,13 +195,24 @@ export type MonthlyCycleDb = {
     delete(args: { where: { id: string } }): Promise<unknown>;
   };
   monthCategory: {
-    update(args: { where: { id: string }; data: { name: string } }): Promise<unknown>;
+    create(args: { data: { monthId: string; name: string; sortOrder: number; templateCategoryId: string | null } }): Promise<{ id: string }>;
+    update(args: { where: { id: string }; data: { name?: string; templateCategoryId?: string | null } }): Promise<unknown>;
     delete(args: { where: { id: string } }): Promise<unknown>;
   };
   monthSubcategory: {
+    create(args: {
+      data: {
+        monthCategoryId: string;
+        name: string;
+        plannedAmount: Prisma.Decimal;
+        defaultPocketId: string | null;
+        templateSubcategoryId: string | null;
+        sortOrder: number;
+      };
+    }): Promise<{ id: string }>;
     update(args: {
       where: { id: string };
-      data: { name: string; plannedAmount: Prisma.Decimal; defaultPocketId?: string | null };
+      data: { name?: string; plannedAmount?: Prisma.Decimal; defaultPocketId?: string | null; templateSubcategoryId?: string | null };
     }): Promise<unknown>;
     delete(args: { where: { id: string } }): Promise<unknown>;
   };
