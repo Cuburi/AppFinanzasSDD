@@ -41,10 +41,17 @@ export const ActiveMonthPage = () => {
   const [editingIncomeId, setEditingIncomeId] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryName, setCategoryName] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryAddToTemplate, setNewCategoryAddToTemplate] = useState(false);
   const [editingSubcategoryId, setEditingSubcategoryId] = useState<string | null>(null);
   const [subcategoryName, setSubcategoryName] = useState("");
   const [subcategoryPlannedAmount, setSubcategoryPlannedAmount] = useState("");
   const [subcategoryDefaultPocketId, setSubcategoryDefaultPocketId] = useState("");
+  const [newSubcategoryParentId, setNewSubcategoryParentId] = useState("");
+  const [newSubcategoryName, setNewSubcategoryName] = useState("");
+  const [newSubcategoryPlannedAmount, setNewSubcategoryPlannedAmount] = useState("");
+  const [newSubcategoryDefaultPocketId, setNewSubcategoryDefaultPocketId] = useState("");
+  const [newSubcategoryAddToTemplate, setNewSubcategoryAddToTemplate] = useState(false);
 
   const refreshExpenseHistory = async (monthId: string) => {
     const expenses = await api.getExpenseHistory(monthId);
@@ -116,7 +123,7 @@ export const ActiveMonthPage = () => {
   };
 
   const subcategories = activeMonth?.categories.flatMap((category) => category.subcategories) ?? [];
-  const canMutateActiveMonth = activeMonth?.status === "ACTIVE";
+  const canMutateActiveMonth = activeMonth?.status === "ACTIVE" && !activeMonth.closedAt;
 
   const resetIncomeForm = (monthData = activeMonth) => {
     setIncomeSourceName("");
@@ -140,6 +147,11 @@ export const ActiveMonthPage = () => {
     setCategoryName("");
   };
 
+  const resetCreateCategoryForm = () => {
+    setNewCategoryName("");
+    setNewCategoryAddToTemplate(false);
+  };
+
   const resetSubcategoryForm = () => {
     setEditingSubcategoryId(null);
     setSubcategoryName("");
@@ -147,10 +159,20 @@ export const ActiveMonthPage = () => {
     setSubcategoryDefaultPocketId("");
   };
 
+  const resetCreateSubcategoryForm = () => {
+    setNewSubcategoryParentId("");
+    setNewSubcategoryName("");
+    setNewSubcategoryPlannedAmount("");
+    setNewSubcategoryDefaultPocketId("");
+    setNewSubcategoryAddToTemplate(false);
+  };
+
   const resetCorrectionForms = (monthData = activeMonth) => {
     resetExpenseForm(monthData);
     resetCategoryForm();
     resetSubcategoryForm();
+    resetCreateCategoryForm();
+    resetCreateSubcategoryForm();
   };
 
   const applyActiveMonthCorrection = async (mutation: () => Promise<Month>, successMessage: string, fallbackError: string, afterSuccess?: (monthData: Month) => void) => {
@@ -243,6 +265,20 @@ export const ActiveMonthPage = () => {
     );
   };
 
+  const handleCreateCategory = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!activeMonth || !canMutateActiveMonth) return;
+    const shouldPromote = newCategoryAddToTemplate;
+    await applyActiveMonthCorrection(
+      () => api.createMonthCategory({ monthId: activeMonth.id, name: newCategoryName, addToTemplate: shouldPromote }),
+      shouldPromote
+        ? "Categoría creada en este mes y copiada a la plantilla global para próximos meses."
+        : "Categoría creada solo en el snapshot del mes activo; la plantilla global no cambió.",
+      "No se pudo crear la categoría del mes activo.",
+      () => resetCreateCategoryForm(),
+    );
+  };
+
   const handleSubcategory = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!activeMonth || !canMutateActiveMonth || !editingSubcategoryId) return;
@@ -258,6 +294,28 @@ export const ActiveMonthPage = () => {
       "Subcategoría del mes activo actualizada sin modificar la plantilla global.",
       "No se pudo actualizar la subcategoría del mes activo.",
       () => resetSubcategoryForm(),
+    );
+  };
+
+  const handleCreateSubcategory = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!activeMonth || !canMutateActiveMonth) return;
+    const shouldPromote = newSubcategoryAddToTemplate;
+    await applyActiveMonthCorrection(
+      () =>
+        api.createMonthSubcategory({
+          monthId: activeMonth.id,
+          categoryId: newSubcategoryParentId,
+          name: newSubcategoryName,
+          plannedAmount: Number(newSubcategoryPlannedAmount),
+          defaultPocketId: newSubcategoryDefaultPocketId || null,
+          addToTemplate: shouldPromote,
+        }),
+      shouldPromote
+        ? "Subcategoría creada en este mes y copiada a la plantilla global para próximos meses."
+        : "Subcategoría creada solo en el snapshot del mes activo; la plantilla global no cambió.",
+      "No se pudo crear la subcategoría del mes activo.",
+      () => resetCreateSubcategoryForm(),
     );
   };
 
@@ -639,6 +697,68 @@ export const ActiveMonthPage = () => {
               · estado {activeMonth.status}
             </p>
             <p>Estos cambios corrigen solo el snapshot del mes activo; no modifican la plantilla global.</p>
+
+            {canMutateActiveMonth ? (
+              <div className="stack-md">
+                <p>Creá categorías y subcategorías solo en este mes. Marcá la copia a plantilla únicamente si querés que aparezcan en próximos meses.</p>
+
+                <form aria-label="Crear categoría del mes activo" className="row gap-sm wrap" onSubmit={handleCreateCategory}>
+                  <label className="field">
+                    <span>Nueva categoría</span>
+                    <input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} required />
+                  </label>
+                  <label className="field">
+                    <span>Copiar categoría a plantilla</span>
+                    <input type="checkbox" checked={newCategoryAddToTemplate} onChange={(event) => setNewCategoryAddToTemplate(event.target.checked)} />
+                  </label>
+                  <Button disabled={submitting} type="submit">
+                    Crear categoría
+                  </Button>
+                </form>
+
+                <form aria-label="Crear subcategoría del mes activo" className="row gap-sm wrap" onSubmit={handleCreateSubcategory}>
+                  <label className="field">
+                    <span>Categoría padre</span>
+                    <select value={newSubcategoryParentId} onChange={(event) => setNewSubcategoryParentId(event.target.value)} required>
+                      <option value="">Elegí una categoría</option>
+                      {activeMonth.categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Nueva subcategoría</span>
+                    <input value={newSubcategoryName} onChange={(event) => setNewSubcategoryName(event.target.value)} required />
+                  </label>
+                  <label className="field small-field">
+                    <span>Planificado inicial</span>
+                    <input min="0" step="0.01" type="number" value={newSubcategoryPlannedAmount} onChange={(event) => setNewSubcategoryPlannedAmount(event.target.value)} required />
+                  </label>
+                  <label className="field">
+                    <span>Bolsillo predeterminado inicial</span>
+                    <select value={newSubcategoryDefaultPocketId} onChange={(event) => setNewSubcategoryDefaultPocketId(event.target.value)}>
+                      <option value="">Sin bolsillo predeterminado</option>
+                      {activePockets.map((pocket) => (
+                        <option key={pocket.id} value={pocket.id}>
+                          {pocket.name} — predeterminado (${pocket.balance.toFixed(2)})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Copiar a plantilla también</span>
+                    <input type="checkbox" checked={newSubcategoryAddToTemplate} onChange={(event) => setNewSubcategoryAddToTemplate(event.target.checked)} />
+                  </label>
+                  <Button disabled={submitting} type="submit">
+                    Crear subcategoría
+                  </Button>
+                </form>
+              </div>
+            ) : (
+              <p className="error">El mes está cerrado: la estructura es de solo lectura y no se pueden crear categorías ni subcategorías.</p>
+            )}
 
             {editingCategoryId ? (
               <form aria-label="Editar categoría del mes activo" className="row gap-sm wrap" onSubmit={handleCategory}>

@@ -4,6 +4,8 @@ import type {
   BasicMonthlyReport,
   CashSummary,
   CreateDebtInput,
+  CreateMonthCategoryInput,
+  CreateMonthSubcategoryInput,
   CreateMonthlyIncomeInput,
   CreatePocketInput,
   DebtView,
@@ -208,6 +210,20 @@ export const api = {
 
     return readJson<Month>(response);
   },
+  async createMonthCategory(input: CreateMonthCategoryInput): Promise<Month> {
+    const response = await fetch(`/api/months/${input.monthId}/categories`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: input.name,
+        addToTemplate: input.addToTemplate,
+      }),
+    });
+
+    return readJson<Month>(response);
+  },
   async deleteMonthCategory(monthId: string, categoryId: string): Promise<Month> {
     const response = await fetch(`/api/months/${monthId}/categories/${categoryId}`, {
       method: "DELETE",
@@ -225,6 +241,22 @@ export const api = {
         name: input.name,
         plannedAmount: input.plannedAmount,
         defaultPocketId: input.defaultPocketId,
+      }),
+    });
+
+    return readJson<Month>(response);
+  },
+  async createMonthSubcategory(input: CreateMonthSubcategoryInput): Promise<Month> {
+    const response = await fetch(`/api/months/${input.monthId}/categories/${input.categoryId}/subcategories`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: input.name,
+        plannedAmount: input.plannedAmount,
+        defaultPocketId: input.defaultPocketId,
+        addToTemplate: input.addToTemplate,
       }),
     });
 
