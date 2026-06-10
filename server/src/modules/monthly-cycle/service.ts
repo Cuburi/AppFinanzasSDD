@@ -1,7 +1,9 @@
 import { prisma } from "../../lib/prisma.js";
 import {
   type ClosureActionInput,
+  type CreateMonthCategoryInput,
   type CreateMonthlyIncomeInput,
+  type CreateMonthSubcategoryInput,
   type ExpenseHistoryQueryInput,
   type OpenMonthInput,
   type DepositToPocketInput,
@@ -46,8 +48,10 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
     recordExpense: movementService.recordExpense,
     updateExpense: movementService.updateExpense,
     deleteExpense: movementService.deleteExpense,
+    createMonthCategory: monthStructureService.createMonthCategory,
     updateMonthCategory: monthStructureService.updateMonthCategory,
     deleteMonthCategory: monthStructureService.deleteMonthCategory,
+    createMonthSubcategory: monthStructureService.createMonthSubcategory,
     updateMonthSubcategory: monthStructureService.updateMonthSubcategory,
     deleteMonthSubcategory: monthStructureService.deleteMonthSubcategory,
     listExpenseHistory: expenseHistoryService.listExpenseHistory,
@@ -73,8 +77,10 @@ export const getActiveMonth = () => monthlyCycleService.getActiveMonth();
 export const recordExpense = (input: RecordExpenseInput) => monthlyCycleService.recordExpense(input);
 export const updateExpense = (input: UpdateExpenseInput) => monthlyCycleService.updateExpense(input);
 export const deleteExpense = (monthId: string, expenseId: string) => monthlyCycleService.deleteExpense(monthId, expenseId);
+export const createMonthCategory = (input: CreateMonthCategoryInput) => monthlyCycleService.createMonthCategory(input);
 export const updateMonthCategory = (input: UpdateMonthCategoryInput) => monthlyCycleService.updateMonthCategory(input);
 export const deleteMonthCategory = (monthId: string, categoryId: string) => monthlyCycleService.deleteMonthCategory(monthId, categoryId);
+export const createMonthSubcategory = (input: CreateMonthSubcategoryInput) => monthlyCycleService.createMonthSubcategory(input);
 export const updateMonthSubcategory = (input: UpdateMonthSubcategoryInput) => monthlyCycleService.updateMonthSubcategory(input);
 export const deleteMonthSubcategory = (monthId: string, subcategoryId: string) =>
   monthlyCycleService.deleteMonthSubcategory(monthId, subcategoryId);

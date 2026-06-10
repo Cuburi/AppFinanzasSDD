@@ -424,6 +424,183 @@ test("monthlyCycleRouter accepts zero plannedAmount for PATCH month subcategorie
   }
 });
 
+test("monthlyCycleRouter parses POST /api/months/:id/categories with explicit addToTemplate", async () => {
+  const calls: unknown[] = [];
+  const server = createTestServer({
+    async getBasicReport() {
+      return report;
+    },
+    async createMonthCategory(input: unknown) {
+      calls.push(input);
+      return {
+        ...month,
+        categories: [...month.categories, { id: "cat-new", name: "Variables", sortOrder: 1, templateCategoryId: null, subcategories: [] }],
+      };
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/categories`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "  Variables  ", addToTemplate: false }),
+    });
+
+    const body = (await response.json()) as MonthView;
+    assert.equal(response.status, 201);
+    assert.equal(body.categories[1]?.name, "Variables");
+    assert.deepEqual(calls, [{ monthId: "month-1", name: "Variables", addToTemplate: false }]);
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter parses POST /api/months/:id/categories/:categoryId/subcategories and allows plannedAmount zero", async () => {
+  const calls: unknown[] = [];
+  const server = createTestServer({
+    async getBasicReport() {
+      return report;
+    },
+    async createMonthSubcategory(input: unknown) {
+      calls.push(input);
+      return {
+        ...month,
+        categories: [
+          {
+            ...month.categories[0]!,
+            subcategories: [
+              ...month.categories[0]!.subcategories,
+              { id: "sub-new", name: "Taxi", plannedAmount: 0, available: 0, defaultPocketId: "pocket-buffer", sortOrder: 1, templateSubcategoryId: null },
+            ],
+          },
+        ],
+      };
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/categories/cat-food/subcategories`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Taxi", plannedAmount: 0, defaultPocketId: "pocket-buffer", addToTemplate: true }),
+    });
+
+    const body = (await response.json()) as MonthView;
+    assert.equal(response.status, 201);
+    assert.equal(body.categories[0]?.subcategories[1]?.plannedAmount, 0);
+    assert.deepEqual(calls, [
+      { monthId: "month-1", categoryId: "cat-food", name: "Taxi", plannedAmount: 0, defaultPocketId: "pocket-buffer", addToTemplate: true },
+    ]);
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter rejects malformed POST month structure payloads before service execution", async () => {
+  let calls = 0;
+  const server = createTestServer({
+    async getBasicReport() {
+      return report;
+    },
+    async createMonthCategory() {
+      calls += 1;
+      return month;
+    },
+    async createMonthSubcategory() {
+      calls += 1;
+      return month;
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+
+    const missingFlag = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/categories`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Variables" }),
+    });
+    const badFlag = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/categories`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Variables", addToTemplate: "yes" }),
+    });
+    const negativeAmount = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/categories/cat-food/subcategories`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Taxi", plannedAmount: -1, addToTemplate: false }),
+    });
+    const blankParent = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/categories/%20%20%20/subcategories`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Taxi", plannedAmount: 0, addToTemplate: false }),
+    });
+
+    assert.equal(missingFlag.status, 400);
+    assert.deepEqual(await missingFlag.json(), { message: "addToTemplate is required." });
+    assert.equal(badFlag.status, 400);
+    assert.deepEqual(await badFlag.json(), { message: "addToTemplate must be true or false." });
+    assert.equal(negativeAmount.status, 400);
+    assert.deepEqual(await negativeAmount.json(), { message: "Planned amount must be zero or greater." });
+    assert.equal(blankParent.status, 400);
+    assert.deepEqual(await blankParent.json(), { message: "Category id is required." });
+    assert.equal(calls, 0);
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter maps POST month structure domain errors", async () => {
+  const calls: unknown[] = [];
+  const server = createTestServer({
+    async getBasicReport() {
+      return report;
+    },
+    async createMonthCategory(input: unknown) {
+      calls.push({ type: "category", input });
+      throw new DomainError(409, "Closed months are immutable.");
+    },
+    async createMonthSubcategory(input: unknown) {
+      calls.push({ type: "subcategory", input });
+      throw new DomainError(404, "Category was not found in this month.");
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+
+    const categoryResponse = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/categories`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Variables", addToTemplate: false }),
+    });
+    const subcategoryResponse = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/categories/missing-category/subcategories`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Taxi", plannedAmount: 0, addToTemplate: false }),
+    });
+
+    assert.equal(categoryResponse.status, 409);
+    assert.deepEqual(await categoryResponse.json(), { message: "Closed months are immutable." });
+    assert.equal(subcategoryResponse.status, 404);
+    assert.deepEqual(await subcategoryResponse.json(), { message: "Category was not found in this month." });
+    assert.deepEqual(calls, [
+      { type: "category", input: { monthId: "month-1", name: "Variables", addToTemplate: false } },
+      { type: "subcategory", input: { monthId: "month-1", categoryId: "missing-category", name: "Taxi", plannedAmount: 0, addToTemplate: false } },
+    ]);
+  } finally {
+    server.close();
+  }
+});
+
 test("monthlyCycleRouter maps month structure PATCH domain errors", async () => {
   const calls: unknown[] = [];
   const server = createTestServer({
