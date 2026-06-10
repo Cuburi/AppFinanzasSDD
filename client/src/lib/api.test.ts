@@ -196,6 +196,41 @@ describe("monthly cash and expense api", () => {
     expect(fetch).toHaveBeenNthCalledWith(4, "/api/months/month-1/subcategories/sub-groceries", { method: "DELETE" });
   });
 
+  it("creates active-month categories with explicit template promotion intent", async () => {
+    const monthPayload = { id: "month-1", categories: [{ id: "cat-gifts", name: "Gifts" }] };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 201 }));
+
+    await expect(api.createMonthCategory({ monthId: "month-1", name: "Gifts", addToTemplate: false })).resolves.toEqual(monthPayload);
+
+    expect(fetch).toHaveBeenCalledWith("/api/months/month-1/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Gifts", addToTemplate: false }),
+    });
+  });
+
+  it("creates active-month subcategories under the selected parent with zero planned amount and optional pocket", async () => {
+    const monthPayload = { id: "month-1", categories: [{ id: "cat-food", subcategories: [{ id: "sub-snacks", name: "Snacks" }] }] };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 201 }));
+
+    await expect(
+      api.createMonthSubcategory({
+        monthId: "month-1",
+        categoryId: "cat-food",
+        name: "Snacks",
+        plannedAmount: 0,
+        defaultPocketId: "pocket-emergency",
+        addToTemplate: true,
+      }),
+    ).resolves.toEqual(monthPayload);
+
+    expect(fetch).toHaveBeenCalledWith("/api/months/month-1/categories/cat-food/subcategories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Snacks", plannedAmount: 0, defaultPocketId: "pocket-emergency", addToTemplate: true }),
+    });
+  });
+
   it("surfaces 409 deletion guard messages from month correction endpoints", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ message: "Cannot delete subcategory because associated movements exist." }), { status: 409 }));
 

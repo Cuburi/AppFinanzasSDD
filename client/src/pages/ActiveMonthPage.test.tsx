@@ -13,8 +13,10 @@ const apiMock = vi.hoisted(() => ({
   updateExpense: vi.fn(),
   deleteExpense: vi.fn(),
   updateMonthCategory: vi.fn(),
+  createMonthCategory: vi.fn(),
   deleteMonthCategory: vi.fn(),
   updateMonthSubcategory: vi.fn(),
+  createMonthSubcategory: vi.fn(),
   deleteMonthSubcategory: vi.fn(),
   createMonthlyIncome: vi.fn(),
   updateMonthlyIncome: vi.fn(),
@@ -93,8 +95,10 @@ describe("ActiveMonthPage", () => {
     apiMock.updateExpense.mockResolvedValue(activeMonth);
     apiMock.deleteExpense.mockResolvedValue(activeMonth);
     apiMock.updateMonthCategory.mockResolvedValue(activeMonth);
+    apiMock.createMonthCategory.mockResolvedValue(activeMonth);
     apiMock.deleteMonthCategory.mockResolvedValue(activeMonth);
     apiMock.updateMonthSubcategory.mockResolvedValue(activeMonth);
+    apiMock.createMonthSubcategory.mockResolvedValue(activeMonth);
     apiMock.deleteMonthSubcategory.mockResolvedValue(activeMonth);
     apiMock.withdrawCash.mockResolvedValue(activeMonth);
     apiMock.getExpenseHistory.mockResolvedValue([
@@ -375,6 +379,98 @@ describe("ActiveMonthPage", () => {
     await waitFor(() => expect(apiMock.deleteMonthCategory).toHaveBeenCalledWith("month-1", "cat-income"));
     expect(screen.queryByRole("button", { name: "Editar categoría Ingresos activos" })).not.toBeInTheDocument();
     expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(5);
+  });
+
+  it("creates a month-only category and refreshes the snapshot with explicit copy guidance", async () => {
+    const user = userEvent.setup();
+    const afterCreate: Month = {
+      ...activeMonth,
+      categories: [...activeMonth.categories, { id: "cat-gifts", name: "Regalos", sortOrder: 1, templateCategoryId: null, subcategories: [] }],
+    };
+    apiMock.createMonthCategory.mockResolvedValueOnce(afterCreate);
+
+    render(<ActiveMonthPage />);
+
+    expect(await screen.findByText(/Creá categorías y subcategorías solo en este mes/i)).toBeInTheDocument();
+    expect(screen.getByText(/Copiar a plantilla también/i)).toBeInTheDocument();
+
+    const categoryForm = screen.getByRole("form", { name: "Crear categoría del mes activo" });
+    await user.type(within(categoryForm).getByLabelText("Nueva categoría"), "Regalos");
+    await user.click(within(categoryForm).getByRole("button", { name: "Crear categoría" }));
+
+    await waitFor(() =>
+      expect(apiMock.createMonthCategory).toHaveBeenCalledWith({
+        monthId: "month-1",
+        name: "Regalos",
+        addToTemplate: false,
+      }),
+    );
+    expect(await screen.findByText("Categoría creada solo en el snapshot del mes activo; la plantilla global no cambió.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Editar categoría Regalos" })).toBeInTheDocument();
+    expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it("creates a promoted subcategory under the selected parent with zero planned amount and optional pocket", async () => {
+    const user = userEvent.setup();
+    const afterCreate: Month = {
+      ...activeMonth,
+      categories: activeMonth.categories.map((category) =>
+        category.id === "cat-income"
+          ? {
+              ...category,
+              subcategories: [
+                ...category.subcategories,
+                {
+                  id: "sub-refunds",
+                  name: "Reintegros",
+                  plannedAmount: 0,
+                  available: 0,
+                  defaultPocketId: "pocket-emergency",
+                  templateSubcategoryId: "tpl-sub-refunds",
+                  sortOrder: 1,
+                },
+              ],
+            }
+          : category,
+      ),
+    };
+    apiMock.createMonthSubcategory.mockResolvedValueOnce(afterCreate);
+
+    render(<ActiveMonthPage />);
+
+    const subcategoryForm = await screen.findByRole("form", { name: "Crear subcategoría del mes activo" });
+    await user.selectOptions(within(subcategoryForm).getByLabelText("Categoría padre"), "cat-income");
+    await user.type(within(subcategoryForm).getByLabelText("Nueva subcategoría"), "Reintegros");
+    await user.type(within(subcategoryForm).getByLabelText("Planificado inicial", { selector: "input" }), "0");
+    await user.selectOptions(within(subcategoryForm).getByLabelText("Bolsillo predeterminado inicial"), "pocket-emergency");
+    await user.click(within(subcategoryForm).getByLabelText("Copiar a plantilla también"));
+    await user.click(within(subcategoryForm).getByRole("button", { name: "Crear subcategoría" }));
+
+    await waitFor(() =>
+      expect(apiMock.createMonthSubcategory).toHaveBeenCalledWith({
+        monthId: "month-1",
+        categoryId: "cat-income",
+        name: "Reintegros",
+        plannedAmount: 0,
+        defaultPocketId: "pocket-emergency",
+        addToTemplate: true,
+      }),
+    );
+    expect(await screen.findByText("Subcategoría creada en este mes y copiada a la plantilla global para próximos meses.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Editar subcategoría Reintegros" })).toBeInTheDocument();
+    expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it("hides active-month structure create actions when the active month is closed", async () => {
+    apiMock.getActiveMonth.mockResolvedValue({ ...activeMonth, status: "CLOSED", closedAt: "2026-05-31T00:00:00.000Z" });
+
+    render(<ActiveMonthPage />);
+
+    expect(await screen.findByText("El mes está cerrado: la estructura es de solo lectura y no se pueden crear categorías ni subcategorías.")).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Crear categoría del mes activo" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Crear subcategoría del mes activo" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Crear categoría" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Crear subcategoría" })).not.toBeInTheDocument();
   });
 
   it("resets correction edit state when cancelling or refreshing the active month", async () => {
