@@ -128,6 +128,80 @@ describe("monthly cash and expense api", () => {
     expect(fetch).toHaveBeenCalledWith("/api/months/month-1/expenses?from=2026-05-01&to=2026-05-31&paymentMethod=NON_CASH&subcategoryId=sub-grocery");
   });
 
+  it("updates and deletes active-month expenses through correction endpoints", async () => {
+    const monthPayload = { id: "month-1", availableMoney: 425, cashBalance: 95 };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...monthPayload, availableMoney: 450 }), { status: 200 }));
+
+    await expect(
+      api.updateExpense({
+        monthId: "month-1",
+        expenseId: "expense-1",
+        sourceSubcategoryId: "sub-food",
+        amount: 30,
+        description: "Dinner",
+        occurredAt: "2026-05-14",
+        paymentMethod: "NON_CASH",
+      }),
+    ).resolves.toEqual(monthPayload);
+    await expect(api.deleteExpense("month-1", "expense-1")).resolves.toMatchObject({ availableMoney: 450 });
+
+    expect(fetch).toHaveBeenNthCalledWith(1, "/api/months/month-1/expenses/expense-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceSubcategoryId: "sub-food",
+        amount: 30,
+        description: "Dinner",
+        occurredAt: "2026-05-14",
+        paymentMethod: "NON_CASH",
+      }),
+    });
+    expect(fetch).toHaveBeenNthCalledWith(2, "/api/months/month-1/expenses/expense-1", { method: "DELETE" });
+  });
+
+  it("updates and deletes active-month snapshot categories and subcategories", async () => {
+    const monthPayload = { id: "month-1", categories: [{ id: "cat-food", name: "Food" }] };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...monthPayload, categories: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 200 }));
+
+    await expect(api.updateMonthCategory({ monthId: "month-1", categoryId: "cat-food", name: "Food updated" })).resolves.toEqual(monthPayload);
+    await expect(api.deleteMonthCategory("month-1", "cat-food")).resolves.toMatchObject({ categories: [] });
+    await expect(
+      api.updateMonthSubcategory({
+        monthId: "month-1",
+        subcategoryId: "sub-groceries",
+        name: "Groceries updated",
+        plannedAmount: 225,
+        defaultPocketId: null,
+      }),
+    ).resolves.toEqual(monthPayload);
+    await expect(api.deleteMonthSubcategory("month-1", "sub-groceries")).resolves.toEqual(monthPayload);
+
+    expect(fetch).toHaveBeenNthCalledWith(1, "/api/months/month-1/categories/cat-food", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Food updated" }),
+    });
+    expect(fetch).toHaveBeenNthCalledWith(2, "/api/months/month-1/categories/cat-food", { method: "DELETE" });
+    expect(fetch).toHaveBeenNthCalledWith(3, "/api/months/month-1/subcategories/sub-groceries", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Groceries updated", plannedAmount: 225, defaultPocketId: null }),
+    });
+    expect(fetch).toHaveBeenNthCalledWith(4, "/api/months/month-1/subcategories/sub-groceries", { method: "DELETE" });
+  });
+
+  it("surfaces 409 deletion guard messages from month correction endpoints", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ message: "Cannot delete subcategory because associated movements exist." }), { status: 409 }));
+
+    await expect(api.deleteMonthSubcategory("month-1", "sub-groceries")).rejects.toThrow("Cannot delete subcategory because associated movements exist.");
+  });
+
   it("withdraws cash and reads the cash summary contract", async () => {
     const monthPayload = { month: { id: "month-1", cashBalance: 125 } };
     const cashPayload = {

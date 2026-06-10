@@ -10,6 +10,12 @@ const apiMock = vi.hoisted(() => ({
   getPockets: vi.fn(),
   openMonth: vi.fn(),
   recordExpense: vi.fn(),
+  updateExpense: vi.fn(),
+  deleteExpense: vi.fn(),
+  updateMonthCategory: vi.fn(),
+  deleteMonthCategory: vi.fn(),
+  updateMonthSubcategory: vi.fn(),
+  deleteMonthSubcategory: vi.fn(),
   createMonthlyIncome: vi.fn(),
   updateMonthlyIncome: vi.fn(),
   deleteMonthlyIncome: vi.fn(),
@@ -84,6 +90,12 @@ describe("ActiveMonthPage", () => {
     apiMock.updateMonthlyIncome.mockResolvedValue(activeMonth);
     apiMock.deleteMonthlyIncome.mockResolvedValue(activeMonth);
     apiMock.recordExpense.mockResolvedValue(activeMonth);
+    apiMock.updateExpense.mockResolvedValue(activeMonth);
+    apiMock.deleteExpense.mockResolvedValue(activeMonth);
+    apiMock.updateMonthCategory.mockResolvedValue(activeMonth);
+    apiMock.deleteMonthCategory.mockResolvedValue(activeMonth);
+    apiMock.updateMonthSubcategory.mockResolvedValue(activeMonth);
+    apiMock.deleteMonthSubcategory.mockResolvedValue(activeMonth);
     apiMock.withdrawCash.mockResolvedValue(activeMonth);
     apiMock.getExpenseHistory.mockResolvedValue([
       {
@@ -218,6 +230,204 @@ describe("ActiveMonthPage", () => {
     expect(await screen.findByText("Gasto registrado y saldos recalculados.")).toBeInTheDocument();
     expect(screen.queryByText("No se pudo registrar el gasto.")).not.toBeInTheDocument();
     expect(screen.queryByText("No se pudo consultar el historial.")).not.toBeInTheDocument();
+  });
+
+  it("edits and deletes registered expenses from the active month only", async () => {
+    const user = userEvent.setup();
+    apiMock.updateExpense.mockResolvedValueOnce({ ...activeMonth, availableMoney: 390 });
+    apiMock.deleteExpense.mockResolvedValueOnce({ ...activeMonth, availableMoney: 410 });
+
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Editar gasto Café" }));
+    const expenseForm = screen.getByRole("button", { name: "Actualizar gasto" }).closest("form");
+    if (!expenseForm) throw new Error("Missing expense edit form.");
+
+    await user.clear(within(expenseForm).getByLabelText("Monto", { selector: "input" }));
+    await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "30");
+    await user.clear(within(expenseForm).getByLabelText("Descripción"));
+    await user.type(within(expenseForm).getByLabelText("Descripción"), "Café corregido");
+    await user.click(within(expenseForm).getByRole("button", { name: "Actualizar gasto" }));
+
+    await waitFor(() =>
+      expect(apiMock.updateExpense).toHaveBeenCalledWith({
+        monthId: "month-1",
+        expenseId: "expense-1",
+        sourceSubcategoryId: "sub-bonus",
+        amount: 30,
+        description: "Café corregido",
+        occurredAt: "2026-05-12",
+        paymentMethod: "CASH",
+      }),
+    );
+    expect(await screen.findByText("Gasto actualizado en el mes activo y saldos recalculados.")).toBeInTheDocument();
+    expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
+    expect(within(expenseForm).getByLabelText("Monto", { selector: "input" })).toHaveValue(null);
+
+    await user.click(screen.getByRole("button", { name: "Eliminar gasto Café" }));
+    await waitFor(() => expect(apiMock.deleteExpense).toHaveBeenCalledWith("month-1", "expense-1"));
+    expect(await screen.findByText("Gasto eliminado del mes activo y saldos recalculados.")).toBeInTheDocument();
+    expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not submit expense corrections when the active month is closed", async () => {
+    apiMock.getActiveMonth.mockResolvedValue({ ...activeMonth, status: "CLOSED", closedAt: "2026-05-31T00:00:00.000Z" });
+
+    render(<ActiveMonthPage />);
+
+    const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
+    if (!expenseForm) throw new Error("Missing expense form.");
+
+    fireEvent.submit(expenseForm);
+
+    expect(apiMock.recordExpense).not.toHaveBeenCalled();
+    expect(apiMock.updateExpense).not.toHaveBeenCalled();
+  });
+
+  it("does not submit stale category or subcategory corrections after the active month becomes closed", async () => {
+    const user = userEvent.setup();
+    apiMock.createMonthlyIncome.mockResolvedValueOnce({ ...activeMonth, status: "CLOSED", closedAt: "2026-05-31T00:00:00.000Z" });
+
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Editar categoría Ingresos" }));
+    await user.click(screen.getByRole("button", { name: "Editar subcategoría Bonus" }));
+    expect(screen.getByRole("form", { name: "Editar categoría del mes activo" })).toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "Editar subcategoría del mes activo" })).toBeInTheDocument();
+
+    const incomeForm = screen.getByRole("button", { name: "Registrar ingreso" }).closest("form");
+    if (!incomeForm) throw new Error("Missing income form.");
+    fireEvent.submit(incomeForm);
+
+    expect(await screen.findByText("El mes está cerrado: los ingresos son de solo lectura.")).toBeInTheDocument();
+
+    fireEvent.submit(screen.getByRole("form", { name: "Editar categoría del mes activo" }));
+    fireEvent.submit(screen.getByRole("form", { name: "Editar subcategoría del mes activo" }));
+
+    expect(apiMock.updateMonthCategory).not.toHaveBeenCalled();
+    expect(apiMock.updateMonthSubcategory).not.toHaveBeenCalled();
+  });
+
+  it("edits and deletes month snapshot categories and subcategories without implying template changes", async () => {
+    const user = userEvent.setup();
+    const afterCategoryUpdate: Month = {
+      ...activeMonth,
+      categories: activeMonth.categories.map((category) => (category.id === "cat-income" ? { ...category, name: "Ingresos activos" } : category)),
+    };
+    const afterSubcategoryUpdate: Month = {
+      ...afterCategoryUpdate,
+      categories: afterCategoryUpdate.categories.map((category) => ({
+        ...category,
+        subcategories: category.subcategories.map((subcategory) => (subcategory.id === "sub-bonus" ? { ...subcategory, name: "Bonus activo", plannedAmount: 450 } : subcategory)),
+      })),
+    };
+    const afterSubcategoryDelete: Month = {
+      ...afterSubcategoryUpdate,
+      categories: afterSubcategoryUpdate.categories.map((category) => ({ ...category, subcategories: [] })),
+    };
+    const afterCategoryDelete: Month = {
+      ...afterSubcategoryDelete,
+      categories: [],
+    };
+    apiMock.updateMonthCategory.mockResolvedValueOnce(afterCategoryUpdate);
+    apiMock.updateMonthSubcategory.mockResolvedValueOnce(afterSubcategoryUpdate);
+    apiMock.deleteMonthSubcategory.mockResolvedValueOnce(afterSubcategoryDelete);
+    apiMock.deleteMonthCategory.mockResolvedValueOnce(afterCategoryDelete);
+
+    render(<ActiveMonthPage />);
+
+    expect(await screen.findByText("Estos cambios corrigen solo el snapshot del mes activo; no modifican la plantilla global.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
+    await user.clear(screen.getByLabelText("Nombre categoría"));
+    await user.type(screen.getByLabelText("Nombre categoría"), "Ingresos activos");
+    await user.click(screen.getByRole("button", { name: "Guardar categoría" }));
+
+    await waitFor(() => expect(apiMock.updateMonthCategory).toHaveBeenCalledWith({ monthId: "month-1", categoryId: "cat-income", name: "Ingresos activos" }));
+    expect(await screen.findByRole("button", { name: "Editar categoría Ingresos activos" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Editar subcategoría Bonus" }));
+    await user.clear(screen.getByLabelText("Nombre subcategoría"));
+    await user.type(screen.getByLabelText("Nombre subcategoría"), "Bonus activo");
+    await user.clear(screen.getByLabelText("Planificado", { selector: "input" }));
+    await user.type(screen.getByLabelText("Planificado", { selector: "input" }), "450");
+    await user.selectOptions(screen.getByLabelText("Bolsillo predeterminado"), "");
+    await user.click(screen.getByRole("button", { name: "Guardar subcategoría" }));
+
+    await waitFor(() =>
+      expect(apiMock.updateMonthSubcategory).toHaveBeenCalledWith({
+        monthId: "month-1",
+        subcategoryId: "sub-bonus",
+        name: "Bonus activo",
+        plannedAmount: 450,
+        defaultPocketId: null,
+      }),
+    );
+    expect(await screen.findByRole("button", { name: "Editar categoría Ingresos activos" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Eliminar subcategoría Bonus activo" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Eliminar subcategoría Bonus activo" }));
+    await waitFor(() => expect(apiMock.deleteMonthSubcategory).toHaveBeenCalledWith("month-1", "sub-bonus"));
+    expect(screen.getByRole("button", { name: "Eliminar categoría Ingresos activos" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Eliminar categoría Ingresos activos" }));
+    await waitFor(() => expect(apiMock.deleteMonthCategory).toHaveBeenCalledWith("month-1", "cat-income"));
+    expect(screen.queryByRole("button", { name: "Editar categoría Ingresos activos" })).not.toBeInTheDocument();
+    expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(5);
+  });
+
+  it("resets correction edit state when cancelling or refreshing the active month", async () => {
+    const user = userEvent.setup();
+    apiMock.getActiveMonth.mockResolvedValueOnce(activeMonth).mockResolvedValueOnce({
+      ...activeMonth,
+      categories: activeMonth.categories.map((category) => ({
+        ...category,
+        name: "Ingresos refrescados",
+      })),
+    });
+
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Editar gasto Café" }));
+    expect(screen.getByRole("button", { name: "Actualizar gasto" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancelar edición de gasto" }));
+    expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
+    expect(screen.getByRole("form", { name: "Editar categoría del mes activo" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Editar subcategoría Bonus" }));
+    expect(screen.getByRole("form", { name: "Editar subcategoría del mes activo" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Refrescar" }));
+
+    expect(await screen.findByRole("button", { name: "Editar categoría Ingresos refrescados" })).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Editar categoría del mes activo" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Editar subcategoría del mes activo" })).not.toBeInTheDocument();
+  });
+
+  it("keeps server deletion guard failures visible without removing month snapshot items", async () => {
+    const user = userEvent.setup();
+    apiMock.deleteMonthSubcategory.mockRejectedValueOnce(new Error("No se puede eliminar la subcategoría porque tiene movimientos asociados."));
+
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Eliminar subcategoría Bonus" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se puede eliminar la subcategoría porque tiene movimientos asociados.");
+    expect(screen.getByText("Bonus")).toBeInTheDocument();
+  });
+
+  it("keeps category deletion guard failures visible without removing the category", async () => {
+    const user = userEvent.setup();
+    apiMock.deleteMonthCategory.mockRejectedValueOnce(new Error("No se puede eliminar la categoría porque todavía tiene subcategorías o movimientos asociados."));
+
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Eliminar categoría Ingresos" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se puede eliminar la categoría porque todavía tiene subcategorías o movimientos asociados.");
+    expect(screen.getByRole("button", { name: "Editar categoría Ingresos" })).toBeInTheDocument();
   });
 
   it("withdraws cash from monthly available money", async () => {
