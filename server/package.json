@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "test": "node --import tsx --test src/**/*.test.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/copy-prisma-generated.mjs && node scripts/verify-prisma-build.mjs",
     "start": "node dist/index.js"
   },
   "dependencies": {
