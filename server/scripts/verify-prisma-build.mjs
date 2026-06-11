@@ -19,6 +19,7 @@ export const verifyPrismaBuild = async ({ prismaClientPath = defaultPrismaClient
 };
 
 const toFileUrl = (filePath) => {
+  if (/^[A-Za-z]:[\\/]/.test(filePath)) return `file:///${filePath.replaceAll("\\", "/")}`;
   if (filePath.startsWith("/")) return `file://${filePath}`;
   return pathToFileURL(filePath).href;
 };
