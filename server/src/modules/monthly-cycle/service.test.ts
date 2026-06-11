@@ -52,9 +52,13 @@ type MonthFixture = {
     }>;
   }>;
   movements: Array<{
+    id?: string;
     type: MovementType;
+    monthId?: string | null;
     paymentMethod?: PaymentMethod | null;
     amount: Prisma.Decimal;
+    description?: string | null;
+    occurredAt?: Date;
     sourceSubcategoryId: string | null;
     targetSubcategoryId: string | null;
     sourcePocketId: string | null;
@@ -136,6 +140,16 @@ const createDbStub = ({
   let capturedCreateArgs: unknown;
   const capturedMovements: unknown[] = [];
   const capturedIncomes: unknown[] = [];
+  const capturedMovementUpdates: unknown[] = [];
+  const capturedMovementDeletes: unknown[] = [];
+  const capturedMonthCategoryUpdates: unknown[] = [];
+  const capturedMonthCategoryCreates: unknown[] = [];
+  const capturedMonthCategoryDeletes: unknown[] = [];
+  const capturedMonthSubcategoryUpdates: unknown[] = [];
+  const capturedMonthSubcategoryCreates: unknown[] = [];
+  const capturedMonthSubcategoryDeletes: unknown[] = [];
+  const capturedTemplateCategoryCreates: unknown[] = [];
+  const capturedTemplateSubcategoryCreates: unknown[] = [];
 
   const db: any = {
     async $transaction<T>(callback: (tx: typeof db) => Promise<T>) {
@@ -151,7 +165,50 @@ const createDbStub = ({
       },
       async create(args: unknown) {
         capturedCreateArgs = args;
-        return {};
+        capturedTemplateCategoryCreates.push(args);
+        const createArgs = args as {
+          data: {
+            name: string;
+            sortOrder: number;
+            subcategories?: {
+              create?: Array<{ name: string; plannedAmount: Prisma.Decimal; defaultPocketId: string | null; sortOrder: number }>;
+            };
+          };
+        };
+        const category = {
+          id: `template-category-created-${capturedTemplateCategoryCreates.length}`,
+          name: createArgs.data.name,
+          sortOrder: createArgs.data.sortOrder,
+          subcategories: (createArgs.data.subcategories?.create ?? []).map((subcategory, index) => ({
+            id: `template-subcategory-created-${capturedTemplateCategoryCreates.length}-${index + 1}`,
+            name: subcategory.name,
+            plannedAmount: subcategory.plannedAmount,
+            defaultPocketId: subcategory.defaultPocketId,
+            active: true,
+            sortOrder: subcategory.sortOrder,
+          })),
+        };
+        readTemplate.push(category);
+        return category;
+      },
+    },
+    templateSubcategory: {
+      async create(args: {
+        data: { categoryId: string; name: string; plannedAmount: Prisma.Decimal; defaultPocketId: string | null; sortOrder: number };
+      }) {
+        capturedTemplateSubcategoryCreates.push(args);
+        const category = readTemplate.find((candidate) => candidate.id === args.data.categoryId);
+        if (!category) throw new Error("Template category missing in stub.");
+        const subcategory = {
+          id: `template-subcategory-created-${capturedTemplateSubcategoryCreates.length}`,
+          name: args.data.name,
+          plannedAmount: args.data.plannedAmount,
+          defaultPocketId: args.data.defaultPocketId,
+          active: true,
+          sortOrder: args.data.sortOrder,
+        };
+        category.subcategories.push(subcategory);
+        return subcategory;
       },
     },
     month: {
@@ -184,6 +241,9 @@ const createDbStub = ({
       },
     },
     movement: {
+      async findUnique(args: { where: { id: string } }) {
+        return monthById?.movements.find((movement) => movement.id === args.where.id) ?? null;
+      },
       async create(args: unknown) {
         capturedMovements.push(args);
         const movement = args as {
@@ -199,8 +259,10 @@ const createDbStub = ({
 
         if (monthById && movement.data?.type && movement.data.amount) {
           monthById.movements.push({
+            id: `movement-${capturedMovements.length}`,
             type: movement.data.type,
             amount: movement.data.amount,
+            monthId: monthById.id,
             sourceSubcategoryId: movement.data.sourceSubcategoryId ?? null,
             targetSubcategoryId: movement.data.targetSubcategoryId ?? null,
             sourcePocketId: movement.data.sourcePocketId ?? null,
@@ -209,6 +271,100 @@ const createDbStub = ({
         }
 
         return { id: `movement-${capturedMovements.length}` };
+      },
+      async update(args: {
+        where: { id: string };
+        data: {
+          amount?: Prisma.Decimal;
+          description?: string | null;
+          occurredAt?: Date;
+          paymentMethod?: PaymentMethod;
+          sourceSubcategoryId?: string;
+        };
+      }) {
+        capturedMovementUpdates.push(args);
+        const movement = monthById?.movements.find((candidate) => candidate.id === args.where.id);
+        if (movement) Object.assign(movement, args.data);
+        return movement ?? null;
+      },
+      async delete(args: { where: { id: string } }) {
+        capturedMovementDeletes.push(args);
+        if (monthById) {
+          monthById.movements = monthById.movements.filter((movement) => movement.id !== args.where.id);
+        }
+        return {};
+      },
+    },
+    monthCategory: {
+      async create(args: { data: { monthId: string; name: string; sortOrder: number; templateCategoryId: string | null } }) {
+        capturedMonthCategoryCreates.push(args);
+        if (!monthById || monthById.id !== args.data.monthId) throw new Error("Month missing in stub.");
+        const category = {
+          id: `month-category-created-${capturedMonthCategoryCreates.length}`,
+          name: args.data.name,
+          sortOrder: args.data.sortOrder,
+          templateCategoryId: args.data.templateCategoryId,
+          subcategories: [],
+        };
+        monthById.categories.push(category);
+        return category;
+      },
+      async update(args: { where: { id: string }; data: { name?: string; templateCategoryId?: string | null } }) {
+        capturedMonthCategoryUpdates.push(args);
+        const category = monthById?.categories.find((candidate) => candidate.id === args.where.id);
+        if (category) Object.assign(category, args.data);
+        return category ?? null;
+      },
+      async delete(args: { where: { id: string } }) {
+        capturedMonthCategoryDeletes.push(args);
+        if (monthById) {
+          monthById.categories = monthById.categories.filter((category) => category.id !== args.where.id);
+        }
+        return {};
+      },
+    },
+    monthSubcategory: {
+      async create(args: {
+        data: {
+          monthCategoryId: string;
+          name: string;
+          plannedAmount: Prisma.Decimal;
+          defaultPocketId: string | null;
+          templateSubcategoryId: string | null;
+          sortOrder: number;
+        };
+      }) {
+        capturedMonthSubcategoryCreates.push(args);
+        const category = monthById?.categories.find((candidate) => candidate.id === args.data.monthCategoryId);
+        if (!category) throw new Error("Month category missing in stub.");
+        const subcategory = {
+          id: `month-subcategory-created-${capturedMonthSubcategoryCreates.length}`,
+          name: args.data.name,
+          plannedAmount: args.data.plannedAmount,
+          defaultPocketId: args.data.defaultPocketId,
+          templateSubcategoryId: args.data.templateSubcategoryId,
+          sortOrder: args.data.sortOrder,
+        };
+        category.subcategories.push(subcategory);
+        return subcategory;
+      },
+      async update(args: {
+        where: { id: string };
+        data: { name?: string; plannedAmount?: Prisma.Decimal; defaultPocketId?: string | null; templateSubcategoryId?: string | null };
+      }) {
+        capturedMonthSubcategoryUpdates.push(args);
+        const subcategory = monthById?.categories.flatMap((category) => category.subcategories).find((candidate) => candidate.id === args.where.id);
+        if (subcategory) Object.assign(subcategory, args.data);
+        return subcategory ?? null;
+      },
+      async delete(args: { where: { id: string } }) {
+        capturedMonthSubcategoryDeletes.push(args);
+        if (monthById) {
+          for (const category of monthById.categories) {
+            category.subcategories = category.subcategories.filter((subcategory) => subcategory.id !== args.where.id);
+          }
+        }
+        return {};
       },
     },
     monthlyIncome: {
@@ -258,6 +414,16 @@ const createDbStub = ({
     db,
     getCapturedCreateArgs: () => capturedCreateArgs,
     getCapturedMovements: () => capturedMovements,
+    getCapturedTemplateCategoryCreates: () => capturedTemplateCategoryCreates,
+    getCapturedTemplateSubcategoryCreates: () => capturedTemplateSubcategoryCreates,
+    getCapturedMonthCategoryCreates: () => capturedMonthCategoryCreates,
+    getCapturedMovementUpdates: () => capturedMovementUpdates,
+    getCapturedMovementDeletes: () => capturedMovementDeletes,
+    getCapturedMonthCategoryUpdates: () => capturedMonthCategoryUpdates,
+    getCapturedMonthCategoryDeletes: () => capturedMonthCategoryDeletes,
+    getCapturedMonthSubcategoryUpdates: () => capturedMonthSubcategoryUpdates,
+    getCapturedMonthSubcategoryCreates: () => capturedMonthSubcategoryCreates,
+    getCapturedMonthSubcategoryDeletes: () => capturedMonthSubcategoryDeletes,
     getCapturedIncomes: () => capturedIncomes,
     setCreatedMonth: (value: MonthFixture) => {
       monthToReturn = value;
@@ -522,6 +688,569 @@ test("recordExpense persists an expense and returns recalculated balances", asyn
   assert.equal(movement.data.sourceSubcategoryId, subcategoryId);
   assert.equal(Number(movement.data.amount.toString()), 75);
   assert.equal(updatedMonth.categories[0]?.subcategories[0]?.available, 175);
+});
+
+test("updateExpense persists active-month expense changes and recalculates balances", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  month.movements.push(
+    {
+      id: "withdrawal-1",
+      type: MovementType.CASH_WITHDRAWAL,
+      monthId: month.id,
+      amount: amount(200),
+      occurredAt: new Date("2026-05-09T00:00:00.000Z"),
+      sourceSubcategoryId: null,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+    {
+      id: "expense-1",
+      type: MovementType.EXPENSE,
+      monthId: month.id,
+      amount: amount(75),
+      description: "Old market",
+      occurredAt: new Date("2026-05-10T00:00:00.000Z"),
+      paymentMethod: PaymentMethod.CASH,
+      sourceSubcategoryId: subcategoryId,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+  );
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const updatedMonth = await service.updateExpense({
+    monthId: month.id,
+    expenseId: "expense-1",
+    sourceSubcategoryId: subcategoryId,
+    amount: 125,
+    description: "Updated market",
+    occurredAt: "2026-05-11T00:00:00.000Z",
+    paymentMethod: PaymentMethod.CASH,
+  });
+  const updateArgs = dbStub.getCapturedMovementUpdates()[0] as {
+    where: { id: string };
+    data: { amount: Prisma.Decimal; description: string | null; occurredAt: Date; paymentMethod: PaymentMethod; sourceSubcategoryId: string };
+  };
+
+  assert.equal(updateArgs.where.id, "expense-1");
+  assert.equal(Number(updateArgs.data.amount.toString()), 125);
+  assert.equal(updateArgs.data.description, "Updated market");
+  assert.equal(updateArgs.data.occurredAt.toISOString(), "2026-05-11T00:00:00.000Z");
+  assert.equal(updateArgs.data.paymentMethod, PaymentMethod.CASH);
+  assert.equal(updateArgs.data.sourceSubcategoryId, subcategoryId);
+  assert.equal(updatedMonth.categories[0]?.subcategories[0]?.available, 125);
+  assert.equal(updatedMonth.cashBalance, 75);
+});
+
+test("updateExpense rejects cash changes that would exceed physical cash", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  month.movements.push(
+    {
+      id: "withdrawal-1",
+      type: MovementType.CASH_WITHDRAWAL,
+      monthId: month.id,
+      amount: amount(40),
+      occurredAt: new Date("2026-05-09T00:00:00.000Z"),
+      sourceSubcategoryId: null,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+    {
+      id: "expense-1",
+      type: MovementType.EXPENSE,
+      monthId: month.id,
+      amount: amount(20),
+      occurredAt: new Date("2026-05-10T00:00:00.000Z"),
+      paymentMethod: PaymentMethod.CASH,
+      sourceSubcategoryId: subcategoryId,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+  );
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  await assert.rejects(
+    () =>
+      service.updateExpense({
+        monthId: month.id,
+        expenseId: "expense-1",
+        sourceSubcategoryId: subcategoryId,
+        amount: 45,
+        occurredAt: "2026-05-10T00:00:00.000Z",
+        paymentMethod: PaymentMethod.CASH,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /insufficient cash/i);
+      return true;
+    },
+  );
+
+  assert.equal(dbStub.getCapturedMovementUpdates().length, 0);
+});
+
+test("deleteExpense removes only active-month expenses and recalculates balances", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  month.movements.push(
+    {
+      id: "withdrawal-1",
+      type: MovementType.CASH_WITHDRAWAL,
+      monthId: month.id,
+      amount: amount(100),
+      occurredAt: new Date("2026-05-09T00:00:00.000Z"),
+      sourceSubcategoryId: null,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+    {
+      id: "expense-1",
+      type: MovementType.EXPENSE,
+      monthId: month.id,
+      amount: amount(75),
+      occurredAt: new Date("2026-05-10T00:00:00.000Z"),
+      paymentMethod: PaymentMethod.CASH,
+      sourceSubcategoryId: subcategoryId,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    },
+  );
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const updatedMonth = await service.deleteExpense(month.id, "expense-1");
+  const deleteArgs = dbStub.getCapturedMovementDeletes()[0] as { where: { id: string } };
+
+  assert.equal(deleteArgs.where.id, "expense-1");
+  assert.equal(updatedMonth.categories[0]?.subcategories[0]?.available, 250);
+  assert.equal(updatedMonth.cashBalance, 100);
+});
+
+test("updateExpense and deleteExpense reject expenses that belong to closed months", async () => {
+  const month = { ...buildCreatedMonth(templateFixture(), 2026, 5), status: MonthStatus.CLOSED };
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  month.movements.push({
+    id: "expense-1",
+    type: MovementType.EXPENSE,
+    monthId: month.id,
+    amount: amount(75),
+    occurredAt: new Date("2026-05-10T00:00:00.000Z"),
+    paymentMethod: PaymentMethod.NON_CASH,
+    sourceSubcategoryId: subcategoryId,
+    targetSubcategoryId: null,
+    sourcePocketId: null,
+    targetPocketId: null,
+  });
+  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+
+  await assert.rejects(
+    () =>
+      service.updateExpense({
+        monthId: month.id,
+        expenseId: "expense-1",
+        sourceSubcategoryId: subcategoryId,
+        amount: 90,
+        occurredAt: "2026-05-10T00:00:00.000Z",
+        paymentMethod: PaymentMethod.NON_CASH,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /closed months are immutable/i);
+      return true;
+    },
+  );
+
+  await assert.rejects(() => service.deleteExpense(month.id, "expense-1"), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 409);
+    assert.match(error.message, /closed months are immutable/i);
+    return true;
+  });
+});
+
+test("updateExpense and deleteExpense reject movements outside the active month expense ledger", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  month.movements.push({
+    id: "foreign-expense",
+    type: MovementType.EXPENSE,
+    monthId: "month-other",
+    amount: amount(75),
+    occurredAt: new Date("2026-05-10T00:00:00.000Z"),
+    paymentMethod: PaymentMethod.NON_CASH,
+    sourceSubcategoryId: subcategoryId,
+    targetSubcategoryId: null,
+    sourcePocketId: null,
+    targetPocketId: null,
+  });
+  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+
+  await assert.rejects(
+    () =>
+      service.updateExpense({
+        monthId: month.id,
+        expenseId: "foreign-expense",
+        sourceSubcategoryId: subcategoryId,
+        amount: 90,
+        occurredAt: "2026-05-10T00:00:00.000Z",
+        paymentMethod: PaymentMethod.NON_CASH,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 404);
+      assert.match(error.message, /expense was not found in this month/i);
+      return true;
+    },
+  );
+
+  await assert.rejects(() => service.deleteExpense(month.id, "foreign-expense"), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 404);
+    assert.match(error.message, /expense was not found in this month/i);
+    return true;
+  });
+});
+
+test("updateMonthCategory renames only the active-month snapshot category", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const categoryId = month.categories[0]?.id ?? "";
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const updatedMonth = await service.updateMonthCategory({ monthId: month.id, categoryId, name: "Hogar" });
+
+  assert.equal(updatedMonth.categories[0]?.name, "Hogar");
+  assert.equal(templateFixture()[0]?.name, "Fijos");
+});
+
+test("updateMonthSubcategory updates snapshot fields and validates default pocket activity", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  const dbStub = createDbStub({ monthById: month, targetPockets: { "pocket-savings": { id: "pocket-savings", active: true } } });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const updatedMonth = await service.updateMonthSubcategory({
+    monthId: month.id,
+    subcategoryId,
+    name: "Alquiler actualizado",
+    plannedAmount: 300,
+    defaultPocketId: "pocket-savings",
+  });
+
+  assert.equal(updatedMonth.categories[0]?.subcategories[0]?.name, "Alquiler actualizado");
+  assert.equal(updatedMonth.categories[0]?.subcategories[0]?.plannedAmount, 300);
+  assert.equal(updatedMonth.categories[0]?.subcategories[0]?.defaultPocketId, "pocket-savings");
+});
+
+test("updateMonthSubcategory preserves omitted defaultPocketId and clears explicit null", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const omittedDefaultPocket = await service.updateMonthSubcategory({
+    monthId: month.id,
+    subcategoryId,
+    name: "Alquiler sin cambio de bolsillo",
+    plannedAmount: 300,
+  });
+  const omittedUpdateArgs = dbStub.getCapturedMonthSubcategoryUpdates()[0] as { data: { defaultPocketId?: string | null } };
+  const clearedDefaultPocket = await service.updateMonthSubcategory({
+    monthId: month.id,
+    subcategoryId,
+    name: "Alquiler sin bolsillo",
+    plannedAmount: 300,
+    defaultPocketId: null,
+  });
+  const nullUpdateArgs = dbStub.getCapturedMonthSubcategoryUpdates()[1] as { data: { defaultPocketId?: string | null } };
+
+  assert.equal("defaultPocketId" in omittedUpdateArgs.data, false);
+  assert.equal(omittedDefaultPocket.categories[0]?.subcategories[0]?.defaultPocketId, "pocket-home");
+  assert.equal(nullUpdateArgs.data.defaultPocketId, null);
+  assert.equal(clearedDefaultPocket.categories[0]?.subcategories[0]?.defaultPocketId, null);
+});
+
+test("updateMonthSubcategory rejects inactive default pocket strings", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  const dbStub = createDbStub({ monthById: month, targetPockets: { "pocket-inactive": { id: "pocket-inactive", active: false } } });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  await assert.rejects(
+    () =>
+      service.updateMonthSubcategory({
+        monthId: month.id,
+        subcategoryId,
+        name: "Alquiler actualizado",
+        plannedAmount: 300,
+        defaultPocketId: "pocket-inactive",
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /default pocket must exist and be active/i);
+      return true;
+    },
+  );
+
+  assert.equal(dbStub.getCapturedMonthSubcategoryUpdates().length, 0);
+});
+
+test("createMonthCategory appends snapshot-only categories without mutating the template", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const updatedMonth = await service.createMonthCategory({ monthId: month.id, name: "  Variables  ", addToTemplate: false });
+  const createArgs = dbStub.getCapturedMonthCategoryCreates()[0] as {
+    data: { name: string; sortOrder: number; templateCategoryId: string | null };
+  };
+
+  assert.equal(createArgs.data.name, "Variables");
+  assert.equal(createArgs.data.sortOrder, 1);
+  assert.equal(createArgs.data.templateCategoryId, null);
+  assert.equal(dbStub.getCapturedTemplateCategoryCreates().length, 0);
+  assert.equal(updatedMonth.categories[1]?.name, "Variables");
+});
+
+test("createMonthCategory promotes explicitly requested template categories and links the snapshot", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const updatedMonth = await service.createMonthCategory({ monthId: month.id, name: "Variables", addToTemplate: true });
+  const templateCreate = dbStub.getCapturedTemplateCategoryCreates()[0] as { data: { name: string; sortOrder: number } };
+  const monthCreate = dbStub.getCapturedMonthCategoryCreates()[0] as { data: { templateCategoryId: string | null } };
+  const snapshotLink = dbStub.getCapturedMonthCategoryUpdates()[0] as { where: { id: string }; data: { templateCategoryId: string } };
+
+  assert.equal(templateCreate.data.name, "Variables");
+  assert.equal(templateCreate.data.sortOrder, 1);
+  assert.equal(monthCreate.data.templateCategoryId, null);
+  assert.equal(snapshotLink.where.id, "month-category-created-1");
+  assert.equal(snapshotLink.data.templateCategoryId, "template-category-created-1");
+  assert.equal(updatedMonth.categories[1]?.templateCategoryId, "template-category-created-1");
+});
+
+test("createMonthCategory rejects duplicate names in snapshot and template scopes", async () => {
+  const snapshotDuplicateMonth = buildCreatedMonth(templateFixture(), 2026, 5);
+  const serviceWithSnapshotDuplicate = createMonthlyCycleService(createDbStub({ monthById: snapshotDuplicateMonth }).db);
+  const templateDuplicateMonth = buildCreatedMonth(templateFixture(), 2026, 5);
+  templateDuplicateMonth.categories[0]!.name = "Fijos del mes";
+  const serviceWithTemplateDuplicate = createMonthlyCycleService(createDbStub({ monthById: templateDuplicateMonth }).db);
+
+  await assert.rejects(
+    () => serviceWithSnapshotDuplicate.createMonthCategory({ monthId: snapshotDuplicateMonth.id, name: "  fijos ", addToTemplate: false }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /category already exists in this month/i);
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () => serviceWithTemplateDuplicate.createMonthCategory({ monthId: templateDuplicateMonth.id, name: "FIJOS", addToTemplate: true }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /category already exists in the template/i);
+      return true;
+    },
+  );
+});
+
+test("createMonthSubcategory appends snapshot-only subcategories and validates default pockets", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const categoryId = month.categories[0]?.id ?? "";
+  const dbStub = createDbStub({ monthById: month, targetPockets: { "pocket-buffer": { id: "pocket-buffer", active: true } } });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const updatedMonth = await service.createMonthSubcategory({
+    monthId: month.id,
+    categoryId,
+    name: "Taxi",
+    plannedAmount: 0,
+    defaultPocketId: "pocket-buffer",
+    addToTemplate: false,
+  });
+  const createArgs = dbStub.getCapturedMonthSubcategoryCreates()[0] as {
+    data: { name: string; plannedAmount: Prisma.Decimal; defaultPocketId: string | null; sortOrder: number; templateSubcategoryId: string | null };
+  };
+
+  assert.equal(createArgs.data.name, "Taxi");
+  assert.equal(Number(createArgs.data.plannedAmount.toString()), 0);
+  assert.equal(createArgs.data.defaultPocketId, "pocket-buffer");
+  assert.equal(createArgs.data.sortOrder, 1);
+  assert.equal(createArgs.data.templateSubcategoryId, null);
+  assert.equal(dbStub.getCapturedTemplateSubcategoryCreates().length, 0);
+  assert.equal(updatedMonth.categories[0]?.subcategories[1]?.available, 0);
+});
+
+test("createMonthSubcategory promotes month-only parents before template subcategories", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  month.categories.push({ id: "cat-month-only", name: "Mes", sortOrder: 1, templateCategoryId: null, subcategories: [] });
+  const dbStub = createDbStub({ monthById: month });
+  const service = createMonthlyCycleService(dbStub.db);
+
+  const updatedMonth = await service.createMonthSubcategory({
+    monthId: month.id,
+    categoryId: "cat-month-only",
+    name: "Solo mes",
+    plannedAmount: 25,
+    addToTemplate: true,
+  });
+  const parentTemplateCreate = dbStub.getCapturedTemplateCategoryCreates()[0] as { data: { name: string; sortOrder: number } };
+  const parentSnapshotLink = dbStub.getCapturedMonthCategoryUpdates()[0] as { where: { id: string }; data: { templateCategoryId: string } };
+  const templateSubcategoryCreate = dbStub.getCapturedTemplateSubcategoryCreates()[0] as {
+    data: { categoryId: string; name: string; plannedAmount: Prisma.Decimal; sortOrder: number };
+  };
+  const subcategorySnapshotLink = dbStub.getCapturedMonthSubcategoryUpdates()[0] as {
+    data: { templateSubcategoryId: string };
+  };
+
+  assert.equal(parentTemplateCreate.data.name, "Mes");
+  assert.equal(parentTemplateCreate.data.sortOrder, 1);
+  assert.equal(parentSnapshotLink.where.id, "cat-month-only");
+  assert.equal(parentSnapshotLink.data.templateCategoryId, "template-category-created-1");
+  assert.equal(templateSubcategoryCreate.data.categoryId, "template-category-created-1");
+  assert.equal(templateSubcategoryCreate.data.name, "Solo mes");
+  assert.equal(Number(templateSubcategoryCreate.data.plannedAmount.toString()), 25);
+  assert.equal(templateSubcategoryCreate.data.sortOrder, 0);
+  assert.equal(subcategorySnapshotLink.data.templateSubcategoryId, "template-subcategory-created-1");
+  assert.equal(updatedMonth.categories[1]?.templateCategoryId, "template-category-created-1");
+});
+
+test("createMonthSubcategory rejects duplicates, closed months, missing parents, and inactive pockets before writes", async () => {
+  const duplicateMonth = buildCreatedMonth(templateFixture(), 2026, 5);
+  const duplicateCategoryId = duplicateMonth.categories[0]?.id ?? "";
+  const duplicateStub = createDbStub({ monthById: duplicateMonth });
+  const duplicateService = createMonthlyCycleService(duplicateStub.db);
+
+  await assert.rejects(
+    () => duplicateService.createMonthSubcategory({ monthId: duplicateMonth.id, categoryId: duplicateCategoryId, name: " alquiler ", plannedAmount: 10, addToTemplate: false }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /subcategory already exists in this month category/i);
+      return true;
+    },
+  );
+  assert.equal(duplicateStub.getCapturedMonthSubcategoryCreates().length, 0);
+
+  const closedMonth = { ...buildCreatedMonth(templateFixture(), 2026, 5), status: MonthStatus.CLOSED };
+  const serviceForClosedMonth = createMonthlyCycleService(createDbStub({ monthById: closedMonth }).db);
+  await assert.rejects(
+    () => serviceForClosedMonth.createMonthSubcategory({ monthId: closedMonth.id, categoryId: closedMonth.categories[0]?.id ?? "", name: "Taxi", plannedAmount: 10, addToTemplate: false }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /closed months are immutable/i);
+      return true;
+    },
+  );
+
+  const activeMonth = buildCreatedMonth(templateFixture(), 2026, 5);
+  const serviceForMissingParent = createMonthlyCycleService(createDbStub({ monthById: activeMonth }).db);
+  await assert.rejects(
+    () => serviceForMissingParent.createMonthSubcategory({ monthId: activeMonth.id, categoryId: "missing-category", name: "Taxi", plannedAmount: 10, addToTemplate: false }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 404);
+      assert.match(error.message, /category was not found in this month/i);
+      return true;
+    },
+  );
+
+  const inactivePocketMonth = buildCreatedMonth(templateFixture(), 2026, 5);
+  const inactivePocketStub = createDbStub({ monthById: inactivePocketMonth, targetPockets: { "pocket-inactive": { id: "pocket-inactive", active: false } } });
+  const serviceForInactivePocket = createMonthlyCycleService(inactivePocketStub.db);
+  await assert.rejects(
+    () => serviceForInactivePocket.createMonthSubcategory({ monthId: inactivePocketMonth.id, categoryId: inactivePocketMonth.categories[0]?.id ?? "", name: "Taxi", plannedAmount: 10, defaultPocketId: "pocket-inactive", addToTemplate: false }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /default pocket must exist and be active/i);
+      return true;
+    },
+  );
+  assert.equal(inactivePocketStub.getCapturedMonthSubcategoryCreates().length, 0);
+});
+
+test("month structure deletes reject movement-linked subcategories and non-empty categories", async () => {
+  const month = buildCreatedMonth(templateFixture(), 2026, 5);
+  const categoryId = month.categories[0]?.id ?? "";
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+  month.movements.push({
+    id: "expense-1",
+    type: MovementType.EXPENSE,
+    monthId: month.id,
+    amount: amount(75),
+    occurredAt: new Date("2026-05-10T00:00:00.000Z"),
+    paymentMethod: PaymentMethod.NON_CASH,
+    sourceSubcategoryId: subcategoryId,
+    targetSubcategoryId: null,
+    sourcePocketId: null,
+    targetPocketId: null,
+  });
+  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+
+  await assert.rejects(() => service.deleteMonthSubcategory(month.id, subcategoryId), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 409);
+    assert.match(error.message, /associated movements/i);
+    return true;
+  });
+
+  await assert.rejects(() => service.deleteMonthCategory(month.id, categoryId), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 409);
+    assert.match(error.message, /delete subcategories first/i);
+    return true;
+  });
+});
+
+test("month structure mutations reject closed months and missing snapshot nodes", async () => {
+  const closedMonth = { ...buildCreatedMonth(templateFixture(), 2026, 5), status: MonthStatus.CLOSED };
+  const serviceForClosedMonth = createMonthlyCycleService(createDbStub({ monthById: closedMonth }).db);
+
+  await assert.rejects(
+    () => serviceForClosedMonth.updateMonthCategory({ monthId: closedMonth.id, categoryId: closedMonth.categories[0]?.id ?? "", name: "Hogar" }),
+    (error: unknown) => {
+      assert.ok(error instanceof DomainError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /closed months are immutable/i);
+      return true;
+    },
+  );
+
+  const activeMonth = buildCreatedMonth(templateFixture(), 2026, 5);
+  const serviceForActiveMonth = createMonthlyCycleService(createDbStub({ monthById: activeMonth }).db);
+
+  await assert.rejects(() => serviceForActiveMonth.deleteMonthCategory(activeMonth.id, "missing-category"), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 404);
+    assert.match(error.message, /category was not found/i);
+    return true;
+  });
+
+  await assert.rejects(() => serviceForActiveMonth.deleteMonthSubcategory(activeMonth.id, "missing-subcategory"), (error: unknown) => {
+    assert.ok(error instanceof DomainError);
+    assert.equal(error.statusCode, 404);
+    assert.match(error.message, /subcategory was not found/i);
+    return true;
+  });
 });
 
 test("createMonthlyIncome persists active-month income and recalculates available money", async () => {

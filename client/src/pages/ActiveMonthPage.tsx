@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
 import { Button, Card, KpiCard, SectionHeader, StatusPill } from "../components/ui";
-import type { ExpenseHistoryItem, Month, MonthlyIncome, PaymentMethod, SavingsPocket } from "../types";
+import type { ExpenseHistoryItem, Month, MonthCategory, MonthlyIncome, MonthSubcategory, PaymentMethod, SavingsPocket } from "../types";
 
 const now = new Date();
 
@@ -25,6 +25,7 @@ export const ActiveMonthPage = () => {
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseOccurredAt, setExpenseOccurredAt] = useState("");
   const [expensePaymentMethod, setExpensePaymentMethod] = useState<PaymentMethod>("NON_CASH");
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [expenseHistory, setExpenseHistory] = useState<ExpenseHistoryItem[]>([]);
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalOccurredAt, setWithdrawalOccurredAt] = useState("");
@@ -38,6 +39,19 @@ export const ActiveMonthPage = () => {
   const [incomeReceivedAt, setIncomeReceivedAt] = useState("");
   const [incomeNotes, setIncomeNotes] = useState("");
   const [editingIncomeId, setEditingIncomeId] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryAddToTemplate, setNewCategoryAddToTemplate] = useState(false);
+  const [editingSubcategoryId, setEditingSubcategoryId] = useState<string | null>(null);
+  const [subcategoryName, setSubcategoryName] = useState("");
+  const [subcategoryPlannedAmount, setSubcategoryPlannedAmount] = useState("");
+  const [subcategoryDefaultPocketId, setSubcategoryDefaultPocketId] = useState("");
+  const [newSubcategoryParentId, setNewSubcategoryParentId] = useState("");
+  const [newSubcategoryName, setNewSubcategoryName] = useState("");
+  const [newSubcategoryPlannedAmount, setNewSubcategoryPlannedAmount] = useState("");
+  const [newSubcategoryDefaultPocketId, setNewSubcategoryDefaultPocketId] = useState("");
+  const [newSubcategoryAddToTemplate, setNewSubcategoryAddToTemplate] = useState(false);
 
   const refreshExpenseHistory = async (monthId: string) => {
     const expenses = await api.getExpenseHistory(monthId);
@@ -55,6 +69,7 @@ export const ActiveMonthPage = () => {
   const refresh = async () => {
     const monthData = await api.getActiveMonth();
     setActiveMonth(monthData);
+    resetCorrectionForms(monthData);
     if (monthData) {
       await refreshExpenseHistory(monthData.id);
     } else {
@@ -108,7 +123,7 @@ export const ActiveMonthPage = () => {
   };
 
   const subcategories = activeMonth?.categories.flatMap((category) => category.subcategories) ?? [];
-  const canMutateActiveMonth = activeMonth?.status === "ACTIVE";
+  const canMutateActiveMonth = activeMonth?.status === "ACTIVE" && !activeMonth.closedAt;
 
   const resetIncomeForm = (monthData = activeMonth) => {
     setIncomeSourceName("");
@@ -116,6 +131,66 @@ export const ActiveMonthPage = () => {
     setIncomeReceivedAt(monthData ? formatMonthDate(monthData) : "");
     setIncomeNotes("");
     setEditingIncomeId(null);
+  };
+
+  const resetExpenseForm = (monthData = activeMonth) => {
+    setExpenseSubcategoryId("");
+    setExpenseAmount("");
+    setExpenseDescription("");
+    setExpenseOccurredAt(monthData ? formatMonthDate(monthData) : "");
+    setExpensePaymentMethod("NON_CASH");
+    setEditingExpenseId(null);
+  };
+
+  const resetCategoryForm = () => {
+    setEditingCategoryId(null);
+    setCategoryName("");
+  };
+
+  const resetCreateCategoryForm = () => {
+    setNewCategoryName("");
+    setNewCategoryAddToTemplate(false);
+  };
+
+  const resetSubcategoryForm = () => {
+    setEditingSubcategoryId(null);
+    setSubcategoryName("");
+    setSubcategoryPlannedAmount("");
+    setSubcategoryDefaultPocketId("");
+  };
+
+  const resetCreateSubcategoryForm = () => {
+    setNewSubcategoryParentId("");
+    setNewSubcategoryName("");
+    setNewSubcategoryPlannedAmount("");
+    setNewSubcategoryDefaultPocketId("");
+    setNewSubcategoryAddToTemplate(false);
+  };
+
+  const resetCorrectionForms = (monthData = activeMonth) => {
+    resetExpenseForm(monthData);
+    resetCategoryForm();
+    resetSubcategoryForm();
+    resetCreateCategoryForm();
+    resetCreateSubcategoryForm();
+  };
+
+  const applyActiveMonthCorrection = async (mutation: () => Promise<Month>, successMessage: string, fallbackError: string, afterSuccess?: (monthData: Month) => void) => {
+    setSubmitting(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const updatedMonth = await mutation();
+      setActiveMonth(updatedMonth);
+      await refreshExpenseHistoryBestEffort(updatedMonth.id);
+      afterSuccess?.(updatedMonth);
+      setMessage(successMessage);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : fallbackError);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const startEditingIncome = (income: MonthlyIncome) => {
@@ -126,32 +201,146 @@ export const ActiveMonthPage = () => {
     setEditingIncomeId(income.id);
   };
 
+  const startEditingExpense = (expense: ExpenseHistoryItem) => {
+    setExpenseSubcategoryId(expense.subcategory.id);
+    setExpenseAmount(String(expense.amount));
+    setExpenseDescription(expense.description ?? "");
+    setExpenseOccurredAt(expense.occurredAt.slice(0, 10));
+    setExpensePaymentMethod(expense.paymentMethod);
+    setEditingExpenseId(expense.id);
+  };
+
+  const startEditingCategory = (category: MonthCategory) => {
+    setEditingCategoryId(category.id);
+    setCategoryName(category.name);
+  };
+
+  const startEditingSubcategory = (subcategory: MonthSubcategory) => {
+    setEditingSubcategoryId(subcategory.id);
+    setSubcategoryName(subcategory.name);
+    setSubcategoryPlannedAmount(String(subcategory.plannedAmount));
+    setSubcategoryDefaultPocketId(subcategory.defaultPocketId ?? "");
+  };
+
   const handleExpense = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!activeMonth) return;
-    setSubmitting(true);
-    setError(null);
-    setMessage(null);
+    if (!activeMonth || !canMutateActiveMonth) return;
+    const input = {
+      monthId: activeMonth.id,
+      sourceSubcategoryId: expenseSubcategoryId,
+      amount: Number(expenseAmount),
+      description: expenseDescription,
+      occurredAt: expenseOccurredAt || formatMonthDate(activeMonth),
+      paymentMethod: expensePaymentMethod,
+    };
 
-    try {
-      const updatedMonth = await api.recordExpense({
-        monthId: activeMonth.id,
-        sourceSubcategoryId: expenseSubcategoryId,
-        amount: Number(expenseAmount),
-        description: expenseDescription,
-        occurredAt: expenseOccurredAt || formatMonthDate(activeMonth),
-        paymentMethod: expensePaymentMethod,
-      });
-      setActiveMonth(updatedMonth);
-      setExpenseAmount("");
-      setExpenseDescription("");
-      await refreshExpenseHistoryBestEffort(updatedMonth.id);
-      setMessage("Gasto registrado y saldos recalculados.");
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "No se pudo registrar el gasto.");
-    } finally {
-      setSubmitting(false);
-    }
+    await applyActiveMonthCorrection(
+      () => (editingExpenseId ? api.updateExpense({ ...input, expenseId: editingExpenseId }) : api.recordExpense(input)),
+      editingExpenseId ? "Gasto actualizado en el mes activo y saldos recalculados." : "Gasto registrado y saldos recalculados.",
+      editingExpenseId ? "No se pudo actualizar el gasto." : "No se pudo registrar el gasto.",
+      resetExpenseForm,
+    );
+  };
+
+  const handleDeleteExpense = async (expense: ExpenseHistoryItem) => {
+    if (!activeMonth || !canMutateActiveMonth) return;
+    await applyActiveMonthCorrection(
+      () => api.deleteExpense(activeMonth.id, expense.id),
+      "Gasto eliminado del mes activo y saldos recalculados.",
+      "No se pudo eliminar el gasto.",
+      (updatedMonth) => {
+        if (editingExpenseId === expense.id) resetExpenseForm(updatedMonth);
+      },
+    );
+  };
+
+  const handleCategory = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!activeMonth || !canMutateActiveMonth || !editingCategoryId) return;
+    await applyActiveMonthCorrection(
+      () => api.updateMonthCategory({ monthId: activeMonth.id, categoryId: editingCategoryId, name: categoryName }),
+      "Categoría del mes activo actualizada sin modificar la plantilla global.",
+      "No se pudo actualizar la categoría del mes activo.",
+      () => resetCategoryForm(),
+    );
+  };
+
+  const handleCreateCategory = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!activeMonth || !canMutateActiveMonth) return;
+    const shouldPromote = newCategoryAddToTemplate;
+    await applyActiveMonthCorrection(
+      () => api.createMonthCategory({ monthId: activeMonth.id, name: newCategoryName, addToTemplate: shouldPromote }),
+      shouldPromote
+        ? "Categoría creada en este mes y copiada a la plantilla global para próximos meses."
+        : "Categoría creada solo en el snapshot del mes activo; la plantilla global no cambió.",
+      "No se pudo crear la categoría del mes activo.",
+      () => resetCreateCategoryForm(),
+    );
+  };
+
+  const handleSubcategory = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!activeMonth || !canMutateActiveMonth || !editingSubcategoryId) return;
+    await applyActiveMonthCorrection(
+      () =>
+        api.updateMonthSubcategory({
+          monthId: activeMonth.id,
+          subcategoryId: editingSubcategoryId,
+          name: subcategoryName,
+          plannedAmount: Number(subcategoryPlannedAmount),
+          defaultPocketId: subcategoryDefaultPocketId || null,
+        }),
+      "Subcategoría del mes activo actualizada sin modificar la plantilla global.",
+      "No se pudo actualizar la subcategoría del mes activo.",
+      () => resetSubcategoryForm(),
+    );
+  };
+
+  const handleCreateSubcategory = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!activeMonth || !canMutateActiveMonth) return;
+    const shouldPromote = newSubcategoryAddToTemplate;
+    await applyActiveMonthCorrection(
+      () =>
+        api.createMonthSubcategory({
+          monthId: activeMonth.id,
+          categoryId: newSubcategoryParentId,
+          name: newSubcategoryName,
+          plannedAmount: Number(newSubcategoryPlannedAmount),
+          defaultPocketId: newSubcategoryDefaultPocketId || null,
+          addToTemplate: shouldPromote,
+        }),
+      shouldPromote
+        ? "Subcategoría creada en este mes y copiada a la plantilla global para próximos meses."
+        : "Subcategoría creada solo en el snapshot del mes activo; la plantilla global no cambió.",
+      "No se pudo crear la subcategoría del mes activo.",
+      () => resetCreateSubcategoryForm(),
+    );
+  };
+
+  const handleDeleteCategory = async (category: MonthCategory) => {
+    if (!activeMonth || !canMutateActiveMonth) return;
+    await applyActiveMonthCorrection(
+      () => api.deleteMonthCategory(activeMonth.id, category.id),
+      "Categoría eliminada del mes activo sin modificar la plantilla global.",
+      "No se pudo eliminar la categoría del mes activo.",
+      () => {
+        if (editingCategoryId === category.id) resetCategoryForm();
+      },
+    );
+  };
+
+  const handleDeleteSubcategory = async (subcategory: MonthSubcategory) => {
+    if (!activeMonth || !canMutateActiveMonth) return;
+    await applyActiveMonthCorrection(
+      () => api.deleteMonthSubcategory(activeMonth.id, subcategory.id),
+      "Subcategoría eliminada del mes activo sin modificar la plantilla global.",
+      "No se pudo eliminar la subcategoría del mes activo.",
+      () => {
+        if (editingSubcategoryId === subcategory.id) resetSubcategoryForm();
+      },
+    );
   };
 
   const handleCashWithdrawal = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -282,7 +471,11 @@ export const ActiveMonthPage = () => {
         </form>
 
         {message ? <p className="success">{message}</p> : null}
-        {error ? <p className="error">{error}</p> : null}
+        {error ? (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        ) : null}
       </Card>
 
       {activeMonth ? (
@@ -393,9 +586,14 @@ export const ActiveMonthPage = () => {
               <span>Descripción</span>
               <input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} />
             </label>
-            <Button disabled={submitting} type="submit">
-              Registrar gasto
+            <Button disabled={submitting || !canMutateActiveMonth} type="submit">
+              {editingExpenseId ? "Actualizar gasto" : "Registrar gasto"}
             </Button>
+            {editingExpenseId ? (
+              <Button variant="secondary" disabled={submitting} onClick={() => resetExpenseForm()} type="button">
+                Cancelar edición de gasto
+              </Button>
+            ) : null}
           </form>
 
           <form className="row gap-sm wrap" onSubmit={handleCashWithdrawal}>
@@ -463,7 +661,19 @@ export const ActiveMonthPage = () => {
                     {formatDisplayDate(expense.occurredAt)} · {expense.subcategory.name} · {expense.category.name} · {formatPaymentMethod(expense.paymentMethod)}
                   </p>
                 </div>
-                <StatusPill tone="danger">Gasto -${expense.amount.toFixed(2)}</StatusPill>
+                <div className="row gap-sm wrap">
+                  <StatusPill tone="danger">Gasto -${expense.amount.toFixed(2)}</StatusPill>
+                  {canMutateActiveMonth ? (
+                    <>
+                      <Button variant="secondary" disabled={submitting} onClick={() => startEditingExpense(expense)} type="button">
+                        Editar gasto {expense.description || "sin descripción"}
+                      </Button>
+                      <Button variant="tertiary" disabled={submitting} onClick={() => void handleDeleteExpense(expense)} type="button">
+                        Eliminar gasto {expense.description || "sin descripción"}
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
               </div>
             ))}
           </section>
@@ -486,23 +696,155 @@ export const ActiveMonthPage = () => {
               </strong>{" "}
               · estado {activeMonth.status}
             </p>
+            <p>Estos cambios corrigen solo el snapshot del mes activo; no modifican la plantilla global.</p>
+
+            {canMutateActiveMonth ? (
+              <div className="stack-md">
+                <p>Creá categorías y subcategorías solo en este mes. Marcá la copia a plantilla únicamente si querés que aparezcan en próximos meses.</p>
+
+                <form aria-label="Crear categoría del mes activo" className="row gap-sm wrap" onSubmit={handleCreateCategory}>
+                  <label className="field">
+                    <span>Nueva categoría</span>
+                    <input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} required />
+                  </label>
+                  <label className="field">
+                    <span>Copiar categoría a plantilla</span>
+                    <input type="checkbox" checked={newCategoryAddToTemplate} onChange={(event) => setNewCategoryAddToTemplate(event.target.checked)} />
+                  </label>
+                  <Button disabled={submitting} type="submit">
+                    Crear categoría
+                  </Button>
+                </form>
+
+                <form aria-label="Crear subcategoría del mes activo" className="row gap-sm wrap" onSubmit={handleCreateSubcategory}>
+                  <label className="field">
+                    <span>Categoría padre</span>
+                    <select value={newSubcategoryParentId} onChange={(event) => setNewSubcategoryParentId(event.target.value)} required>
+                      <option value="">Elegí una categoría</option>
+                      {activeMonth.categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Nueva subcategoría</span>
+                    <input value={newSubcategoryName} onChange={(event) => setNewSubcategoryName(event.target.value)} required />
+                  </label>
+                  <label className="field small-field">
+                    <span>Planificado inicial</span>
+                    <input min="0" step="0.01" type="number" value={newSubcategoryPlannedAmount} onChange={(event) => setNewSubcategoryPlannedAmount(event.target.value)} required />
+                  </label>
+                  <label className="field">
+                    <span>Bolsillo predeterminado inicial</span>
+                    <select value={newSubcategoryDefaultPocketId} onChange={(event) => setNewSubcategoryDefaultPocketId(event.target.value)}>
+                      <option value="">Sin bolsillo predeterminado</option>
+                      {activePockets.map((pocket) => (
+                        <option key={pocket.id} value={pocket.id}>
+                          {pocket.name} — predeterminado (${pocket.balance.toFixed(2)})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Copiar a plantilla también</span>
+                    <input type="checkbox" checked={newSubcategoryAddToTemplate} onChange={(event) => setNewSubcategoryAddToTemplate(event.target.checked)} />
+                  </label>
+                  <Button disabled={submitting} type="submit">
+                    Crear subcategoría
+                  </Button>
+                </form>
+              </div>
+            ) : (
+              <p className="error">El mes está cerrado: la estructura es de solo lectura y no se pueden crear categorías ni subcategorías.</p>
+            )}
+
+            {editingCategoryId ? (
+              <form aria-label="Editar categoría del mes activo" className="row gap-sm wrap" onSubmit={handleCategory}>
+                <label className="field">
+                  <span>Nombre categoría</span>
+                  <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} required />
+                </label>
+                <Button disabled={submitting} type="submit">
+                  Guardar categoría
+                </Button>
+                <Button variant="secondary" disabled={submitting} onClick={resetCategoryForm} type="button">
+                  Cancelar categoría
+                </Button>
+              </form>
+            ) : null}
+
+            {editingSubcategoryId ? (
+              <form aria-label="Editar subcategoría del mes activo" className="row gap-sm wrap" onSubmit={handleSubcategory}>
+                <label className="field">
+                  <span>Nombre subcategoría</span>
+                  <input value={subcategoryName} onChange={(event) => setSubcategoryName(event.target.value)} required />
+                </label>
+                <label className="field small-field">
+                  <span>Planificado</span>
+                  <input min="0" step="0.01" type="number" value={subcategoryPlannedAmount} onChange={(event) => setSubcategoryPlannedAmount(event.target.value)} required />
+                </label>
+                <label className="field">
+                  <span>Bolsillo predeterminado</span>
+                  <select value={subcategoryDefaultPocketId} onChange={(event) => setSubcategoryDefaultPocketId(event.target.value)}>
+                    <option value="">Sin bolsillo predeterminado</option>
+                    {activePockets.map((pocket) => (
+                      <option key={pocket.id} value={pocket.id}>
+                        {pocket.name} (${pocket.balance.toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Button disabled={submitting} type="submit">
+                  Guardar subcategoría
+                </Button>
+                <Button variant="secondary" disabled={submitting} onClick={resetSubcategoryForm} type="button">
+                  Cancelar subcategoría
+                </Button>
+              </form>
+            ) : null}
 
             <div className="stack-md">
               {activeMonth.categories.map((category) => (
                 <section className="stack-sm" key={category.id}>
-                  <h3>{category.name}</h3>
+                  <div className="row between wrap align-start">
+                    <h3>{category.name}</h3>
+                    {canMutateActiveMonth ? (
+                      <div className="row gap-sm wrap">
+                        <Button variant="secondary" disabled={submitting} onClick={() => startEditingCategory(category)} type="button">
+                          Editar categoría {category.name}
+                        </Button>
+                        <Button variant="tertiary" disabled={submitting} onClick={() => void handleDeleteCategory(category)} type="button">
+                          Eliminar categoría {category.name}
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
 
                   <div className="stack-sm">
                     {category.subcategories.map((subcategory) => (
-                      <div className="budget-line" key={subcategory.id}>
+                      <div className="budget-line align-start" key={subcategory.id}>
                         <div>
                           <strong>{subcategory.name}</strong>
                           <p>Planificado: ${subcategory.plannedAmount.toFixed(2)}</p>
                         </div>
 
-                        <StatusPill tone={subcategory.available < 0 ? "danger" : "success"}>
-                          Disponible: ${subcategory.available.toFixed(2)}
-                        </StatusPill>
+                        <div className="row gap-sm wrap">
+                          <StatusPill tone={subcategory.available < 0 ? "danger" : "success"}>
+                            Disponible: ${subcategory.available.toFixed(2)}
+                          </StatusPill>
+                          {canMutateActiveMonth ? (
+                            <>
+                              <Button variant="secondary" disabled={submitting} onClick={() => startEditingSubcategory(subcategory)} type="button">
+                                Editar subcategoría {subcategory.name}
+                              </Button>
+                              <Button variant="tertiary" disabled={submitting} onClick={() => void handleDeleteSubcategory(subcategory)} type="button">
+                                Eliminar subcategoría {subcategory.name}
+                              </Button>
+                            </>
+                          ) : null}
+                        </div>
                       </div>
                     ))}
                   </div>

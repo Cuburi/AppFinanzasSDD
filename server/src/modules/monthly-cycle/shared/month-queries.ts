@@ -34,6 +34,32 @@ export const findMonthSubcategory = (month: MonthRecord, subcategoryId: string) 
 
 export const listMonthSubcategories = (month: MonthRecord) => month.categories.flatMap((category) => category.subcategories);
 
+export const findMonthCategory = (month: MonthRecord, categoryId: string) =>
+  month.categories.find((category) => category.id === categoryId);
+
+export const assertMonthCategory = (month: MonthRecord, categoryId: string) => {
+  const category = findMonthCategory(month, categoryId);
+
+  if (!category) {
+    throw new DomainError(404, "Category was not found in this month.");
+  }
+
+  return category;
+};
+
+export const assertMonthSubcategory = (month: MonthRecord, subcategoryId: string) => {
+  const subcategory = findMonthSubcategory(month, subcategoryId);
+
+  if (!subcategory) {
+    throw new DomainError(404, "Subcategory was not found in this month.");
+  }
+
+  return subcategory;
+};
+
+export const hasAssociatedMonthMovements = (month: MonthRecord, subcategoryId: string) =>
+  month.movements.some((movement) => movement.sourceSubcategoryId === subcategoryId || movement.targetSubcategoryId === subcategoryId);
+
 export const assertPocketIsActive = async (db: MonthlyCycleDb, pocketId: string, label: string) => {
   const pocket = await db.savingsPocket.findUnique({
     where: { id: pocketId },

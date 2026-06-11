@@ -138,6 +138,39 @@ export type RecordExpenseInput = {
   description?: string;
 };
 
+export type UpdateExpenseInput = RecordExpenseInput & {
+  expenseId: string;
+};
+
+export type UpdateMonthCategoryInput = {
+  monthId: string;
+  categoryId: string;
+  name: string;
+};
+
+export type CreateMonthCategoryInput = {
+  monthId: string;
+  name: string;
+  addToTemplate: boolean;
+};
+
+export type CreateMonthSubcategoryInput = {
+  monthId: string;
+  categoryId: string;
+  name: string;
+  plannedAmount: number;
+  defaultPocketId?: string | null;
+  addToTemplate: boolean;
+};
+
+export type UpdateMonthSubcategoryInput = {
+  monthId: string;
+  subcategoryId: string;
+  name: string;
+  plannedAmount: number;
+  defaultPocketId?: string | null;
+};
+
 export type ExpenseHistoryFilters = {
   from?: string;
   to?: string;

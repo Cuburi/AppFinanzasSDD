@@ -4,6 +4,7 @@ export * from "./expenses.dto.js";
 export * from "./history.dto.js";
 export * from "./incomes.dto.js";
 export * from "./month.dto.js";
+export * from "./month-structure.dto.js";
 export * from "./pockets.dto.js";
 export * from "./reports.dto.js";
 export * from "./template.dto.js";

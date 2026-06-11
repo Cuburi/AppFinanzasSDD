@@ -72,6 +72,7 @@ export type MonthRecord = {
     id?: string;
     type: MovementType;
     amount: Prisma.Decimal;
+    monthId?: string | null;
     occurredAt?: Date;
     description?: string | null;
     paymentMethod?: PaymentMethod | null;
@@ -102,7 +103,18 @@ export type MonthlyCycleDb = {
           }>;
         };
       };
-    }): Promise<unknown>;
+    }): Promise<{ id: string }>;
+  };
+  templateSubcategory: {
+    create(args: {
+      data: {
+        categoryId: string;
+        name: string;
+        plannedAmount: Prisma.Decimal;
+        defaultPocketId: string | null;
+        sortOrder: number;
+      };
+    }): Promise<{ id: string }>;
   };
   month: {
     findFirst(args: unknown): Promise<MonthRecord | { id: string; year: number; month: number } | null>;
@@ -139,6 +151,7 @@ export type MonthlyCycleDb = {
     }): Promise<MonthRecord>;
   };
   movement: {
+    findUnique(args: { where: { id: string } }): Promise<MonthRecord["movements"][number] | null>;
     findMany(args: unknown): Promise<
       Array<{
         id?: string;
@@ -169,6 +182,39 @@ export type MonthlyCycleDb = {
         externalSourceLabel?: string | null;
       };
     }): Promise<unknown>;
+    update(args: {
+      where: { id: string };
+      data: {
+        amount?: Prisma.Decimal;
+        description?: string | null;
+        occurredAt?: Date;
+        paymentMethod?: PaymentMethod;
+        sourceSubcategoryId?: string;
+      };
+    }): Promise<unknown>;
+    delete(args: { where: { id: string } }): Promise<unknown>;
+  };
+  monthCategory: {
+    create(args: { data: { monthId: string; name: string; sortOrder: number; templateCategoryId: string | null } }): Promise<{ id: string }>;
+    update(args: { where: { id: string }; data: { name?: string; templateCategoryId?: string | null } }): Promise<unknown>;
+    delete(args: { where: { id: string } }): Promise<unknown>;
+  };
+  monthSubcategory: {
+    create(args: {
+      data: {
+        monthCategoryId: string;
+        name: string;
+        plannedAmount: Prisma.Decimal;
+        defaultPocketId: string | null;
+        templateSubcategoryId: string | null;
+        sortOrder: number;
+      };
+    }): Promise<{ id: string }>;
+    update(args: {
+      where: { id: string };
+      data: { name?: string; plannedAmount?: Prisma.Decimal; defaultPocketId?: string | null; templateSubcategoryId?: string | null };
+    }): Promise<unknown>;
+    delete(args: { where: { id: string } }): Promise<unknown>;
   };
   monthlyIncome: {
     findUnique(args: { where: { id: string } }): Promise<MonthlyIncomeRecord | null>;

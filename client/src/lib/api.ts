@@ -4,6 +4,8 @@ import type {
   BasicMonthlyReport,
   CashSummary,
   CreateDebtInput,
+  CreateMonthCategoryInput,
+  CreateMonthSubcategoryInput,
   CreateMonthlyIncomeInput,
   CreatePocketInput,
   DebtView,
@@ -15,7 +17,10 @@ import type {
   RegisterDebtPaymentInput,
   RecordExpenseInput,
   SavingsPocket,
+  UpdateExpenseInput,
+  UpdateMonthCategoryInput,
   UpdateMonthlyIncomeInput,
+  UpdateMonthSubcategoryInput,
   Template,
   UpdatePocketInput,
   WithdrawCashInput,
@@ -157,6 +162,30 @@ export const api = {
 
     return readJson<Month>(response);
   },
+  async updateExpense(input: UpdateExpenseInput): Promise<Month> {
+    const response = await fetch(`/api/months/${input.monthId}/expenses/${input.expenseId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sourceSubcategoryId: input.sourceSubcategoryId,
+        amount: input.amount,
+        description: input.description,
+        occurredAt: input.occurredAt,
+        paymentMethod: input.paymentMethod,
+      }),
+    });
+
+    return readJson<Month>(response);
+  },
+  async deleteExpense(monthId: string, expenseId: string): Promise<Month> {
+    const response = await fetch(`/api/months/${monthId}/expenses/${expenseId}`, {
+      method: "DELETE",
+    });
+
+    return readJson<Month>(response);
+  },
   async getExpenseHistory(monthId: string, filters: ExpenseHistoryFilters = {}): Promise<ExpenseHistoryItem[]> {
     const params = new URLSearchParams();
     if (filters.from) params.set("from", filters.from);
@@ -169,6 +198,76 @@ export const api = {
     const payload = await readJson<{ expenses: ExpenseHistoryItem[] }>(response);
 
     return payload.expenses;
+  },
+  async updateMonthCategory(input: UpdateMonthCategoryInput): Promise<Month> {
+    const response = await fetch(`/api/months/${input.monthId}/categories/${input.categoryId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name: input.name }),
+    });
+
+    return readJson<Month>(response);
+  },
+  async createMonthCategory(input: CreateMonthCategoryInput): Promise<Month> {
+    const response = await fetch(`/api/months/${input.monthId}/categories`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: input.name,
+        addToTemplate: input.addToTemplate,
+      }),
+    });
+
+    return readJson<Month>(response);
+  },
+  async deleteMonthCategory(monthId: string, categoryId: string): Promise<Month> {
+    const response = await fetch(`/api/months/${monthId}/categories/${categoryId}`, {
+      method: "DELETE",
+    });
+
+    return readJson<Month>(response);
+  },
+  async updateMonthSubcategory(input: UpdateMonthSubcategoryInput): Promise<Month> {
+    const response = await fetch(`/api/months/${input.monthId}/subcategories/${input.subcategoryId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: input.name,
+        plannedAmount: input.plannedAmount,
+        defaultPocketId: input.defaultPocketId,
+      }),
+    });
+
+    return readJson<Month>(response);
+  },
+  async createMonthSubcategory(input: CreateMonthSubcategoryInput): Promise<Month> {
+    const response = await fetch(`/api/months/${input.monthId}/categories/${input.categoryId}/subcategories`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: input.name,
+        plannedAmount: input.plannedAmount,
+        defaultPocketId: input.defaultPocketId,
+        addToTemplate: input.addToTemplate,
+      }),
+    });
+
+    return readJson<Month>(response);
+  },
+  async deleteMonthSubcategory(monthId: string, subcategoryId: string): Promise<Month> {
+    const response = await fetch(`/api/months/${monthId}/subcategories/${subcategoryId}`, {
+      method: "DELETE",
+    });
+
+    return readJson<Month>(response);
   },
   async withdrawCash(input: WithdrawCashInput): Promise<Month> {
     const response = await fetch(`/api/months/${input.monthId}/cash-withdrawals`, {
