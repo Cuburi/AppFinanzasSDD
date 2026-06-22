@@ -3,7 +3,7 @@ import express from "express";
 
 import { createHealthRouter } from "./health.js";
 import { prisma } from "./lib/prisma.js";
-import { debtsRouter } from "./modules/debts/routes.js";
+import { createDebtsModule } from "./modules/debts/debts.module.js";
 import { monthlyCycleRouter } from "./modules/monthly-cycle/routes.js";
 import { pocketsRouter } from "./modules/pockets/routes.js";
 
@@ -18,7 +18,7 @@ app.use(
     },
   }),
 );
-app.use("/api", debtsRouter());
+app.use("/api", createDebtsModule().router);
 app.use("/api", pocketsRouter());
 app.use("/api", monthlyCycleRouter());
 
