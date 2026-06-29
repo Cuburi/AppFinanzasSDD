@@ -2,9 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
 
-import { debtsRouter } from "./routes.js";
-import { DomainError } from "./service.js";
-import type { DebtView } from "./shared/types.js";
+import { DebtNotFoundError } from "../application/errors/debt-application-errors.js";
+import { DomainError } from "../domain/debt-errors.js";
+import { createDebtsRouter } from "./debts.routes.js";
+import type { DebtView } from "../shared/types.js";
 
 const openDebt: DebtView = {
   id: "debt-1",
@@ -19,10 +20,10 @@ const openDebt: DebtView = {
   payments: [{ id: "payment-1", amount: 30, paidAt: "2026-05-03T00:00:00.000Z", notes: "Abono" }],
 };
 
-const createTestServer = (service: Parameters<typeof debtsRouter>[0]) => {
+const createTestServer = (service: Parameters<typeof createDebtsRouter>[0]) => {
   const app = express();
   app.use(express.json());
-  app.use("/api", debtsRouter(service));
+  app.use("/api", createDebtsRouter(service));
 
   return app.listen(0);
 };
@@ -37,7 +38,7 @@ const request = async (server: ReturnType<typeof createTestServer>, path: string
   });
 };
 
-test("debtsRouter exposes GET /api/debts with stable debt API shape", async () => {
+test("createDebtsRouter exposes GET /api/debts with stable debt API shape", async () => {
   const service = {
     async listDebts() {
       return [openDebt];
@@ -61,7 +62,7 @@ test("debtsRouter exposes GET /api/debts with stable debt API shape", async () =
   }
 });
 
-test("debtsRouter parses POST /api/debts payloads and fixes currency to COP", async () => {
+test("createDebtsRouter parses POST /api/debts payloads and fixes currency to COP", async () => {
   const calls: unknown[] = [];
   const service = {
     async listDebts() {
@@ -105,7 +106,7 @@ test("debtsRouter parses POST /api/debts payloads and fixes currency to COP", as
   }
 });
 
-test("debtsRouter rejects invalid create shapes before workflow execution", async () => {
+test("createDebtsRouter rejects invalid create shapes before application execution", async () => {
   let createCalls = 0;
   const service = {
     async listDebts() {
@@ -113,7 +114,7 @@ test("debtsRouter rejects invalid create shapes before workflow execution", asyn
     },
     async createDebt() {
       createCalls += 1;
-      throw new Error("Invalid create payload should not reach the workflow.");
+      throw new Error("Invalid create payload should not reach the use case.");
     },
     async registerPayment() {
       throw new Error("Not used in this test.");
@@ -141,7 +142,7 @@ test("debtsRouter rejects invalid create shapes before workflow execution", asyn
   }
 });
 
-test("debtsRouter parses payment payloads and maps overpayment domain errors", async () => {
+test("createDebtsRouter parses payment payloads and maps overpayment domain errors", async () => {
   const calls: unknown[] = [];
   const service = {
     async listDebts() {
@@ -183,7 +184,34 @@ test("debtsRouter parses payment payloads and maps overpayment domain errors", a
   }
 });
 
-test("debtsRouter rejects invalid payment shapes before workflow execution", async () => {
+test("createDebtsRouter maps missing-debt payment errors to HTTP 404", async () => {
+  const service = {
+    async listDebts() {
+      throw new Error("Not used in this test.");
+    },
+    async createDebt() {
+      throw new Error("Not used in this test.");
+    },
+    async registerPayment() {
+      throw new DebtNotFoundError();
+    },
+  };
+  const server = createTestServer(service);
+
+  try {
+    const response = await request(server, "/api/debts/missing-debt/payments", {
+      method: "POST",
+      body: JSON.stringify({ amount: 20, paidAt: "2026-05-04T00:00:00.000Z" }),
+    });
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { message: "Debt not found." });
+  } finally {
+    server.close();
+  }
+});
+
+test("createDebtsRouter rejects invalid payment shapes before application execution", async () => {
   let paymentCalls = 0;
   const service = {
     async listDebts() {
@@ -194,7 +222,7 @@ test("debtsRouter rejects invalid payment shapes before workflow execution", asy
     },
     async registerPayment() {
       paymentCalls += 1;
-      throw new Error("Invalid payment payload should not reach the workflow.");
+      throw new Error("Invalid payment payload should not reach the use case.");
     },
   };
   const server = createTestServer(service);

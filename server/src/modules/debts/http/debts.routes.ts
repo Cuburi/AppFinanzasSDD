@@ -1,19 +1,15 @@
 import { type Response, Router } from "express";
 
-import { parseCreateDebtInput, parseRegisterDebtPaymentInput } from "./dto/index.js";
-import { toDebtApiView, toDebtListApiResponse } from "./mappers/debt-mappers.js";
-import { DomainError, createDebt, listDebts, registerPayment } from "./service.js";
+import { DebtNotFoundError } from "../application/errors/debt-application-errors.js";
+import { DomainError } from "../domain/debt-errors.js";
+import type { CreateDebtInput, DebtView, RegisterDebtPaymentInput } from "../shared/types.js";
+import { parseCreateDebtInput, parseRegisterDebtPaymentInput } from "./debts.schemas.js";
+import { toDebtApiView, toDebtListApiResponse } from "./debts.presenter.js";
 
-type DebtsService = {
-  listDebts: typeof listDebts;
-  createDebt: typeof createDebt;
-  registerPayment: typeof registerPayment;
-};
-
-const defaultService: DebtsService = {
-  listDebts,
-  createDebt,
-  registerPayment,
+export type DebtsHttpService = {
+  listDebts: () => Promise<DebtView[]>;
+  createDebt: (input: CreateDebtInput) => Promise<DebtView>;
+  registerPayment: (debtId: string, input: RegisterDebtPaymentInput) => Promise<DebtView>;
 };
 
 const isDomainError = (error: unknown): error is DomainError => error instanceof DomainError;
@@ -21,6 +17,11 @@ const isDomainError = (error: unknown): error is DomainError => error instanceof
 const readMessage = (error: unknown) => (error instanceof Error ? error.message : "Unexpected error.");
 
 const handleError = (response: Response, error: unknown) => {
+  if (error instanceof DebtNotFoundError) {
+    response.status(404).json({ message: error.message });
+    return;
+  }
+
   if (isDomainError(error)) {
     response.status(error.statusCode).json({ message: error.message });
     return;
@@ -29,7 +30,7 @@ const handleError = (response: Response, error: unknown) => {
   response.status(400).json({ message: readMessage(error) });
 };
 
-export const debtsRouter = (service: DebtsService = defaultService) => {
+export const createDebtsRouter = (service: DebtsHttpService) => {
   const router = Router();
 
   router.get("/debts", async (_request, response) => {
