@@ -26,13 +26,15 @@ import { createMovementService } from "./workflows/movement-service.js";
 import { createReportsService } from "./workflows/reports-service.js";
 import { createTemplateService } from "./workflows/template-service.js";
 import type { MonthlyCycleDb } from "./shared/service-types.js";
+import type { MonthlyCycleWorkflowDependencies } from "./workflows/workflow-dependencies.js";
 
 export { DomainError } from "./shared/service-errors.js";
 
-export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
-  const templateService = createTemplateService(db);
-  const monthLifecycleService = createMonthLifecycleService(db);
-  const movementService = createMovementService(db);
+export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDependencies) => {
+  const db = dependencies as MonthlyCycleDb;
+  const templateService = createTemplateService(dependencies);
+  const monthLifecycleService = createMonthLifecycleService(dependencies);
+  const movementService = createMovementService(dependencies);
   const incomeService = createIncomeService(db);
   const closureService = createClosureService(db);
   const cashService = createCashService(db);
