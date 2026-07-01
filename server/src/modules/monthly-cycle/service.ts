@@ -68,6 +68,8 @@ export const createMonthlyCycleService = (db: MonthlyCycleDb) => {
   };
 };
 
+export type MonthlyCycleService = ReturnType<typeof createMonthlyCycleService>;
+
 const monthlyCycleService = createMonthlyCycleService(prisma as unknown as MonthlyCycleDb);
 
 export const getTemplate = () => monthlyCycleService.getTemplate();

@@ -142,6 +142,65 @@ test("monthlyCycleRouter maps missing report months to 404", async () => {
   }
 });
 
+test("monthlyCycleRouter delegates template, month lifecycle, and pocket deposit routes through injected service", async () => {
+  const calls: unknown[] = [];
+  const server = createTestServer({
+    async getTemplate() {
+      calls.push({ type: "getTemplate" });
+      return { categories: [{ id: "cat-template", name: "Template", sortOrder: 0, subcategories: [] }] };
+    },
+    async openMonth(input: unknown) {
+      calls.push({ type: "openMonth", input });
+      return month;
+    },
+    async depositToPocket(input: unknown) {
+      calls.push({ type: "depositToPocket", input });
+      return month;
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+
+    const templateResponse = await fetch(`http://127.0.0.1:${address.port}/api/template`);
+    const openResponse = await fetch(`http://127.0.0.1:${address.port}/api/months/open`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ year: 2026, month: 5 }),
+    });
+    const depositResponse = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-1", amount: 75, description: "Deposit" }),
+    });
+
+    assert.equal(templateResponse.status, 200);
+    assert.deepEqual(await templateResponse.json(), { categories: [{ id: "cat-template", name: "Template", sortOrder: 0, subcategories: [] }] });
+    assert.equal(openResponse.status, 201);
+    assert.deepEqual(await openResponse.json(), month);
+    assert.equal(depositResponse.status, 201);
+    assert.deepEqual(await depositResponse.json(), { month });
+    assert.deepEqual(calls, [
+      { type: "getTemplate" },
+      { type: "openMonth", input: { year: 2026, month: 5 } },
+      {
+        type: "depositToPocket",
+        input: {
+          monthId: "month-1",
+          sourceSubcategoryId: "sub-market",
+          targetPocketId: "pocket-1",
+          amount: 75,
+          description: "Deposit",
+          externalSourceLabel: null,
+        },
+      },
+    ]);
+  } finally {
+    server.close();
+  }
+});
+
 test("monthlyCycleRouter parses PATCH /api/months/:id/expenses/:expenseId and returns the updated month", async () => {
   const calls: unknown[] = [];
   const server = createTestServer({
