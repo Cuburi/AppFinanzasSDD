@@ -1,4 +1,6 @@
-import type { MonthView, TemplateView } from "../../dto/index.js";
+import type { TemplateInput } from "../../dto/index.js";
+import type { MonthRecord, TemplateCategoryRecord } from "../../shared/service-types.js";
+import type { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../../lib/prisma-client.js";
 
 export const MONTHLY_CYCLE_PORT_NAMES = [
   "months",
@@ -12,23 +14,62 @@ export const MONTHLY_CYCLE_PORT_NAMES = [
 
 export type MonthlyCyclePortName = (typeof MONTHLY_CYCLE_PORT_NAMES)[number];
 
+export type ActiveMonthSummary = { id: string; year: number; month: number };
+
 export interface MonthRepositoryPort {
-  findActive(): Promise<MonthView | null>;
-  findById(monthId: string): Promise<MonthView | null>;
+  findActive(): Promise<MonthRecord | null>;
+  findActiveSummary(status: MonthStatus): Promise<ActiveMonthSummary | null>;
+  findById(monthId: string): Promise<MonthRecord>;
+  findByYearMonth(year: number, month: number): Promise<{ id: string } | null>;
+  findPriorClosedBefore(year: number, month: number): Promise<MonthRecord | null>;
+  createFromTemplate(input: {
+    year: number;
+    month: number;
+    status: MonthStatus;
+    template: TemplateCategoryRecord[];
+  }): Promise<MonthRecord>;
+  close(monthId: string): Promise<MonthRecord>;
 }
 
 export interface TemplateRepositoryPort {
-  findTemplate(): Promise<TemplateView>;
+  readCategories(): Promise<TemplateCategoryRecord[]>;
+  replaceCategories(input: TemplateInput): Promise<void>;
 }
 
-export interface MovementRepositoryPort {}
+export type MovementRecord = MonthRecord["movements"][number];
+
+export interface MovementRepositoryPort {
+  findById(movementId: string): Promise<MovementRecord | null>;
+  create(args: {
+    type: MovementType;
+    amount: Prisma.Decimal;
+    description?: string | null;
+    occurredAt?: Date;
+    paymentMethod?: PaymentMethod | null;
+    monthId?: string | null;
+    sourceSubcategoryId?: string | null;
+    targetSubcategoryId?: string | null;
+    targetPocketId?: string | null;
+    externalSourceLabel?: string | null;
+  }): Promise<void>;
+  updateExpense(input: {
+    expenseId: string;
+    amount: Prisma.Decimal;
+    description?: string | null;
+    occurredAt: Date;
+    paymentMethod: PaymentMethod;
+    sourceSubcategoryId: string;
+  }): Promise<void>;
+  delete(movementId: string): Promise<void>;
+}
 
 export interface IncomeRepositoryPort {}
 
 export interface MonthStructureRepositoryPort {}
 
 export interface PocketValidationPort {
-  ensurePocketCanReceiveMovement(pocketId: string): Promise<void>;
+  ensurePocketIsActive(pocketId: string, label: string): Promise<void>;
+  ensureTemplateDefaultPocketsAreActive(input: TemplateInput): Promise<void>;
 }
 
 export type MonthlyCyclePorts = {

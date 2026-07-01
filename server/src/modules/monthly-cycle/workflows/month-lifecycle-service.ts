@@ -5,9 +5,10 @@ import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
 import { calculateCashBalance } from "../shared/cash-ledger.js";
 import { decimal } from "../shared/money.js";
 import { decimalToNumber } from "../shared/money.js";
-import { assertMonthIsMutable, assertTemplateDefaultPocketsAreActive, readMonthById, readTemplateCategories } from "../shared/month-queries.js";
+import { assertMonthIsMutable } from "../shared/month-queries.js";
 import { DomainError } from "../shared/service-errors.js";
-import { monthInclude, type MonthRecord, type MonthlyCycleDb } from "../shared/service-types.js";
+import type { MonthRecord } from "../shared/service-types.js";
+import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflow-dependencies.js";
 
 const assertTemplateHasSubcategories = (input: TemplateInput) => {
   const count = input.categories.reduce((total, category) => total + category.subcategories.length, 0);
@@ -17,135 +18,93 @@ const assertTemplateHasSubcategories = (input: TemplateInput) => {
   }
 };
 
-export const createMonthLifecycleService = (db: MonthlyCycleDb) => ({
-  async openMonth(input: OpenMonthInput): Promise<MonthView> {
-    const month = await db.$transaction(async (tx) => {
-      const activeMonth = await tx.month.findFirst({
-        where: { status: MonthStatus.ACTIVE },
-        select: { id: true, year: true, month: true },
-      });
+export const createMonthLifecycleService = (dependencies: MonthlyCycleWorkflowDependencies) => {
+  const ports = resolveMonthlyCyclePorts(dependencies);
 
-      if (activeMonth) {
-        throw new DomainError(409, `There is already an active month (${activeMonth.year}-${String(activeMonth.month).padStart(2, "0")}).`);
-      }
+  return {
+    async openMonth(input: OpenMonthInput): Promise<MonthView> {
+      const month = await ports.transactionRunner.run(async (txPorts) => {
+        const activeMonth = await txPorts.months.findActiveSummary(MonthStatus.ACTIVE);
 
-      const existingTargetMonth = await tx.month.findUnique({
-        where: {
-          year_month: {
-            year: input.year,
-            month: input.month,
-          },
-        },
-        select: { id: true },
-      });
+        if (activeMonth) {
+          throw new DomainError(409, `There is already an active month (${activeMonth.year}-${String(activeMonth.month).padStart(2, "0")}).`);
+        }
 
-      if (existingTargetMonth) {
-        throw new DomainError(409, "That month already exists.");
-      }
+        const existingTargetMonth = await txPorts.months.findByYearMonth(input.year, input.month);
 
-      const template = await readTemplateCategories(tx);
-      const templateInput = {
-        categories: template.map((category) => ({
-          name: category.name,
-          subcategories: category.subcategories.map((subcategory) => ({
-            name: subcategory.name,
-            plannedAmount: decimalToNumber(subcategory.plannedAmount),
-            defaultPocketId: subcategory.defaultPocketId,
+        if (existingTargetMonth) {
+          throw new DomainError(409, "That month already exists.");
+        }
+
+        const template = await txPorts.templates.readCategories();
+        const templateInput = {
+          categories: template.map((category) => ({
+            name: category.name,
+            subcategories: category.subcategories.map((subcategory) => ({
+              name: subcategory.name,
+              plannedAmount: decimalToNumber(subcategory.plannedAmount),
+              defaultPocketId: subcategory.defaultPocketId,
+            })),
           })),
-        })),
-      };
-      assertTemplateHasSubcategories(templateInput);
-      await assertTemplateDefaultPocketsAreActive(tx, templateInput);
+        };
+        assertTemplateHasSubcategories(templateInput);
+        await txPorts.pockets.ensureTemplateDefaultPocketsAreActive(templateInput);
 
-      const createdMonth = await tx.month.create({
-        data: {
+        const createdMonth = await txPorts.months.createFromTemplate({
           year: input.year,
           month: input.month,
           status: MonthStatus.ACTIVE,
-          categories: {
-            create: template.map((category, categoryIndex) => ({
-              name: category.name,
-              sortOrder: categoryIndex,
-              templateCategoryId: category.id,
-              subcategories: {
-                create: category.subcategories.map((subcategory, subcategoryIndex) => ({
-                  name: subcategory.name,
-                  plannedAmount: subcategory.plannedAmount,
-                  defaultPocketId: subcategory.defaultPocketId,
-                  templateSubcategoryId: subcategory.id,
-                  sortOrder: subcategoryIndex,
-                })),
-              },
-            })),
-          },
-        },
-        include: monthInclude,
-      });
+          template,
+        });
 
-      const priorClosedMonth = await tx.month.findFirst({
-        where: {
-          status: MonthStatus.CLOSED,
-          OR: [{ year: { lt: input.year } }, { year: input.year, month: { lt: input.month } }],
-        },
-        orderBy: [{ year: "desc" }, { month: "desc" }],
-        include: monthInclude,
-      });
+        const priorClosedMonth = await txPorts.months.findPriorClosedBefore(input.year, input.month);
 
-      if (priorClosedMonth && "categories" in priorClosedMonth) {
-        const carryover = calculateCashBalance((priorClosedMonth as MonthRecord).movements);
-        if (carryover > 0) {
-          await tx.movement.create({
-            data: {
+        if (priorClosedMonth) {
+          const carryover = calculateCashBalance(priorClosedMonth.movements);
+          if (carryover > 0) {
+            await txPorts.movements.create({
               type: MovementType.CASH_CARRYOVER_IN,
               amount: decimal(carryover),
               description: "Cash carryover from previous closed month",
               occurredAt: new Date(Date.UTC(input.year, input.month - 1, 1)),
               monthId: createdMonth.id,
-            },
-          });
+            });
 
-          return readMonthById(tx, createdMonth.id);
+            return txPorts.months.findById(createdMonth.id);
+          }
         }
-      }
 
-      return createdMonth;
-    });
-
-    return mapMonth(month);
-  },
-
-  async getActiveMonth(): Promise<MonthView | null> {
-    const month = await db.month.findFirst({
-      where: { status: MonthStatus.ACTIVE },
-      orderBy: { openedAt: "desc" },
-      include: monthInclude,
-    });
-
-    if (!month) {
-      return null;
-    }
-
-    return mapMonth(month as MonthRecord);
-  },
-
-  async closeMonth(monthId: string, buildClosureReview: (month: MonthRecord) => ClosureReviewView): Promise<MonthView> {
-    const month = await db.$transaction(async (tx) => {
-      const existingMonth = await readMonthById(tx, monthId);
-      assertMonthIsMutable(existingMonth);
-
-      const review = buildClosureReview(existingMonth);
-
-      if (!review.canClose) {
-        throw new DomainError(409, "Month cannot be closed while pending subcategory balances or available money remain unresolved.");
-      }
-
-      return tx.month.update({
-        where: { id: monthId },
-        data: { status: MonthStatus.CLOSED, closedAt: new Date() },
-        include: monthInclude,
+        return createdMonth;
       });
-    });
 
-    return mapMonth(month);
-  },
-});
+      return mapMonth(month);
+    },
+
+    async getActiveMonth(): Promise<MonthView | null> {
+      const month = await ports.months.findActive();
+
+      if (!month) {
+        return null;
+      }
+
+      return mapMonth(month);
+    },
+
+    async closeMonth(monthId: string, buildClosureReview: (month: MonthRecord) => ClosureReviewView): Promise<MonthView> {
+      const month = await ports.transactionRunner.run(async (txPorts) => {
+        const existingMonth = await txPorts.months.findById(monthId);
+        assertMonthIsMutable(existingMonth);
+
+        const review = buildClosureReview(existingMonth);
+
+        if (!review.canClose) {
+          throw new DomainError(409, "Month cannot be closed while pending subcategory balances or available money remain unresolved.");
+        }
+
+        return txPorts.months.close(monthId);
+      });
+
+      return mapMonth(month);
+    },
+  };
+};
