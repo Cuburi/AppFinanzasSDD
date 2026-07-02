@@ -88,3 +88,19 @@ test("monthly-cycle final wiring avoids service shim consumers in startup, route
   assert.doesNotMatch(routesSource, /\.\/service\.js/);
   assert.doesNotMatch(moduleSource, /\.\/service\.js/);
 });
+
+test("template application use cases are composed by the module root and exposed to routes as a narrow boundary", async () => {
+  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+    readFile(new URL("./routes.ts", import.meta.url), "utf8"),
+    readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
+    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(moduleSource, /createTemplateUseCases/);
+  assert.match(moduleSource, /createMonthlyCycleService/);
+  assert.doesNotMatch(moduleSource, /\.\/workflows\/template-service\.js/);
+  assert.doesNotMatch(moduleSource, /\.\/workflows\//);
+  assert.match(routesSource, /TemplateRouteService/);
+  assert.doesNotMatch(routesSource, /\.\/monthly-cycle\.service\.js/);
+  assert.doesNotMatch(compatibilityServiceSource, /createTemplateService/);
+});

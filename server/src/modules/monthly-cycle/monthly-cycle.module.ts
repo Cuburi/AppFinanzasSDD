@@ -1,7 +1,8 @@
 import { prisma } from "../../lib/prisma.js";
-import { createMonthlyCyclePrismaAdapters, createMonthlyCyclePrismaTransactionRunner } from "./infrastructure/prisma/monthly-cycle-prisma-adapters.js";
-import { createMonthlyCycleService } from "./monthly-cycle.service.js";
 import type { MonthlyCycleService } from "./monthly-cycle.service.js";
+import { createMonthlyCycleService } from "./monthly-cycle.service.js";
+import { createTemplateUseCases } from "./application/use-cases/template-use-cases.js";
+import { createMonthlyCyclePrismaAdapters, createMonthlyCyclePrismaTransactionRunner } from "./infrastructure/prisma/monthly-cycle-prisma-adapters.js";
 import { createMonthlyCycleRouter } from "./routes.js";
 import type { MonthlyCycleDb } from "./shared/service-types.js";
 
@@ -19,8 +20,14 @@ export const createMonthlyCycleModule = (options: CreateMonthlyCycleModuleOption
     transactionRunner: createMonthlyCyclePrismaTransactionRunner(db),
   };
   const dependencies = Object.assign(db, ports);
-  const baseService = createMonthlyCycleService(dependencies);
-  const service = { ...baseService, ...options.service };
+  const templateUseCases = createTemplateUseCases(ports);
+  const compatibilityService = createMonthlyCycleService(dependencies, { templateUseCases });
+  const service = {
+    ...compatibilityService,
+    getTemplate: templateUseCases.getTemplate,
+    updateTemplate: templateUseCases.updateTemplate,
+    ...options.service,
+  };
 
   return {
     router: createMonthlyCycleRouter(service),
