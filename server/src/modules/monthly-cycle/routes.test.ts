@@ -201,6 +201,73 @@ test("monthlyCycleRouter delegates template, month lifecycle, and pocket deposit
   }
 });
 
+test("monthlyCycleRouter preserves PUT /api/template payload and response contract", async () => {
+  const calls: unknown[] = [];
+  const server = createTestServer({
+    async updateTemplate(input: unknown) {
+      calls.push(input);
+      return {
+        categories: [
+          {
+            id: "cat-template",
+            name: "Template",
+            sortOrder: 0,
+            subcategories: [
+              {
+                id: "sub-buffer",
+                name: "Buffer",
+                plannedAmount: 100,
+                defaultPocketId: "pocket-buffer",
+                active: true,
+                sortOrder: 0,
+              },
+            ],
+          },
+        ],
+      };
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/template`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        categories: [{ name: " Template ", subcategories: [{ name: " Buffer ", plannedAmount: 100, defaultPocketId: "pocket-buffer" }] }],
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      categories: [
+        {
+          id: "cat-template",
+          name: "Template",
+          sortOrder: 0,
+          subcategories: [
+            {
+              id: "sub-buffer",
+              name: "Buffer",
+              plannedAmount: 100,
+              defaultPocketId: "pocket-buffer",
+              active: true,
+              sortOrder: 0,
+            },
+          ],
+        },
+      ],
+    });
+    assert.deepEqual(calls, [
+      { categories: [{ name: "Template", subcategories: [{ name: "Buffer", plannedAmount: 100, defaultPocketId: "pocket-buffer" }] }] },
+    ]);
+  } finally {
+    server.close();
+  }
+});
+
 test("monthlyCycleRouter parses PATCH /api/months/:id/expenses/:expenseId and returns the updated month", async () => {
   const calls: unknown[] = [];
   const server = createTestServer({

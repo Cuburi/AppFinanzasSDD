@@ -1,6 +1,24 @@
 import { Router } from "express";
 
 import {
+  type BasicMonthlyReportView,
+  type CashSummaryView,
+  type ClosureActionInput,
+  type ClosureReviewView,
+  type CreateMonthCategoryInput,
+  type CreateMonthSubcategoryInput,
+  type CreateMonthlyIncomeInput,
+  type DepositToPocketInput,
+  type ExpenseHistoryQueryInput,
+  type ExpenseHistoryView,
+  type MonthView,
+  type OpenMonthInput,
+  type RecordExpenseInput,
+  type UpdateExpenseInput,
+  type UpdateMonthCategoryInput,
+  type UpdateMonthSubcategoryInput,
+  type UpdateMonthlyIncomeInput,
+  type WithdrawCashInput,
   parseCreateMonthlyIncomeInput,
   parseClosureActionInput,
   parseCreateMonthCategoryInput,
@@ -21,14 +39,41 @@ import {
   parseUpdateMonthSubcategoryInput,
   parseWithdrawCashInput,
 } from "./dto/index.js";
+import type { TemplateUseCases } from "./application/use-cases/template-use-cases.js";
 import { DomainError } from "./shared/service-errors.js";
-import type { MonthlyCycleService } from "./monthly-cycle.service.js";
 
 const isDomainError = (error: unknown): error is DomainError => error instanceof DomainError;
 
 const readMessage = (error: unknown) => (error instanceof Error ? error.message : "Unexpected error.");
 
-export type MonthlyCycleRouteService = MonthlyCycleService;
+export type TemplateRouteService = TemplateUseCases;
+
+type CompatibilityRouteService = {
+  openMonth(input: OpenMonthInput): Promise<MonthView>;
+  getActiveMonth(): Promise<MonthView | null>;
+  recordExpense(input: RecordExpenseInput): Promise<MonthView>;
+  updateExpense(input: UpdateExpenseInput): Promise<MonthView>;
+  deleteExpense(monthId: string, expenseId: string): Promise<MonthView>;
+  createMonthCategory(input: CreateMonthCategoryInput): Promise<MonthView>;
+  updateMonthCategory(input: UpdateMonthCategoryInput): Promise<MonthView>;
+  deleteMonthCategory(monthId: string, categoryId: string): Promise<MonthView>;
+  createMonthSubcategory(input: CreateMonthSubcategoryInput): Promise<MonthView>;
+  updateMonthSubcategory(input: UpdateMonthSubcategoryInput): Promise<MonthView>;
+  deleteMonthSubcategory(monthId: string, subcategoryId: string): Promise<MonthView>;
+  listExpenseHistory(input: ExpenseHistoryQueryInput): Promise<ExpenseHistoryView>;
+  getBasicReport(monthId: string): Promise<BasicMonthlyReportView>;
+  withdrawCash(input: WithdrawCashInput): Promise<{ month: MonthView }>;
+  getCashSummary(monthId: string): Promise<CashSummaryView>;
+  depositToPocket(input: DepositToPocketInput): Promise<MonthView | null>;
+  createMonthlyIncome(input: CreateMonthlyIncomeInput): Promise<MonthView>;
+  updateMonthlyIncome(input: UpdateMonthlyIncomeInput): Promise<MonthView>;
+  deleteMonthlyIncome(monthId: string, incomeId: string): Promise<MonthView>;
+  getClosureReview(monthId: string): Promise<ClosureReviewView>;
+  applyClosureAction(input: ClosureActionInput): Promise<ClosureReviewView>;
+  closeMonth(monthId: string): Promise<MonthView>;
+};
+
+export type MonthlyCycleRouteService = TemplateRouteService & CompatibilityRouteService;
 
 export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRouteService>) => {
   const service = routeService as MonthlyCycleRouteService;

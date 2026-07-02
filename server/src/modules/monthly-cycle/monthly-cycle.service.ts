@@ -1,3 +1,4 @@
+import { createTemplateUseCases, type TemplateUseCases } from "./application/use-cases/template-use-cases.js";
 import { createCashService } from "./workflows/cash-service.js";
 import { createClosureService, buildClosureReview } from "./workflows/closure-service.js";
 import { createExpenseHistoryService } from "./workflows/expense-history-service.js";
@@ -6,13 +7,16 @@ import { createMonthLifecycleService } from "./workflows/month-lifecycle-service
 import { createMonthStructureService } from "./workflows/month-structure-service.js";
 import { createMovementService } from "./workflows/movement-service.js";
 import { createReportsService } from "./workflows/reports-service.js";
-import { createTemplateService } from "./workflows/template-service.js";
 import type { MonthlyCycleDb } from "./shared/service-types.js";
-import type { MonthlyCycleWorkflowDependencies } from "./workflows/workflow-dependencies.js";
+import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflows/workflow-dependencies.js";
 
-export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDependencies) => {
+type CreateMonthlyCycleServiceOptions = {
+  templateUseCases?: TemplateUseCases;
+};
+
+export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDependencies, options: CreateMonthlyCycleServiceOptions = {}) => {
   const db = dependencies as MonthlyCycleDb;
-  const templateService = createTemplateService(dependencies);
+  const templateUseCases = options.templateUseCases ?? createTemplateUseCases(resolveMonthlyCyclePorts(dependencies));
   const monthLifecycleService = createMonthLifecycleService(dependencies);
   const movementService = createMovementService(dependencies);
   const incomeService = createIncomeService(db);
@@ -23,8 +27,8 @@ export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDepe
   const monthStructureService = createMonthStructureService(db);
 
   return {
-    getTemplate: templateService.getTemplate,
-    updateTemplate: templateService.updateTemplate,
+    getTemplate: templateUseCases.getTemplate,
+    updateTemplate: templateUseCases.updateTemplate,
     openMonth: monthLifecycleService.openMonth,
     getActiveMonth: monthLifecycleService.getActiveMonth,
     recordExpense: movementService.recordExpense,
