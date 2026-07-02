@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import express from "express";
 import test from "node:test";
 
@@ -73,4 +74,17 @@ test("monthly-cycle port scaffold names the initial explicit boundaries", () => 
     "pockets",
     "transactionRunner",
   ]);
+});
+
+test("monthly-cycle final wiring avoids service shim consumers in startup, routes, and module root", async () => {
+  const [indexSource, routesSource, moduleSource] = await Promise.all([
+    readFile(new URL("../../index.ts", import.meta.url), "utf8"),
+    readFile(new URL("./routes.ts", import.meta.url), "utf8"),
+    readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(indexSource, /createMonthlyCycleModule/);
+  assert.doesNotMatch(indexSource, /monthlyCycleRouter/);
+  assert.doesNotMatch(routesSource, /\.\/service\.js/);
+  assert.doesNotMatch(moduleSource, /\.\/service\.js/);
 });
