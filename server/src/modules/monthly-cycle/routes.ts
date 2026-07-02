@@ -21,34 +21,8 @@ import {
   parseUpdateMonthSubcategoryInput,
   parseWithdrawCashInput,
 } from "./dto/index.js";
-import {
-  DomainError,
-  applyClosureAction,
-  closeMonth,
-  createMonthCategory,
-  createMonthlyIncome,
-  createMonthSubcategory,
-  deleteExpense,
-  deleteMonthCategory,
-  deleteMonthlyIncome,
-  deleteMonthSubcategory,
-  depositToPocket,
-  getActiveMonth,
-  getClosureReview,
-  getCashSummary,
-  getBasicReport,
-  getTemplate,
-  listExpenseHistory,
-  openMonth,
-  recordExpense,
-  updateExpense,
-  updateMonthCategory,
-  withdrawCash,
-  updateMonthlyIncome,
-  updateMonthSubcategory,
-  updateTemplate,
-} from "./service.js";
-import type { MonthlyCycleService } from "./service.js";
+import { DomainError } from "./shared/service-errors.js";
+import type { MonthlyCycleService } from "./monthly-cycle.service.js";
 
 const isDomainError = (error: unknown): error is DomainError => error instanceof DomainError;
 
@@ -56,35 +30,8 @@ const readMessage = (error: unknown) => (error instanceof Error ? error.message 
 
 export type MonthlyCycleRouteService = MonthlyCycleService;
 
-const defaultMonthlyCycleRouteService: MonthlyCycleRouteService = {
-  getTemplate,
-  updateTemplate,
-  openMonth,
-  getActiveMonth,
-  recordExpense,
-  getBasicReport,
-  updateExpense,
-  deleteExpense,
-  createMonthCategory,
-  updateMonthCategory,
-  deleteMonthCategory,
-  createMonthSubcategory,
-  updateMonthSubcategory,
-  deleteMonthSubcategory,
-  listExpenseHistory,
-  withdrawCash,
-  getCashSummary,
-  createMonthlyIncome,
-  updateMonthlyIncome,
-  deleteMonthlyIncome,
-  depositToPocket,
-  getClosureReview,
-  applyClosureAction,
-  closeMonth,
-};
-
-export const createMonthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteService> = {}) => {
-  const service = { ...defaultMonthlyCycleRouteService, ...serviceOverrides };
+export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRouteService>) => {
+  const service = routeService as MonthlyCycleRouteService;
   const router = Router();
 
   router.get("/template", async (_request, response) => {

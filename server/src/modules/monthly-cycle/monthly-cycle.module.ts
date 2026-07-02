@@ -1,8 +1,8 @@
 import { prisma } from "../../lib/prisma.js";
 import { createMonthlyCyclePrismaAdapters, createMonthlyCyclePrismaTransactionRunner } from "./infrastructure/prisma/monthly-cycle-prisma-adapters.js";
+import { createMonthlyCycleService } from "./monthly-cycle.service.js";
+import type { MonthlyCycleService } from "./monthly-cycle.service.js";
 import { createMonthlyCycleRouter } from "./routes.js";
-import { createMonthlyCycleService } from "./service.js";
-import type { MonthlyCycleService } from "./service.js";
 import type { MonthlyCycleDb } from "./shared/service-types.js";
 
 type PrismaMonthlyCycleModuleDb = typeof prisma;
