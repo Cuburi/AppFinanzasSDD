@@ -159,7 +159,21 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       await db.movement.delete({ where: { id: movementId } });
     },
   },
-  incomes: {},
+  incomes: {
+    findById(incomeId) {
+      return db.monthlyIncome.findUnique({ where: { id: incomeId } });
+    },
+    async create(input) {
+      await db.monthlyIncome.create({ data: input });
+    },
+    async update(input) {
+      const { incomeId, ...data } = input;
+      await db.monthlyIncome.update({ where: { id: incomeId }, data });
+    },
+    async delete(incomeId) {
+      await db.monthlyIncome.delete({ where: { id: incomeId } });
+    },
+  },
   structure: {},
   pockets: {
     ensurePocketIsActive(pocketId, label) {

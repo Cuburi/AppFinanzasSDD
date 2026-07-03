@@ -32,7 +32,7 @@ test("template workflow updates through transaction-scoped ports instead of a Pr
   const txPorts: MonthlyCyclePrismaPortSet = {
     months: {} as MonthlyCyclePrismaPortSet["months"],
     movements: {} as MonthlyCyclePrismaPortSet["movements"],
-    incomes: {},
+    incomes: {} as MonthlyCyclePrismaPortSet["incomes"],
     structure: {},
     templates: {
       async readCategories() {
@@ -91,7 +91,7 @@ test("movement workflow validates pocket deposits through ports inside the trans
   const txPorts: MonthlyCyclePrismaPortSet = {
     months: {} as MonthlyCyclePrismaPortSet["months"],
     templates: {} as MonthlyCyclePrismaPortSet["templates"],
-    incomes: {},
+    incomes: {} as MonthlyCyclePrismaPortSet["incomes"],
     structure: {},
     pockets: {
       async ensurePocketIsActive(pocketId, label) {

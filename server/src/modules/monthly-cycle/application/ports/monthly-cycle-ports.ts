@@ -1,5 +1,5 @@
 import type { TemplateInput } from "../../dto/index.js";
-import type { MonthRecord, TemplateCategoryRecord } from "../../shared/service-types.js";
+import type { MonthRecord, MonthlyIncomeRecord, TemplateCategoryRecord } from "../../shared/service-types.js";
 import type { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../../lib/prisma-client.js";
 
 export const MONTHLY_CYCLE_PORT_NAMES = [
@@ -63,7 +63,12 @@ export interface MovementRepositoryPort {
   delete(movementId: string): Promise<void>;
 }
 
-export interface IncomeRepositoryPort {}
+export interface IncomeRepositoryPort {
+  findById(incomeId: string): Promise<MonthlyIncomeRecord | null>;
+  create(input: { monthId: string; sourceName: string; amount: Prisma.Decimal; receivedAt: Date; notes: string | null }): Promise<void>;
+  update(input: { incomeId: string; sourceName?: string; amount?: Prisma.Decimal; receivedAt?: Date; notes?: string | null }): Promise<void>;
+  delete(incomeId: string): Promise<void>;
+}
 
 export interface MonthStructureRepositoryPort {}
 
