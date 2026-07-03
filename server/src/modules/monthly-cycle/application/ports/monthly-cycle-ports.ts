@@ -61,6 +61,7 @@ export interface MovementRepositoryPort {
     sourceSubcategoryId: string;
   }): Promise<void>;
   delete(movementId: string): Promise<void>;
+  findCashLedgerEvents(monthId: string): Promise<MovementRecord[]>;
 }
 
 export interface IncomeRepositoryPort {

@@ -1,8 +1,8 @@
+import { createCashUseCases, type CashUseCases } from "./application/use-cases/cash-use-cases.js";
 import { createIncomeUseCases, type IncomeUseCases } from "./application/use-cases/income-use-cases.js";
 import { createLifecycleUseCases, type LifecycleUseCases } from "./application/use-cases/lifecycle-use-cases.js";
 import { createMovementUseCases, type MovementUseCases } from "./application/use-cases/movement-use-cases.js";
 import { createTemplateUseCases, type TemplateUseCases } from "./application/use-cases/template-use-cases.js";
-import { createCashService } from "./workflows/cash-service.js";
 import { createClosureService, buildClosureReview } from "./workflows/closure-service.js";
 import { createExpenseHistoryService } from "./workflows/expense-history-service.js";
 import { createMonthStructureService } from "./workflows/month-structure-service.js";
@@ -15,6 +15,7 @@ type CreateMonthlyCycleServiceOptions = {
   movementUseCases?: MovementUseCases;
   templateUseCases?: TemplateUseCases;
   incomeUseCases?: IncomeUseCases;
+  cashUseCases?: CashUseCases;
 };
 
 export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDependencies, options: CreateMonthlyCycleServiceOptions = {}) => {
@@ -24,8 +25,8 @@ export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDepe
   const movementUseCases = options.movementUseCases ?? createMovementUseCases(ports);
   const templateUseCases = options.templateUseCases ?? createTemplateUseCases(ports);
   const incomeUseCases = options.incomeUseCases ?? createIncomeUseCases(ports);
+  const cashUseCases = options.cashUseCases ?? createCashUseCases(ports);
   const closureService = createClosureService(db);
-  const cashService = createCashService(db);
   const expenseHistoryService = createExpenseHistoryService(db);
   const reportsService = createReportsService(db);
   const monthStructureService = createMonthStructureService(db);
@@ -46,8 +47,8 @@ export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDepe
     deleteMonthSubcategory: monthStructureService.deleteMonthSubcategory,
     listExpenseHistory: expenseHistoryService.listExpenseHistory,
     getBasicReport: reportsService.getBasicReport,
-    withdrawCash: cashService.withdrawCash,
-    getCashSummary: cashService.getCashSummary,
+    withdrawCash: cashUseCases.withdrawCash,
+    getCashSummary: cashUseCases.getCashSummary,
     depositToPocket: movementUseCases.depositToPocket,
     createMonthlyIncome: incomeUseCases.createMonthlyIncome,
     updateMonthlyIncome: incomeUseCases.updateMonthlyIncome,

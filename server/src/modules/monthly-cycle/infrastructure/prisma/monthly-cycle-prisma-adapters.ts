@@ -1,4 +1,4 @@
-import { MonthStatus, type MovementType, type PaymentMethod, type Prisma } from "../../../../lib/prisma-client.js";
+import { MonthStatus, MovementType, PaymentMethod, type Prisma } from "../../../../lib/prisma-client.js";
 import type { MonthlyCyclePorts } from "../../application/ports/monthly-cycle-ports.js";
 import { decimal } from "../../shared/money.js";
 import { DomainError } from "../../shared/service-errors.js";
@@ -157,6 +157,17 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
     },
     async delete(movementId) {
       await db.movement.delete({ where: { id: movementId } });
+    },
+    async findCashLedgerEvents(monthId) {
+      const movements = await db.movement.findMany({
+        where: { monthId, type: { in: [MovementType.CASH_WITHDRAWAL, MovementType.CASH_CARRYOVER_IN, MovementType.EXPENSE] } },
+        orderBy: { occurredAt: "asc" },
+      });
+
+      return movements.filter(
+        (movement) =>
+          movement.type === MovementType.CASH_WITHDRAWAL || movement.type === MovementType.CASH_CARRYOVER_IN || movement.paymentMethod === PaymentMethod.CASH,
+      );
     },
   },
   incomes: {
