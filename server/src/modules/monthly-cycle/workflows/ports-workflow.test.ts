@@ -108,6 +108,9 @@ test("movement workflow validates pocket deposits through ports inside the trans
       },
       async updateExpense() {},
       async delete() {},
+      async findCashLedgerEvents() {
+        return [];
+      },
     },
   };
   const service = createMovementService({

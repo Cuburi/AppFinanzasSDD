@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import type { MonthlyCycleService } from "./monthly-cycle.service.js";
 import { createMonthlyCycleService } from "./monthly-cycle.service.js";
+import { createCashUseCases } from "./application/use-cases/cash-use-cases.js";
 import { createIncomeUseCases } from "./application/use-cases/income-use-cases.js";
 import { createLifecycleUseCases } from "./application/use-cases/lifecycle-use-cases.js";
 import { createMovementUseCases } from "./application/use-cases/movement-use-cases.js";
@@ -27,7 +28,8 @@ export const createMonthlyCycleModule = (options: CreateMonthlyCycleModuleOption
   const movementUseCases = createMovementUseCases(ports);
   const templateUseCases = createTemplateUseCases(ports);
   const incomeUseCases = createIncomeUseCases(ports);
-  const compatibilityService = createMonthlyCycleService(dependencies, { lifecycleUseCases, movementUseCases, templateUseCases, incomeUseCases });
+  const cashUseCases = createCashUseCases(ports);
+  const compatibilityService = createMonthlyCycleService(dependencies, { lifecycleUseCases, movementUseCases, templateUseCases, incomeUseCases, cashUseCases });
   const service = {
     ...compatibilityService,
     openMonth: lifecycleUseCases.openMonth,
@@ -42,6 +44,8 @@ export const createMonthlyCycleModule = (options: CreateMonthlyCycleModuleOption
     createMonthlyIncome: incomeUseCases.createMonthlyIncome,
     updateMonthlyIncome: incomeUseCases.updateMonthlyIncome,
     deleteMonthlyIncome: incomeUseCases.deleteMonthlyIncome,
+    withdrawCash: cashUseCases.withdrawCash,
+    getCashSummary: cashUseCases.getCashSummary,
     ...options.service,
   };
 
