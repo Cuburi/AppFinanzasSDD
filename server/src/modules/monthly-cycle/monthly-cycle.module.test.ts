@@ -104,3 +104,18 @@ test("template application use cases are composed by the module root and exposed
   assert.doesNotMatch(routesSource, /\.\/monthly-cycle\.service\.js/);
   assert.doesNotMatch(compatibilityServiceSource, /createTemplateService/);
 });
+
+test("lifecycle and movement use cases are composed by the module root without broadening the route boundary", async () => {
+  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+    readFile(new URL("./routes.ts", import.meta.url), "utf8"),
+    readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
+    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(moduleSource, /createLifecycleUseCases/);
+  assert.match(moduleSource, /createMovementUseCases/);
+  assert.match(routesSource, /LifecycleRouteService/);
+  assert.match(routesSource, /MovementRouteService/);
+  assert.doesNotMatch(compatibilityServiceSource, /createMonthLifecycleService/);
+  assert.doesNotMatch(compatibilityServiceSource, /createMovementService/);
+});

@@ -1,24 +1,27 @@
+import { createLifecycleUseCases, type LifecycleUseCases } from "./application/use-cases/lifecycle-use-cases.js";
+import { createMovementUseCases, type MovementUseCases } from "./application/use-cases/movement-use-cases.js";
 import { createTemplateUseCases, type TemplateUseCases } from "./application/use-cases/template-use-cases.js";
 import { createCashService } from "./workflows/cash-service.js";
 import { createClosureService, buildClosureReview } from "./workflows/closure-service.js";
 import { createExpenseHistoryService } from "./workflows/expense-history-service.js";
 import { createIncomeService } from "./workflows/income-service.js";
-import { createMonthLifecycleService } from "./workflows/month-lifecycle-service.js";
 import { createMonthStructureService } from "./workflows/month-structure-service.js";
-import { createMovementService } from "./workflows/movement-service.js";
 import { createReportsService } from "./workflows/reports-service.js";
 import type { MonthlyCycleDb } from "./shared/service-types.js";
 import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflows/workflow-dependencies.js";
 
 type CreateMonthlyCycleServiceOptions = {
+  lifecycleUseCases?: LifecycleUseCases;
+  movementUseCases?: MovementUseCases;
   templateUseCases?: TemplateUseCases;
 };
 
 export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDependencies, options: CreateMonthlyCycleServiceOptions = {}) => {
   const db = dependencies as MonthlyCycleDb;
-  const templateUseCases = options.templateUseCases ?? createTemplateUseCases(resolveMonthlyCyclePorts(dependencies));
-  const monthLifecycleService = createMonthLifecycleService(dependencies);
-  const movementService = createMovementService(dependencies);
+  const ports = resolveMonthlyCyclePorts(dependencies);
+  const lifecycleUseCases = options.lifecycleUseCases ?? createLifecycleUseCases(ports);
+  const movementUseCases = options.movementUseCases ?? createMovementUseCases(ports);
+  const templateUseCases = options.templateUseCases ?? createTemplateUseCases(ports);
   const incomeService = createIncomeService(db);
   const closureService = createClosureService(db);
   const cashService = createCashService(db);
@@ -29,11 +32,11 @@ export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDepe
   return {
     getTemplate: templateUseCases.getTemplate,
     updateTemplate: templateUseCases.updateTemplate,
-    openMonth: monthLifecycleService.openMonth,
-    getActiveMonth: monthLifecycleService.getActiveMonth,
-    recordExpense: movementService.recordExpense,
-    updateExpense: movementService.updateExpense,
-    deleteExpense: movementService.deleteExpense,
+    openMonth: lifecycleUseCases.openMonth,
+    getActiveMonth: lifecycleUseCases.getActiveMonth,
+    recordExpense: movementUseCases.recordExpense,
+    updateExpense: movementUseCases.updateExpense,
+    deleteExpense: movementUseCases.deleteExpense,
     createMonthCategory: monthStructureService.createMonthCategory,
     updateMonthCategory: monthStructureService.updateMonthCategory,
     deleteMonthCategory: monthStructureService.deleteMonthCategory,
@@ -44,13 +47,13 @@ export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDepe
     getBasicReport: reportsService.getBasicReport,
     withdrawCash: cashService.withdrawCash,
     getCashSummary: cashService.getCashSummary,
-    depositToPocket: movementService.depositToPocket,
+    depositToPocket: movementUseCases.depositToPocket,
     createMonthlyIncome: incomeService.createMonthlyIncome,
     updateMonthlyIncome: incomeService.updateMonthlyIncome,
     deleteMonthlyIncome: incomeService.deleteMonthlyIncome,
     getClosureReview: closureService.getClosureReview,
     applyClosureAction: closureService.applyClosureAction,
-    closeMonth: (monthId: string) => monthLifecycleService.closeMonth(monthId, buildClosureReview),
+    closeMonth: (monthId: string) => lifecycleUseCases.closeMonth(monthId, buildClosureReview),
   };
 };
 

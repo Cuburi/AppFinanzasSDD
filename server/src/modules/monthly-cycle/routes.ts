@@ -39,6 +39,8 @@ import {
   parseUpdateMonthSubcategoryInput,
   parseWithdrawCashInput,
 } from "./dto/index.js";
+import type { LifecycleUseCases } from "./application/use-cases/lifecycle-use-cases.js";
+import type { MovementUseCases } from "./application/use-cases/movement-use-cases.js";
 import type { TemplateUseCases } from "./application/use-cases/template-use-cases.js";
 import { DomainError } from "./shared/service-errors.js";
 
@@ -47,13 +49,12 @@ const isDomainError = (error: unknown): error is DomainError => error instanceof
 const readMessage = (error: unknown) => (error instanceof Error ? error.message : "Unexpected error.");
 
 export type TemplateRouteService = TemplateUseCases;
+export type LifecycleRouteService = Pick<LifecycleUseCases, "openMonth" | "getActiveMonth"> & {
+  closeMonth(monthId: string): Promise<MonthView>;
+};
+export type MovementRouteService = MovementUseCases;
 
 type CompatibilityRouteService = {
-  openMonth(input: OpenMonthInput): Promise<MonthView>;
-  getActiveMonth(): Promise<MonthView | null>;
-  recordExpense(input: RecordExpenseInput): Promise<MonthView>;
-  updateExpense(input: UpdateExpenseInput): Promise<MonthView>;
-  deleteExpense(monthId: string, expenseId: string): Promise<MonthView>;
   createMonthCategory(input: CreateMonthCategoryInput): Promise<MonthView>;
   updateMonthCategory(input: UpdateMonthCategoryInput): Promise<MonthView>;
   deleteMonthCategory(monthId: string, categoryId: string): Promise<MonthView>;
@@ -64,16 +65,14 @@ type CompatibilityRouteService = {
   getBasicReport(monthId: string): Promise<BasicMonthlyReportView>;
   withdrawCash(input: WithdrawCashInput): Promise<{ month: MonthView }>;
   getCashSummary(monthId: string): Promise<CashSummaryView>;
-  depositToPocket(input: DepositToPocketInput): Promise<MonthView | null>;
   createMonthlyIncome(input: CreateMonthlyIncomeInput): Promise<MonthView>;
   updateMonthlyIncome(input: UpdateMonthlyIncomeInput): Promise<MonthView>;
   deleteMonthlyIncome(monthId: string, incomeId: string): Promise<MonthView>;
   getClosureReview(monthId: string): Promise<ClosureReviewView>;
   applyClosureAction(input: ClosureActionInput): Promise<ClosureReviewView>;
-  closeMonth(monthId: string): Promise<MonthView>;
 };
 
-export type MonthlyCycleRouteService = TemplateRouteService & CompatibilityRouteService;
+export type MonthlyCycleRouteService = TemplateRouteService & LifecycleRouteService & MovementRouteService & CompatibilityRouteService;
 
 export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRouteService>) => {
   const service = routeService as MonthlyCycleRouteService;
