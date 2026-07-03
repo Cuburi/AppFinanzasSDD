@@ -2,9 +2,11 @@ import { prisma } from "../../lib/prisma.js";
 import type { MonthlyCycleService } from "./monthly-cycle.service.js";
 import { createMonthlyCycleService } from "./monthly-cycle.service.js";
 import { createCashUseCases } from "./application/use-cases/cash-use-cases.js";
+import { createExpenseHistoryUseCases } from "./application/use-cases/expense-history-use-cases.js";
 import { createIncomeUseCases } from "./application/use-cases/income-use-cases.js";
 import { createLifecycleUseCases } from "./application/use-cases/lifecycle-use-cases.js";
 import { createMovementUseCases } from "./application/use-cases/movement-use-cases.js";
+import { createReportsUseCases } from "./application/use-cases/reports-use-cases.js";
 import { createTemplateUseCases } from "./application/use-cases/template-use-cases.js";
 import { createMonthlyCyclePrismaAdapters, createMonthlyCyclePrismaTransactionRunner } from "./infrastructure/prisma/monthly-cycle-prisma-adapters.js";
 import { createMonthlyCycleRouter } from "./routes.js";
@@ -29,7 +31,9 @@ export const createMonthlyCycleModule = (options: CreateMonthlyCycleModuleOption
   const templateUseCases = createTemplateUseCases(ports);
   const incomeUseCases = createIncomeUseCases(ports);
   const cashUseCases = createCashUseCases(ports);
-  const compatibilityService = createMonthlyCycleService(dependencies, { lifecycleUseCases, movementUseCases, templateUseCases, incomeUseCases, cashUseCases });
+  const reportsUseCases = createReportsUseCases(ports);
+  const expenseHistoryUseCases = createExpenseHistoryUseCases(ports);
+  const compatibilityService = createMonthlyCycleService(dependencies, { lifecycleUseCases, movementUseCases, templateUseCases, incomeUseCases, cashUseCases, reportsUseCases, expenseHistoryUseCases });
   const service = {
     ...compatibilityService,
     openMonth: lifecycleUseCases.openMonth,
@@ -46,6 +50,8 @@ export const createMonthlyCycleModule = (options: CreateMonthlyCycleModuleOption
     deleteMonthlyIncome: incomeUseCases.deleteMonthlyIncome,
     withdrawCash: cashUseCases.withdrawCash,
     getCashSummary: cashUseCases.getCashSummary,
+    getBasicReport: reportsUseCases.getBasicReport,
+    listExpenseHistory: expenseHistoryUseCases.listExpenseHistory,
     ...options.service,
   };
 

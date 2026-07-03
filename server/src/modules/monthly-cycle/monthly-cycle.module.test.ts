@@ -143,3 +143,18 @@ test("cash use cases are composed by the module root without broadening the rout
   assert.match(routesSource, /CashRouteService/);
   assert.doesNotMatch(compatibilityServiceSource, /createCashService/);
 });
+
+test("reports and expense-history use cases are composed by the module root without broadening the route boundary", async () => {
+  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+    readFile(new URL("./routes.ts", import.meta.url), "utf8"),
+    readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
+    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(moduleSource, /createReportsUseCases/);
+  assert.match(moduleSource, /createExpenseHistoryUseCases/);
+  assert.match(routesSource, /ReportsRouteService/);
+  assert.match(routesSource, /ExpenseHistoryRouteService/);
+  assert.doesNotMatch(compatibilityServiceSource, /createReportsService/);
+  assert.doesNotMatch(compatibilityServiceSource, /createExpenseHistoryService/);
+});
