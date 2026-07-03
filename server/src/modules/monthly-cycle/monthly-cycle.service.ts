@@ -1,12 +1,12 @@
 import { createCashUseCases, type CashUseCases } from "./application/use-cases/cash-use-cases.js";
+import { createExpenseHistoryUseCases, type ExpenseHistoryUseCases } from "./application/use-cases/expense-history-use-cases.js";
 import { createIncomeUseCases, type IncomeUseCases } from "./application/use-cases/income-use-cases.js";
 import { createLifecycleUseCases, type LifecycleUseCases } from "./application/use-cases/lifecycle-use-cases.js";
 import { createMovementUseCases, type MovementUseCases } from "./application/use-cases/movement-use-cases.js";
+import { createReportsUseCases, type ReportsUseCases } from "./application/use-cases/reports-use-cases.js";
 import { createTemplateUseCases, type TemplateUseCases } from "./application/use-cases/template-use-cases.js";
 import { createClosureService, buildClosureReview } from "./workflows/closure-service.js";
-import { createExpenseHistoryService } from "./workflows/expense-history-service.js";
 import { createMonthStructureService } from "./workflows/month-structure-service.js";
-import { createReportsService } from "./workflows/reports-service.js";
 import type { MonthlyCycleDb } from "./shared/service-types.js";
 import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflows/workflow-dependencies.js";
 
@@ -16,6 +16,8 @@ type CreateMonthlyCycleServiceOptions = {
   templateUseCases?: TemplateUseCases;
   incomeUseCases?: IncomeUseCases;
   cashUseCases?: CashUseCases;
+  reportsUseCases?: ReportsUseCases;
+  expenseHistoryUseCases?: ExpenseHistoryUseCases;
 };
 
 export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDependencies, options: CreateMonthlyCycleServiceOptions = {}) => {
@@ -26,9 +28,9 @@ export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDepe
   const templateUseCases = options.templateUseCases ?? createTemplateUseCases(ports);
   const incomeUseCases = options.incomeUseCases ?? createIncomeUseCases(ports);
   const cashUseCases = options.cashUseCases ?? createCashUseCases(ports);
+  const reportsUseCases = options.reportsUseCases ?? createReportsUseCases(ports);
+  const expenseHistoryUseCases = options.expenseHistoryUseCases ?? createExpenseHistoryUseCases(ports);
   const closureService = createClosureService(db);
-  const expenseHistoryService = createExpenseHistoryService(db);
-  const reportsService = createReportsService(db);
   const monthStructureService = createMonthStructureService(db);
 
   return {
@@ -45,8 +47,8 @@ export const createMonthlyCycleService = (dependencies: MonthlyCycleWorkflowDepe
     createMonthSubcategory: monthStructureService.createMonthSubcategory,
     updateMonthSubcategory: monthStructureService.updateMonthSubcategory,
     deleteMonthSubcategory: monthStructureService.deleteMonthSubcategory,
-    listExpenseHistory: expenseHistoryService.listExpenseHistory,
-    getBasicReport: reportsService.getBasicReport,
+    listExpenseHistory: expenseHistoryUseCases.listExpenseHistory,
+    getBasicReport: reportsUseCases.getBasicReport,
     withdrawCash: cashUseCases.withdrawCash,
     getCashSummary: cashUseCases.getCashSummary,
     depositToPocket: movementUseCases.depositToPocket,

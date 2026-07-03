@@ -1,4 +1,4 @@
-import type { TemplateInput } from "../../dto/index.js";
+import type { ExpenseHistoryQueryInput, TemplateInput } from "../../dto/index.js";
 import type { MonthRecord, MonthlyIncomeRecord, TemplateCategoryRecord } from "../../shared/service-types.js";
 import type { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../../lib/prisma-client.js";
 
@@ -61,6 +61,7 @@ export interface MovementRepositoryPort {
     sourceSubcategoryId: string;
   }): Promise<void>;
   delete(movementId: string): Promise<void>;
+  findExpenseHistory(input: ExpenseHistoryQueryInput): Promise<MovementRecord[]>;
   findCashLedgerEvents(monthId: string): Promise<MovementRecord[]>;
 }
 

@@ -158,6 +158,25 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
     async delete(movementId) {
       await db.movement.delete({ where: { id: movementId } });
     },
+    findExpenseHistory(input) {
+      return db.movement.findMany({
+        where: {
+          monthId: input.monthId,
+          type: MovementType.EXPENSE,
+          ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
+          ...(input.subcategoryId ? { sourceSubcategoryId: input.subcategoryId } : {}),
+          ...(input.from || input.to
+            ? {
+                occurredAt: {
+                  ...(input.from ? { gte: new Date(input.from) } : {}),
+                  ...(input.to ? { lte: new Date(input.to) } : {}),
+                },
+              }
+            : {}),
+        },
+        orderBy: { occurredAt: "desc" },
+      });
+    },
     async findCashLedgerEvents(monthId) {
       const movements = await db.movement.findMany({
         where: { monthId, type: { in: [MovementType.CASH_WITHDRAWAL, MovementType.CASH_CARRYOVER_IN, MovementType.EXPENSE] } },
