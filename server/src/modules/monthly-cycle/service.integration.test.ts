@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../lib/prisma-client.js";
 
-import { createMonthlyCycleService, DomainError } from "./service.js";
+import { createMonthlyCycleService } from "./monthly-cycle.service.js";
+import { DomainError } from "./shared/service-errors.js";
 
 const money = (value: number) => new Prisma.Decimal(value.toFixed(2));
 

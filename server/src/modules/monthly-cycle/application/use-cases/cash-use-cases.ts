@@ -1,4 +1,3 @@
-import { MovementType } from "../../../../lib/prisma-client.js";
 import type { CashSummaryView, MonthView, WithdrawCashInput } from "../../dto/index.js";
 import { mapCashSummary, mapMonth } from "../../mappers/monthly-cycle-mappers.js";
 import { assertOccurredAtWithinMonth } from "../../shared/cash-ledger.js";
@@ -7,7 +6,7 @@ import { decimal } from "../../shared/money.js";
 import { DomainError } from "../../shared/service-errors.js";
 import { calculateMonthBalances } from "../../balance-calculator.js";
 import type { MonthRecord } from "../../shared/service-types.js";
-import type { MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
+import { MovementType, type MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 
 export const CASH_USE_CASE_NAMES = ["withdrawCash", "getCashSummary"] as const;
 

@@ -1,6 +1,34 @@
 import type { ExpenseHistoryQueryInput, TemplateInput } from "../../dto/index.js";
 import type { MonthRecord, MonthlyIncomeRecord, TemplateCategoryRecord } from "../../shared/service-types.js";
-import type { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../../lib/prisma-client.js";
+
+export const MonthStatus = {
+  ACTIVE: "ACTIVE",
+  CLOSED: "CLOSED",
+} as const;
+
+export type MonthStatus = (typeof MonthStatus)[keyof typeof MonthStatus];
+
+export const MovementType = {
+  EXPENSE: "EXPENSE",
+  CASH_WITHDRAWAL: "CASH_WITHDRAWAL",
+  CASH_CARRYOVER_IN: "CASH_CARRYOVER_IN",
+  POCKET_DEPOSIT_FROM_SUBCATEGORY: "POCKET_DEPOSIT_FROM_SUBCATEGORY",
+  POCKET_DEPOSIT_EXTERNAL: "POCKET_DEPOSIT_EXTERNAL",
+  SURPLUS_TO_POCKET_ON_CLOSE: "SURPLUS_TO_POCKET_ON_CLOSE",
+  DEFICIT_COVER_FROM_SUBCATEGORY: "DEFICIT_COVER_FROM_SUBCATEGORY",
+  DEFICIT_COVER_FROM_POCKET: "DEFICIT_COVER_FROM_POCKET",
+} as const;
+
+export type MovementType = (typeof MovementType)[keyof typeof MovementType];
+
+export const PaymentMethod = {
+  NON_CASH: "NON_CASH",
+  CASH: "CASH",
+} as const;
+
+export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
+
+export type MonthlyCycleMoney = { toString(): string };
 
 export const MONTHLY_CYCLE_PORT_NAMES = [
   "months",
@@ -42,7 +70,7 @@ export interface MovementRepositoryPort {
   findById(movementId: string): Promise<MovementRecord | null>;
   create(args: {
     type: MovementType;
-    amount: Prisma.Decimal;
+    amount: MonthlyCycleMoney;
     description?: string | null;
     occurredAt?: Date;
     paymentMethod?: PaymentMethod | null;
@@ -55,7 +83,7 @@ export interface MovementRepositoryPort {
   }): Promise<void>;
   updateExpense(input: {
     expenseId: string;
-    amount: Prisma.Decimal;
+    amount: MonthlyCycleMoney;
     description?: string | null;
     occurredAt: Date;
     paymentMethod: PaymentMethod;
@@ -68,8 +96,8 @@ export interface MovementRepositoryPort {
 
 export interface IncomeRepositoryPort {
   findById(incomeId: string): Promise<MonthlyIncomeRecord | null>;
-  create(input: { monthId: string; sourceName: string; amount: Prisma.Decimal; receivedAt: Date; notes: string | null }): Promise<void>;
-  update(input: { incomeId: string; sourceName?: string; amount?: Prisma.Decimal; receivedAt?: Date; notes?: string | null }): Promise<void>;
+  create(input: { monthId: string; sourceName: string; amount: MonthlyCycleMoney; receivedAt: Date; notes: string | null }): Promise<void>;
+  update(input: { incomeId: string; sourceName?: string; amount?: MonthlyCycleMoney; receivedAt?: Date; notes?: string | null }): Promise<void>;
   delete(incomeId: string): Promise<void>;
 }
 
@@ -81,16 +109,16 @@ export interface MonthStructureRepositoryPort {
   createMonthSubcategory(input: {
     categoryId: string;
     name: string;
-    plannedAmount: Prisma.Decimal;
+    plannedAmount: MonthlyCycleMoney;
     defaultPocketId: string | null;
     templateSubcategoryId: string | null;
     sortOrder: number;
   }): Promise<{ id: string }>;
-  updateMonthSubcategory(input: { subcategoryId: string; name: string; plannedAmount: Prisma.Decimal; defaultPocketId?: string | null }): Promise<void>;
+  updateMonthSubcategory(input: { subcategoryId: string; name: string; plannedAmount: MonthlyCycleMoney; defaultPocketId?: string | null }): Promise<void>;
   linkMonthSubcategory(subcategoryId: string, templateSubcategoryId: string): Promise<void>;
   deleteMonthSubcategory(subcategoryId: string): Promise<void>;
   createTemplateCategory(input: { name: string; sortOrder: number }): Promise<{ id: string }>;
-  createTemplateSubcategory(input: { categoryId: string; name: string; plannedAmount: Prisma.Decimal; defaultPocketId: string | null; sortOrder: number }): Promise<{ id: string }>;
+  createTemplateSubcategory(input: { categoryId: string; name: string; plannedAmount: MonthlyCycleMoney; defaultPocketId: string | null; sortOrder: number }): Promise<{ id: string }>;
 }
 
 export interface PocketValidationPort {
