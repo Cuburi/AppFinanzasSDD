@@ -138,6 +138,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       monthId?: string | null;
       sourceSubcategoryId?: string | null;
       targetSubcategoryId?: string | null;
+      sourcePocketId?: string | null;
       targetPocketId?: string | null;
       externalSourceLabel?: string | null;
     }) {

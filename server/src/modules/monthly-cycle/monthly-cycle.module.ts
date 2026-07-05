@@ -2,6 +2,7 @@ import { prisma } from "../../lib/prisma.js";
 import type { MonthlyCycleService } from "./monthly-cycle.service.js";
 import { createMonthlyCycleService } from "./monthly-cycle.service.js";
 import { createCashUseCases } from "./application/use-cases/cash-use-cases.js";
+import { createClosureUseCases } from "./application/use-cases/closure-use-cases.js";
 import { createExpenseHistoryUseCases } from "./application/use-cases/expense-history-use-cases.js";
 import { createIncomeUseCases } from "./application/use-cases/income-use-cases.js";
 import { createLifecycleUseCases } from "./application/use-cases/lifecycle-use-cases.js";
@@ -33,12 +34,13 @@ export const createMonthlyCycleModule = (options: CreateMonthlyCycleModuleOption
   const cashUseCases = createCashUseCases(ports);
   const reportsUseCases = createReportsUseCases(ports);
   const expenseHistoryUseCases = createExpenseHistoryUseCases(ports);
-  const compatibilityService = createMonthlyCycleService(dependencies, { lifecycleUseCases, movementUseCases, templateUseCases, incomeUseCases, cashUseCases, reportsUseCases, expenseHistoryUseCases });
+  const closureUseCases = createClosureUseCases(ports);
+  const compatibilityService = createMonthlyCycleService(dependencies, { lifecycleUseCases, movementUseCases, templateUseCases, incomeUseCases, cashUseCases, reportsUseCases, expenseHistoryUseCases, closureUseCases });
   const service = {
     ...compatibilityService,
     openMonth: lifecycleUseCases.openMonth,
     getActiveMonth: lifecycleUseCases.getActiveMonth,
-    closeMonth: compatibilityService.closeMonth,
+    closeMonth: closureUseCases.closeMonth,
     recordExpense: movementUseCases.recordExpense,
     updateExpense: movementUseCases.updateExpense,
     deleteExpense: movementUseCases.deleteExpense,
@@ -52,6 +54,8 @@ export const createMonthlyCycleModule = (options: CreateMonthlyCycleModuleOption
     getCashSummary: cashUseCases.getCashSummary,
     getBasicReport: reportsUseCases.getBasicReport,
     listExpenseHistory: expenseHistoryUseCases.listExpenseHistory,
+    getClosureReview: closureUseCases.getClosureReview,
+    applyClosureAction: closureUseCases.applyClosureAction,
     ...options.service,
   };
 

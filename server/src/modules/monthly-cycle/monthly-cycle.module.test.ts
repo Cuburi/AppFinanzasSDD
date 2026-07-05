@@ -158,3 +158,17 @@ test("reports and expense-history use cases are composed by the module root with
   assert.doesNotMatch(compatibilityServiceSource, /createReportsService/);
   assert.doesNotMatch(compatibilityServiceSource, /createExpenseHistoryService/);
 });
+
+test("closure use cases are composed by the module root without broadening the route boundary", async () => {
+  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+    readFile(new URL("./routes.ts", import.meta.url), "utf8"),
+    readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
+    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(moduleSource, /createClosureUseCases/);
+  assert.match(routesSource, /ClosureRouteService/);
+  assert.doesNotMatch(routesSource, /getClosureReview\(monthId: string\)/);
+  assert.doesNotMatch(routesSource, /applyClosureAction\(input: ClosureActionInput\)/);
+  assert.doesNotMatch(compatibilityServiceSource, /createClosureService/);
+});

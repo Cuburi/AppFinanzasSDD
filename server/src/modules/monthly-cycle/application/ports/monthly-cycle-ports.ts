@@ -49,6 +49,7 @@ export interface MovementRepositoryPort {
     monthId?: string | null;
     sourceSubcategoryId?: string | null;
     targetSubcategoryId?: string | null;
+    sourcePocketId?: string | null;
     targetPocketId?: string | null;
     externalSourceLabel?: string | null;
   }): Promise<void>;

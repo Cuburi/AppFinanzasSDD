@@ -2,8 +2,6 @@ import { Router } from "express";
 
 import {
   type BasicMonthlyReportView,
-  type ClosureActionInput,
-  type ClosureReviewView,
   type CreateMonthCategoryInput,
   type CreateMonthSubcategoryInput,
   type CreateMonthlyIncomeInput,
@@ -42,6 +40,7 @@ import type { MovementUseCases } from "./application/use-cases/movement-use-case
 import type { TemplateUseCases } from "./application/use-cases/template-use-cases.js";
 import type { IncomeUseCases } from "./application/use-cases/income-use-cases.js";
 import type { CashUseCases } from "./application/use-cases/cash-use-cases.js";
+import type { ClosureUseCases } from "./application/use-cases/closure-use-cases.js";
 import type { ReportsUseCases } from "./application/use-cases/reports-use-cases.js";
 import type { ExpenseHistoryUseCases } from "./application/use-cases/expense-history-use-cases.js";
 import { DomainError } from "./shared/service-errors.js";
@@ -53,11 +52,10 @@ const readMessage = (error: unknown) => (error instanceof Error ? error.message 
 export type TemplateRouteService = TemplateUseCases;
 export type IncomeRouteService = IncomeUseCases;
 export type CashRouteService = CashUseCases;
+export type ClosureRouteService = ClosureUseCases;
 export type ReportsRouteService = ReportsUseCases;
 export type ExpenseHistoryRouteService = ExpenseHistoryUseCases;
-export type LifecycleRouteService = Pick<LifecycleUseCases, "openMonth" | "getActiveMonth"> & {
-  closeMonth(monthId: string): Promise<MonthView>;
-};
+export type LifecycleRouteService = Pick<LifecycleUseCases, "openMonth" | "getActiveMonth">;
 export type MovementRouteService = MovementUseCases;
 
 type CompatibilityRouteService = {
@@ -67,11 +65,9 @@ type CompatibilityRouteService = {
   createMonthSubcategory(input: CreateMonthSubcategoryInput): Promise<MonthView>;
   updateMonthSubcategory(input: UpdateMonthSubcategoryInput): Promise<MonthView>;
   deleteMonthSubcategory(monthId: string, subcategoryId: string): Promise<MonthView>;
-  getClosureReview(monthId: string): Promise<ClosureReviewView>;
-  applyClosureAction(input: ClosureActionInput): Promise<ClosureReviewView>;
 };
 
-export type MonthlyCycleRouteService = TemplateRouteService & IncomeRouteService & CashRouteService & ReportsRouteService & ExpenseHistoryRouteService & LifecycleRouteService & MovementRouteService & CompatibilityRouteService;
+export type MonthlyCycleRouteService = TemplateRouteService & IncomeRouteService & CashRouteService & ClosureRouteService & ReportsRouteService & ExpenseHistoryRouteService & LifecycleRouteService & MovementRouteService & CompatibilityRouteService;
 
 export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRouteService>) => {
   const service = routeService as MonthlyCycleRouteService;
