@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import express from "express";
 import test from "node:test";
 
@@ -42,12 +42,13 @@ const request = async (server: ReturnType<typeof createTestServer>, path: string
 
 test("createMonthlyCycleModule exposes router and service from explicit service wiring", async () => {
   const calls: string[] = [];
+  const getBasicReport = async (monthId: string) => {
+    calls.push(monthId);
+    return report;
+  };
   const module = createMonthlyCycleModule({
     service: {
-      async getBasicReport(monthId: string) {
-        calls.push(monthId);
-        return report;
-      },
+      getBasicReport,
     },
   });
   const server = createTestServer(module.router);
@@ -57,7 +58,7 @@ test("createMonthlyCycleModule exposes router and service from explicit service 
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), report);
-    assert.equal(module.service.getBasicReport, module.service.getBasicReport);
+    assert.equal(module.service.getBasicReport, getBasicReport);
     assert.deepEqual(calls, ["month-1"]);
   } finally {
     server.close();
@@ -171,4 +172,32 @@ test("closure use cases are composed by the module root without broadening the r
   assert.doesNotMatch(routesSource, /getClosureReview\(monthId: string\)/);
   assert.doesNotMatch(routesSource, /applyClosureAction\(input: ClosureActionInput\)/);
   assert.doesNotMatch(compatibilityServiceSource, /createClosureService/);
+});
+
+test("month-structure use cases are composed by the module root without broadening the route boundary", async () => {
+  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+    readFile(new URL("./routes.ts", import.meta.url), "utf8"),
+    readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
+    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(moduleSource, /createMonthStructureUseCases/);
+  assert.match(routesSource, /MonthStructureRouteService/);
+  assert.doesNotMatch(routesSource, /type CompatibilityRouteService = \{/);
+  assert.doesNotMatch(compatibilityServiceSource, /createMonthStructureService/);
+});
+
+test("obsolete compatibility workflows without active consumers are removed", async () => {
+  const obsoleteWorkflowPaths = [
+    "./workflows/cash-service.ts",
+    "./workflows/closure-service.ts",
+    "./workflows/expense-history-service.ts",
+    "./workflows/income-service.ts",
+    "./workflows/month-structure-service.ts",
+    "./workflows/reports-service.ts",
+  ];
+
+  for (const workflowPath of obsoleteWorkflowPaths) {
+    await assert.rejects(() => access(new URL(workflowPath, import.meta.url)), { code: "ENOENT" });
+  }
 });

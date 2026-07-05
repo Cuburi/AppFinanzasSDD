@@ -205,7 +205,62 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       await db.monthlyIncome.delete({ where: { id: incomeId } });
     },
   },
-  structure: {},
+  structure: {
+    createMonthCategory(input) {
+      return db.monthCategory.create({ data: { monthId: input.monthId, name: input.name, sortOrder: input.sortOrder, templateCategoryId: input.templateCategoryId } });
+    },
+    async updateMonthCategory(input) {
+      await db.monthCategory.update({ where: { id: input.categoryId }, data: { name: input.name } });
+    },
+    async linkMonthCategory(categoryId, templateCategoryId) {
+      await db.monthCategory.update({ where: { id: categoryId }, data: { templateCategoryId } });
+    },
+    async deleteMonthCategory(categoryId) {
+      await db.monthCategory.delete({ where: { id: categoryId } });
+    },
+    createMonthSubcategory(input) {
+      return db.monthSubcategory.create({
+        data: {
+          monthCategoryId: input.categoryId,
+          name: input.name,
+          plannedAmount: input.plannedAmount,
+          defaultPocketId: input.defaultPocketId,
+          templateSubcategoryId: input.templateSubcategoryId,
+          sortOrder: input.sortOrder,
+        },
+      });
+    },
+    async updateMonthSubcategory(input) {
+      await db.monthSubcategory.update({
+        where: { id: input.subcategoryId },
+        data: {
+          name: input.name,
+          plannedAmount: input.plannedAmount,
+          ...(input.defaultPocketId !== undefined ? { defaultPocketId: input.defaultPocketId } : {}),
+        },
+      });
+    },
+    async linkMonthSubcategory(subcategoryId, templateSubcategoryId) {
+      await db.monthSubcategory.update({ where: { id: subcategoryId }, data: { templateSubcategoryId } });
+    },
+    async deleteMonthSubcategory(subcategoryId) {
+      await db.monthSubcategory.delete({ where: { id: subcategoryId } });
+    },
+    createTemplateCategory(input) {
+      return db.templateCategory.create({ data: { name: input.name, sortOrder: input.sortOrder, subcategories: { create: [] } } });
+    },
+    createTemplateSubcategory(input) {
+      return db.templateSubcategory.create({
+        data: {
+          categoryId: input.categoryId,
+          name: input.name,
+          plannedAmount: input.plannedAmount,
+          defaultPocketId: input.defaultPocketId,
+          sortOrder: input.sortOrder,
+        },
+      });
+    },
+  },
   pockets: {
     ensurePocketIsActive(pocketId, label) {
       return ensurePocketIsActive(db, pocketId, label);

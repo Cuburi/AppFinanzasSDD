@@ -6,6 +6,7 @@ import { createClosureUseCases } from "./application/use-cases/closure-use-cases
 import { createExpenseHistoryUseCases } from "./application/use-cases/expense-history-use-cases.js";
 import { createIncomeUseCases } from "./application/use-cases/income-use-cases.js";
 import { createLifecycleUseCases } from "./application/use-cases/lifecycle-use-cases.js";
+import { createMonthStructureUseCases } from "./application/use-cases/month-structure-use-cases.js";
 import { createMovementUseCases } from "./application/use-cases/movement-use-cases.js";
 import { createReportsUseCases } from "./application/use-cases/reports-use-cases.js";
 import { createTemplateUseCases } from "./application/use-cases/template-use-cases.js";
@@ -35,7 +36,8 @@ export const createMonthlyCycleModule = (options: CreateMonthlyCycleModuleOption
   const reportsUseCases = createReportsUseCases(ports);
   const expenseHistoryUseCases = createExpenseHistoryUseCases(ports);
   const closureUseCases = createClosureUseCases(ports);
-  const compatibilityService = createMonthlyCycleService(dependencies, { lifecycleUseCases, movementUseCases, templateUseCases, incomeUseCases, cashUseCases, reportsUseCases, expenseHistoryUseCases, closureUseCases });
+  const monthStructureUseCases = createMonthStructureUseCases(ports);
+  const compatibilityService = createMonthlyCycleService(dependencies, { lifecycleUseCases, movementUseCases, templateUseCases, incomeUseCases, cashUseCases, reportsUseCases, expenseHistoryUseCases, closureUseCases, monthStructureUseCases });
   const service = {
     ...compatibilityService,
     openMonth: lifecycleUseCases.openMonth,
@@ -56,6 +58,12 @@ export const createMonthlyCycleModule = (options: CreateMonthlyCycleModuleOption
     listExpenseHistory: expenseHistoryUseCases.listExpenseHistory,
     getClosureReview: closureUseCases.getClosureReview,
     applyClosureAction: closureUseCases.applyClosureAction,
+    createMonthCategory: monthStructureUseCases.createMonthCategory,
+    updateMonthCategory: monthStructureUseCases.updateMonthCategory,
+    deleteMonthCategory: monthStructureUseCases.deleteMonthCategory,
+    createMonthSubcategory: monthStructureUseCases.createMonthSubcategory,
+    updateMonthSubcategory: monthStructureUseCases.updateMonthSubcategory,
+    deleteMonthSubcategory: monthStructureUseCases.deleteMonthSubcategory,
     ...options.service,
   };
 

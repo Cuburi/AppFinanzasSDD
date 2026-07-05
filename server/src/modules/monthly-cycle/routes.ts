@@ -43,6 +43,7 @@ import type { CashUseCases } from "./application/use-cases/cash-use-cases.js";
 import type { ClosureUseCases } from "./application/use-cases/closure-use-cases.js";
 import type { ReportsUseCases } from "./application/use-cases/reports-use-cases.js";
 import type { ExpenseHistoryUseCases } from "./application/use-cases/expense-history-use-cases.js";
+import type { MonthStructureUseCases } from "./application/use-cases/month-structure-use-cases.js";
 import { DomainError } from "./shared/service-errors.js";
 
 const isDomainError = (error: unknown): error is DomainError => error instanceof DomainError;
@@ -57,17 +58,9 @@ export type ReportsRouteService = ReportsUseCases;
 export type ExpenseHistoryRouteService = ExpenseHistoryUseCases;
 export type LifecycleRouteService = Pick<LifecycleUseCases, "openMonth" | "getActiveMonth">;
 export type MovementRouteService = MovementUseCases;
+export type MonthStructureRouteService = MonthStructureUseCases;
 
-type CompatibilityRouteService = {
-  createMonthCategory(input: CreateMonthCategoryInput): Promise<MonthView>;
-  updateMonthCategory(input: UpdateMonthCategoryInput): Promise<MonthView>;
-  deleteMonthCategory(monthId: string, categoryId: string): Promise<MonthView>;
-  createMonthSubcategory(input: CreateMonthSubcategoryInput): Promise<MonthView>;
-  updateMonthSubcategory(input: UpdateMonthSubcategoryInput): Promise<MonthView>;
-  deleteMonthSubcategory(monthId: string, subcategoryId: string): Promise<MonthView>;
-};
-
-export type MonthlyCycleRouteService = TemplateRouteService & IncomeRouteService & CashRouteService & ClosureRouteService & ReportsRouteService & ExpenseHistoryRouteService & LifecycleRouteService & MovementRouteService & CompatibilityRouteService;
+export type MonthlyCycleRouteService = TemplateRouteService & IncomeRouteService & CashRouteService & ClosureRouteService & ReportsRouteService & ExpenseHistoryRouteService & LifecycleRouteService & MovementRouteService & MonthStructureRouteService;
 
 export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRouteService>) => {
   const service = routeService as MonthlyCycleRouteService;
