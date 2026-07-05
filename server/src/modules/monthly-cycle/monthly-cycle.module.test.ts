@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import express from "express";
 import test from "node:test";
 
@@ -40,6 +40,22 @@ const request = async (server: ReturnType<typeof createTestServer>, path: string
   return fetch(`http://127.0.0.1:${address.port}${path}`);
 };
 
+const listTypeScriptFiles = async (directory: URL): Promise<URL[]> => {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map((entry) => {
+      const entryUrl = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, directory);
+
+      if (entry.isDirectory()) return listTypeScriptFiles(entryUrl);
+      if (entry.isFile() && entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")) return [entryUrl];
+
+      return [];
+    }),
+  );
+
+  return files.flat();
+};
+
 test("createMonthlyCycleModule exposes router and service from explicit service wiring", async () => {
   const calls: string[] = [];
   const getBasicReport = async (monthId: string) => {
@@ -75,6 +91,16 @@ test("monthly-cycle port scaffold names the initial explicit boundaries", () => 
     "pockets",
     "transactionRunner",
   ]);
+});
+
+test("monthly-cycle application contracts do not import Prisma-generated types", async () => {
+  const applicationFiles = await listTypeScriptFiles(new URL("./application/", import.meta.url));
+
+  for (const file of applicationFiles) {
+    const source = await readFile(file, "utf8");
+    assert.doesNotMatch(source, /lib\/prisma-client\.js/);
+    assert.doesNotMatch(source, /\bPrisma\.Decimal\b/);
+  }
 });
 
 test("monthly-cycle final wiring avoids service shim consumers in startup, routes, and module root", async () => {
@@ -200,4 +226,8 @@ test("obsolete compatibility workflows without active consumers are removed", as
   for (const workflowPath of obsoleteWorkflowPaths) {
     await assert.rejects(() => access(new URL(workflowPath, import.meta.url)), { code: "ENOENT" });
   }
+});
+
+test("legacy service compatibility shim is removed after test consumers migrate", async () => {
+  await assert.rejects(() => access(new URL("./service.ts", import.meta.url)), { code: "ENOENT" });
 });

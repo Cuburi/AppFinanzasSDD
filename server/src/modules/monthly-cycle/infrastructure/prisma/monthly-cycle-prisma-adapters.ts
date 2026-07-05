@@ -1,5 +1,5 @@
-import { MonthStatus, MovementType, PaymentMethod, type Prisma } from "../../../../lib/prisma-client.js";
-import type { MonthlyCyclePorts } from "../../application/ports/monthly-cycle-ports.js";
+import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../../lib/prisma-client.js";
+import type { MonthlyCycleMoney, MonthlyCyclePorts } from "../../application/ports/monthly-cycle-ports.js";
 import { decimal } from "../../shared/money.js";
 import { DomainError } from "../../shared/service-errors.js";
 import { monthInclude, templateInclude, type MonthRecord, type MonthlyCycleDb } from "../../shared/service-types.js";
@@ -27,6 +27,8 @@ const ensurePocketIsActive = async (db: MonthlyCycleDb, pocketId: string, label:
     throw new DomainError(400, `${label} must exist and be active.`);
   }
 };
+
+const toPrismaDecimal = (value: MonthlyCycleMoney) => new Prisma.Decimal(value.toString());
 
 export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyclePrismaPortSet => ({
   months: {
@@ -131,7 +133,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
     },
     async create(args: {
       type: MovementType;
-      amount: Prisma.Decimal;
+      amount: MonthlyCycleMoney;
       description?: string | null;
       occurredAt?: Date;
       paymentMethod?: PaymentMethod | null;
@@ -142,13 +144,13 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       targetPocketId?: string | null;
       externalSourceLabel?: string | null;
     }) {
-      await db.movement.create({ data: args });
+      await db.movement.create({ data: { ...args, amount: toPrismaDecimal(args.amount) } });
     },
     async updateExpense(input) {
       await db.movement.update({
         where: { id: input.expenseId },
         data: {
-          amount: input.amount,
+          amount: toPrismaDecimal(input.amount),
           description: input.description,
           occurredAt: input.occurredAt,
           paymentMethod: input.paymentMethod,
@@ -195,11 +197,11 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       return db.monthlyIncome.findUnique({ where: { id: incomeId } });
     },
     async create(input) {
-      await db.monthlyIncome.create({ data: input });
+      await db.monthlyIncome.create({ data: { ...input, amount: toPrismaDecimal(input.amount) } });
     },
     async update(input) {
-      const { incomeId, ...data } = input;
-      await db.monthlyIncome.update({ where: { id: incomeId }, data });
+      const { incomeId, amount, ...data } = input;
+      await db.monthlyIncome.update({ where: { id: incomeId }, data: { ...data, ...(amount ? { amount: toPrismaDecimal(amount) } : {}) } });
     },
     async delete(incomeId) {
       await db.monthlyIncome.delete({ where: { id: incomeId } });
@@ -223,7 +225,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
         data: {
           monthCategoryId: input.categoryId,
           name: input.name,
-          plannedAmount: input.plannedAmount,
+          plannedAmount: toPrismaDecimal(input.plannedAmount),
           defaultPocketId: input.defaultPocketId,
           templateSubcategoryId: input.templateSubcategoryId,
           sortOrder: input.sortOrder,
@@ -235,7 +237,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
         where: { id: input.subcategoryId },
         data: {
           name: input.name,
-          plannedAmount: input.plannedAmount,
+          plannedAmount: toPrismaDecimal(input.plannedAmount),
           ...(input.defaultPocketId !== undefined ? { defaultPocketId: input.defaultPocketId } : {}),
         },
       });
@@ -254,7 +256,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
         data: {
           categoryId: input.categoryId,
           name: input.name,
-          plannedAmount: input.plannedAmount,
+          plannedAmount: toPrismaDecimal(input.plannedAmount),
           defaultPocketId: input.defaultPocketId,
           sortOrder: input.sortOrder,
         },

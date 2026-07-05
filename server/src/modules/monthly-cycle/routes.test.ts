@@ -5,7 +5,7 @@ import type { ErrorRequestHandler } from "express";
 import { PaymentMethod } from "../../lib/prisma-client.js";
 
 import { monthlyCycleRouter } from "./routes.js";
-import { DomainError } from "./service.js";
+import { DomainError } from "./shared/service-errors.js";
 import type { BasicMonthlyReportView, MonthView } from "./dto/index.js";
 
 const report: BasicMonthlyReportView = {

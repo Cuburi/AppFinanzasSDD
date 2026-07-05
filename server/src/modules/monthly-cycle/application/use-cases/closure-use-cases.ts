@@ -1,4 +1,3 @@
-import { MonthStatus, MovementType } from "../../../../lib/prisma-client.js";
 import type { ClosureActionInput, ClosureReviewView, MonthView } from "../../dto/index.js";
 import { mapMonth } from "../../mappers/monthly-cycle-mappers.js";
 import { calculateMonthBalances } from "../../balance-calculator.js";
@@ -6,7 +5,7 @@ import { findMonthSubcategory, listMonthSubcategories, assertMonthIsMutable } fr
 import { decimal, decimalToNumber, isZero } from "../../shared/money.js";
 import { DomainError } from "../../shared/service-errors.js";
 import type { MonthRecord } from "../../shared/service-types.js";
-import type { MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
+import { MonthStatus, MovementType, type MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 
 export const CLOSURE_USE_CASE_NAMES = ["getClosureReview", "applyClosureAction", "closeMonth"] as const;
 
