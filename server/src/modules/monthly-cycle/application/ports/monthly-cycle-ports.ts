@@ -73,7 +73,25 @@ export interface IncomeRepositoryPort {
   delete(incomeId: string): Promise<void>;
 }
 
-export interface MonthStructureRepositoryPort {}
+export interface MonthStructureRepositoryPort {
+  createMonthCategory(input: { monthId: string; name: string; sortOrder: number; templateCategoryId: string | null }): Promise<{ id: string }>;
+  updateMonthCategory(input: { categoryId: string; name: string }): Promise<void>;
+  linkMonthCategory(categoryId: string, templateCategoryId: string): Promise<void>;
+  deleteMonthCategory(categoryId: string): Promise<void>;
+  createMonthSubcategory(input: {
+    categoryId: string;
+    name: string;
+    plannedAmount: Prisma.Decimal;
+    defaultPocketId: string | null;
+    templateSubcategoryId: string | null;
+    sortOrder: number;
+  }): Promise<{ id: string }>;
+  updateMonthSubcategory(input: { subcategoryId: string; name: string; plannedAmount: Prisma.Decimal; defaultPocketId?: string | null }): Promise<void>;
+  linkMonthSubcategory(subcategoryId: string, templateSubcategoryId: string): Promise<void>;
+  deleteMonthSubcategory(subcategoryId: string): Promise<void>;
+  createTemplateCategory(input: { name: string; sortOrder: number }): Promise<{ id: string }>;
+  createTemplateSubcategory(input: { categoryId: string; name: string; plannedAmount: Prisma.Decimal; defaultPocketId: string | null; sortOrder: number }): Promise<{ id: string }>;
+}
 
 export interface PocketValidationPort {
   ensurePocketIsActive(pocketId: string, label: string): Promise<void>;
