@@ -1,4 +1,4 @@
-import { MovementType, PaymentMethod } from "../../../lib/prisma-client.js";
+import { MovementType, PaymentMethod } from "../application/monthly-cycle-types.js";
 
 import type { DepositToPocketInput, MonthView, RecordExpenseInput, UpdateExpenseInput } from "../dto/index.js";
 import { mapMonth } from "../mappers/monthly-cycle-mappers.js";

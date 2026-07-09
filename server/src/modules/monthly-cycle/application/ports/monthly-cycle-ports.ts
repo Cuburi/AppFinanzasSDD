@@ -1,32 +1,8 @@
 import type { ExpenseHistoryQueryInput, TemplateInput } from "../../dto/index.js";
 import type { MonthRecord, MonthlyIncomeRecord, TemplateCategoryRecord } from "../../shared/service-types.js";
+import type { MonthStatus as MonthlyCycleMonthStatus, MovementType as MonthlyCycleMovementType, PaymentMethod as MonthlyCyclePaymentMethod } from "../monthly-cycle-types.js";
 
-export const MonthStatus = {
-  ACTIVE: "ACTIVE",
-  CLOSED: "CLOSED",
-} as const;
-
-export type MonthStatus = (typeof MonthStatus)[keyof typeof MonthStatus];
-
-export const MovementType = {
-  EXPENSE: "EXPENSE",
-  CASH_WITHDRAWAL: "CASH_WITHDRAWAL",
-  CASH_CARRYOVER_IN: "CASH_CARRYOVER_IN",
-  POCKET_DEPOSIT_FROM_SUBCATEGORY: "POCKET_DEPOSIT_FROM_SUBCATEGORY",
-  POCKET_DEPOSIT_EXTERNAL: "POCKET_DEPOSIT_EXTERNAL",
-  SURPLUS_TO_POCKET_ON_CLOSE: "SURPLUS_TO_POCKET_ON_CLOSE",
-  DEFICIT_COVER_FROM_SUBCATEGORY: "DEFICIT_COVER_FROM_SUBCATEGORY",
-  DEFICIT_COVER_FROM_POCKET: "DEFICIT_COVER_FROM_POCKET",
-} as const;
-
-export type MovementType = (typeof MovementType)[keyof typeof MovementType];
-
-export const PaymentMethod = {
-  NON_CASH: "NON_CASH",
-  CASH: "CASH",
-} as const;
-
-export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
+export * from "../monthly-cycle-types.js";
 
 export type MonthlyCycleMoney = { toString(): string };
 
@@ -46,14 +22,14 @@ export type ActiveMonthSummary = { id: string; year: number; month: number };
 
 export interface MonthRepositoryPort {
   findActive(): Promise<MonthRecord | null>;
-  findActiveSummary(status: MonthStatus): Promise<ActiveMonthSummary | null>;
+  findActiveSummary(status: MonthlyCycleMonthStatus): Promise<ActiveMonthSummary | null>;
   findById(monthId: string): Promise<MonthRecord>;
   findByYearMonth(year: number, month: number): Promise<{ id: string } | null>;
   findPriorClosedBefore(year: number, month: number): Promise<MonthRecord | null>;
   createFromTemplate(input: {
     year: number;
     month: number;
-    status: MonthStatus;
+    status: MonthlyCycleMonthStatus;
     template: TemplateCategoryRecord[];
   }): Promise<MonthRecord>;
   close(monthId: string): Promise<MonthRecord>;
@@ -69,11 +45,11 @@ export type MovementRecord = MonthRecord["movements"][number];
 export interface MovementRepositoryPort {
   findById(movementId: string): Promise<MovementRecord | null>;
   create(args: {
-    type: MovementType;
+    type: MonthlyCycleMovementType;
     amount: MonthlyCycleMoney;
     description?: string | null;
     occurredAt?: Date;
-    paymentMethod?: PaymentMethod | null;
+    paymentMethod?: MonthlyCyclePaymentMethod | null;
     monthId?: string | null;
     sourceSubcategoryId?: string | null;
     targetSubcategoryId?: string | null;
@@ -86,7 +62,7 @@ export interface MovementRepositoryPort {
     amount: MonthlyCycleMoney;
     description?: string | null;
     occurredAt: Date;
-    paymentMethod: PaymentMethod;
+    paymentMethod: MonthlyCyclePaymentMethod;
     sourceSubcategoryId: string;
   }): Promise<void>;
   delete(movementId: string): Promise<void>;

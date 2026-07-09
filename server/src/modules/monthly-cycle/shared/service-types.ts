@@ -1,4 +1,5 @@
-import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../lib/prisma-client.js";
+import type { Prisma } from "../../../lib/prisma-client.js";
+import type { MonthStatus, MovementType, PaymentMethod } from "../application/monthly-cycle-types.js";
 
 export const templateInclude = {
   subcategories: {
