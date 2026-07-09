@@ -1,4 +1,4 @@
-import type { MovementType, PaymentMethod } from "../../../lib/prisma-client.js";
+import type { MovementType, PaymentMethod } from "../application/monthly-cycle-types.js";
 
 export type ExpenseHistoryItemView = {
   id: string;

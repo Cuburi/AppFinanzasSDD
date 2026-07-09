@@ -1,4 +1,6 @@
-import { MovementType, PaymentMethod, Prisma } from "../../../lib/prisma-client.js";
+import type { Prisma } from "../../../lib/prisma-client.js";
+
+import { MovementType, PaymentMethod } from "../application/monthly-cycle-types.js";
 
 type CashMovement = {
   type: MovementType;

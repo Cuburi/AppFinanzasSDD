@@ -1,4 +1,4 @@
-import { MonthStatus, MovementType } from "../../../lib/prisma-client.js";
+import { MonthStatus, MovementType } from "../application/monthly-cycle-types.js";
 
 import type { ClosureReviewView, MonthView, OpenMonthInput, TemplateInput } from "../dto/index.js";
 import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
