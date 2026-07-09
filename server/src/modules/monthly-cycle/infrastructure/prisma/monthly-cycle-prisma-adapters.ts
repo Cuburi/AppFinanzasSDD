@@ -1,6 +1,7 @@
 import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../../lib/prisma-client.js";
-import type { MonthlyCycleMoney, MonthlyCyclePorts } from "../../application/ports/monthly-cycle-ports.js";
+import type { MonthlyCyclePorts } from "../../application/ports/monthly-cycle-ports.js";
 import { decimal } from "../../shared/money.js";
+import type { MonthlyCycleMoney } from "../../shared/money.js";
 import { DomainError } from "../../shared/service-errors.js";
 import { monthInclude, templateInclude, type MonthRecord, type MonthlyCycleDb } from "../../shared/service-types.js";
 import type { TemplateInput } from "../../dto/index.js";
@@ -82,7 +83,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
               subcategories: {
                 create: category.subcategories.map((subcategory, subcategoryIndex) => ({
                   name: subcategory.name,
-                  plannedAmount: subcategory.plannedAmount,
+                  plannedAmount: toPrismaDecimal(subcategory.plannedAmount),
                   defaultPocketId: subcategory.defaultPocketId,
                   templateSubcategoryId: subcategory.id,
                   sortOrder: subcategoryIndex,
@@ -117,7 +118,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
             subcategories: {
               create: category.subcategories.map((subcategory, subcategoryIndex) => ({
                 name: subcategory.name,
-                plannedAmount: decimal(subcategory.plannedAmount),
+                plannedAmount: toPrismaDecimal(decimal(subcategory.plannedAmount)),
                 defaultPocketId: subcategory.defaultPocketId ?? null,
                 sortOrder: subcategoryIndex,
               })),

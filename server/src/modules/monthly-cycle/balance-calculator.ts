@@ -1,22 +1,20 @@
-import type { Prisma } from "../../lib/prisma-client.js";
-
 import { MovementType, PaymentMethod } from "./application/monthly-cycle-types.js";
-import { decimalToNumber, roundMoney } from "./shared/money.js";
+import { decimalToNumber, roundMoney, type MonthlyCycleMoney } from "./shared/money.js";
 
 type MonthShape = {
   incomes?: Array<{
-    amount: Prisma.Decimal;
+    amount: MonthlyCycleMoney;
   }>;
   categories: Array<{
     subcategories: Array<{
       id: string;
-      plannedAmount: Prisma.Decimal;
+      plannedAmount: MonthlyCycleMoney;
     }>;
   }>;
   movements: Array<{
     type: MovementType;
     paymentMethod?: PaymentMethod | null;
-    amount: Prisma.Decimal;
+    amount: MonthlyCycleMoney;
     sourceSubcategoryId: string | null;
     targetSubcategoryId: string | null;
     sourcePocketId: string | null;

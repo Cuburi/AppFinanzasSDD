@@ -1,10 +1,9 @@
 import type { ExpenseHistoryQueryInput, TemplateInput } from "../../dto/index.js";
+import type { MonthlyCycleMoney } from "../../shared/money.js";
 import type { MonthRecord, MonthlyIncomeRecord, TemplateCategoryRecord } from "../../shared/service-types.js";
 import type { MonthStatus as MonthlyCycleMonthStatus, MovementType as MonthlyCycleMovementType, PaymentMethod as MonthlyCyclePaymentMethod } from "../monthly-cycle-types.js";
 
 export * from "../monthly-cycle-types.js";
-
-export type MonthlyCycleMoney = { toString(): string };
 
 export const MONTHLY_CYCLE_PORT_NAMES = [
   "months",
