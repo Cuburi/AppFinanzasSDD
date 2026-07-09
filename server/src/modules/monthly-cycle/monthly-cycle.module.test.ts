@@ -103,6 +103,20 @@ test("monthly-cycle application contracts do not import Prisma-generated types",
   }
 });
 
+test("monthly-cycle shared and application money boundaries do not expose Prisma Decimal", async () => {
+  const boundaryFiles = [
+    ...(await listTypeScriptFiles(new URL("./shared/", import.meta.url))),
+    ...(await listTypeScriptFiles(new URL("./application/ports/", import.meta.url))),
+    new URL("./balance-calculator.ts", import.meta.url),
+  ];
+
+  for (const file of boundaryFiles) {
+    const source = await readFile(file, "utf8");
+    assert.doesNotMatch(source, /lib\/prisma-client\.js/);
+    assert.doesNotMatch(source, /\bPrisma\.Decimal\b/);
+  }
+});
+
 test("monthly-cycle final wiring avoids service shim consumers in startup, routes, and module root", async () => {
   const [indexSource, routesSource, moduleSource] = await Promise.all([
     readFile(new URL("../../index.ts", import.meta.url), "utf8"),
