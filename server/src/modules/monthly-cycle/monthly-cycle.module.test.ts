@@ -130,101 +130,109 @@ test("monthly-cycle final wiring avoids service shim consumers in startup, route
   assert.doesNotMatch(moduleSource, /\.\/service\.js/);
 });
 
+test("monthly-cycle module root composes route service methods without the legacy service adapter", async () => {
+  const moduleSource = await readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8");
+
+  assert.match(moduleSource, /composeMonthlyCycleService/);
+  assert.doesNotMatch(moduleSource, /createMonthlyCycleService/);
+  assert.doesNotMatch(moduleSource, /\.\/monthly-cycle\.service\.js/);
+});
+
+test("legacy monthly-cycle service adapter is removed after test consumers migrate", async () => {
+  await assert.rejects(() => access(new URL("./monthly-cycle.service.ts", import.meta.url)), { code: "ENOENT" });
+});
+
+test("monthly-cycle behavior suites are named for module-created service coverage", async () => {
+  await Promise.all([
+    access(new URL("./module-service.test.ts", import.meta.url)),
+    access(new URL("./module-service.integration.test.ts", import.meta.url)),
+  ]);
+
+  await Promise.all([
+    assert.rejects(() => access(new URL("./service.test.ts", import.meta.url)), { code: "ENOENT" }),
+    assert.rejects(() => access(new URL("./service.integration.test.ts", import.meta.url)), { code: "ENOENT" }),
+  ]);
+});
+
 test("template application use cases are composed by the module root and exposed to routes as a narrow boundary", async () => {
-  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+  const [routesSource, moduleSource] = await Promise.all([
     readFile(new URL("./routes.ts", import.meta.url), "utf8"),
     readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
-    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(moduleSource, /createTemplateUseCases/);
-  assert.match(moduleSource, /createMonthlyCycleService/);
+  assert.match(moduleSource, /composeMonthlyCycleService/);
   assert.doesNotMatch(moduleSource, /\.\/workflows\/template-service\.js/);
   assert.doesNotMatch(moduleSource, /\.\/workflows\//);
   assert.match(routesSource, /TemplateRouteService/);
   assert.doesNotMatch(routesSource, /\.\/monthly-cycle\.service\.js/);
-  assert.doesNotMatch(compatibilityServiceSource, /createTemplateService/);
 });
 
 test("lifecycle and movement use cases are composed by the module root without broadening the route boundary", async () => {
-  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+  const [routesSource, moduleSource] = await Promise.all([
     readFile(new URL("./routes.ts", import.meta.url), "utf8"),
     readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
-    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(moduleSource, /createLifecycleUseCases/);
   assert.match(moduleSource, /createMovementUseCases/);
   assert.match(routesSource, /LifecycleRouteService/);
   assert.match(routesSource, /MovementRouteService/);
-  assert.doesNotMatch(compatibilityServiceSource, /createMonthLifecycleService/);
-  assert.doesNotMatch(compatibilityServiceSource, /createMovementService/);
 });
 
 test("income use cases are composed by the module root without broadening the route boundary", async () => {
-  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+  const [routesSource, moduleSource] = await Promise.all([
     readFile(new URL("./routes.ts", import.meta.url), "utf8"),
     readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
-    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(moduleSource, /createIncomeUseCases/);
   assert.match(routesSource, /IncomeRouteService/);
-  assert.doesNotMatch(compatibilityServiceSource, /createIncomeService/);
 });
 
 test("cash use cases are composed by the module root without broadening the route boundary", async () => {
-  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+  const [routesSource, moduleSource] = await Promise.all([
     readFile(new URL("./routes.ts", import.meta.url), "utf8"),
     readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
-    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(moduleSource, /createCashUseCases/);
   assert.match(routesSource, /CashRouteService/);
-  assert.doesNotMatch(compatibilityServiceSource, /createCashService/);
 });
 
 test("reports and expense-history use cases are composed by the module root without broadening the route boundary", async () => {
-  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+  const [routesSource, moduleSource] = await Promise.all([
     readFile(new URL("./routes.ts", import.meta.url), "utf8"),
     readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
-    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(moduleSource, /createReportsUseCases/);
   assert.match(moduleSource, /createExpenseHistoryUseCases/);
   assert.match(routesSource, /ReportsRouteService/);
   assert.match(routesSource, /ExpenseHistoryRouteService/);
-  assert.doesNotMatch(compatibilityServiceSource, /createReportsService/);
-  assert.doesNotMatch(compatibilityServiceSource, /createExpenseHistoryService/);
 });
 
 test("closure use cases are composed by the module root without broadening the route boundary", async () => {
-  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+  const [routesSource, moduleSource] = await Promise.all([
     readFile(new URL("./routes.ts", import.meta.url), "utf8"),
     readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
-    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(moduleSource, /createClosureUseCases/);
   assert.match(routesSource, /ClosureRouteService/);
   assert.doesNotMatch(routesSource, /getClosureReview\(monthId: string\)/);
   assert.doesNotMatch(routesSource, /applyClosureAction\(input: ClosureActionInput\)/);
-  assert.doesNotMatch(compatibilityServiceSource, /createClosureService/);
 });
 
 test("month-structure use cases are composed by the module root without broadening the route boundary", async () => {
-  const [routesSource, moduleSource, compatibilityServiceSource] = await Promise.all([
+  const [routesSource, moduleSource] = await Promise.all([
     readFile(new URL("./routes.ts", import.meta.url), "utf8"),
     readFile(new URL("./monthly-cycle.module.ts", import.meta.url), "utf8"),
-    readFile(new URL("./monthly-cycle.service.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(moduleSource, /createMonthStructureUseCases/);
   assert.match(routesSource, /MonthStructureRouteService/);
   assert.doesNotMatch(routesSource, /type CompatibilityRouteService = \{/);
-  assert.doesNotMatch(compatibilityServiceSource, /createMonthStructureService/);
 });
 
 test("obsolete compatibility workflows without active consumers are removed", async () => {
@@ -242,6 +250,6 @@ test("obsolete compatibility workflows without active consumers are removed", as
   }
 });
 
-test("legacy service compatibility shim is removed after test consumers migrate", async () => {
+test("legacy service compatibility shim remains removed", async () => {
   await assert.rejects(() => access(new URL("./service.ts", import.meta.url)), { code: "ENOENT" });
 });

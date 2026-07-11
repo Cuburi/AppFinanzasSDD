@@ -2,10 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../lib/prisma-client.js";
 
-import { createMonthlyCycleService } from "./monthly-cycle.service.js";
+import { createMonthlyCycleModule } from "./monthly-cycle.module.js";
 import { DomainError } from "./shared/service-errors.js";
 
 const amount = (value: number) => new Prisma.Decimal(value.toFixed(2));
+const createMonthlyCycleTestService = (db: unknown) => createMonthlyCycleModule({ db: db as never }).service;
 
 type TemplateFixture = Array<{
   id: string;
@@ -434,7 +435,7 @@ const createDbStub = ({
 
 test("updateTemplate keeps defaultPocketId optional when saving subcategories", async () => {
   const dbStub = createDbStub();
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   await service.updateTemplate({
     categories: [
@@ -452,10 +453,10 @@ test("updateTemplate keeps defaultPocketId optional when saving subcategories", 
 });
 
 test("updateTemplate rejects inactive or nonexistent default pockets", async () => {
-  const serviceWithInactivePocket = createMonthlyCycleService(
+  const serviceWithInactivePocket = createMonthlyCycleTestService(
     createDbStub({ targetPockets: { "pocket-inactive": { id: "pocket-inactive", active: false } } }).db,
   );
-  const serviceWithMissingPocket = createMonthlyCycleService(createDbStub({ targetPockets: { "pocket-missing": null } }).db);
+  const serviceWithMissingPocket = createMonthlyCycleTestService(createDbStub({ targetPockets: { "pocket-missing": null } }).db);
 
   await assert.rejects(
     () =>
@@ -496,14 +497,14 @@ test("updateTemplate rejects inactive or nonexistent default pockets", async () 
 
 test("openMonth rejects template snapshots with inactive or nonexistent default pockets", async () => {
   const template = templateFixture();
-  const serviceWithInactivePocket = createMonthlyCycleService(
+  const serviceWithInactivePocket = createMonthlyCycleTestService(
     createDbStub({
       template,
       targetPockets: { "pocket-home": { id: "pocket-home", active: false } },
       createdMonth: buildCreatedMonth(template, 2026, 6),
     }).db,
   );
-  const serviceWithMissingPocket = createMonthlyCycleService(
+  const serviceWithMissingPocket = createMonthlyCycleTestService(
     createDbStub({
       template,
       targetPockets: { "pocket-home": null },
@@ -529,10 +530,10 @@ test("openMonth rejects template snapshots with inactive or nonexistent default 
 test("depositToPocket rejects inactive or nonexistent target pockets", async () => {
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
-  const serviceWithInactivePocket = createMonthlyCycleService(
+  const serviceWithInactivePocket = createMonthlyCycleTestService(
     createDbStub({ monthById: month, targetPockets: { "pocket-inactive": { id: "pocket-inactive", active: false } } }).db,
   );
-  const serviceWithMissingPocket = createMonthlyCycleService(createDbStub({ monthById: month, targetPockets: { "pocket-missing": null } }).db);
+  const serviceWithMissingPocket = createMonthlyCycleTestService(createDbStub({ monthById: month, targetPockets: { "pocket-missing": null } }).db);
 
   await assert.rejects(
     () =>
@@ -575,7 +576,7 @@ test("applyClosureAction rejects inactive default pockets for new surplus action
     throw new Error("Missing subcategory fixture.");
   }
 
-  const service = createMonthlyCycleService(
+  const service = createMonthlyCycleTestService(
     createDbStub({ monthById: month, targetPockets: { "pocket-home": { id: "pocket-home", active: false } } }).db,
   );
 
@@ -601,7 +602,7 @@ test("openMonth snapshots the current template into a new active month", async (
     template,
     createdMonth: buildCreatedMonth(template, 2026, 6),
   });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const month = await service.openMonth({ year: 2026, month: 6 });
   const createArgs = dbStub.getCapturedCreateArgs() as {
@@ -629,7 +630,7 @@ test("openMonth rejects creating a second active month", async () => {
   const dbStub = createDbStub({
     activeMonth: { id: "month-active", year: 2026, month: 5 },
   });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   await assert.rejects(() => service.openMonth({ year: 2026, month: 6 }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
@@ -650,7 +651,7 @@ test("openMonth rejects opening a month without template subcategories", async (
       },
     ],
   });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   await assert.rejects(() => service.openMonth({ year: 2026, month: 6 }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
@@ -662,7 +663,7 @@ test("openMonth rejects opening a month without template subcategories", async (
 
 test("getActiveMonth returns null when there is no active month", async () => {
   const dbStub = createDbStub({ activeMonth: null });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const month = await service.getActiveMonth();
 
@@ -673,7 +674,7 @@ test("recordExpense persists an expense and returns recalculated balances", asyn
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const updatedMonth = await service.recordExpense({
     monthId: month.id,
@@ -721,7 +722,7 @@ test("updateExpense persists active-month expense changes and recalculates balan
     },
   );
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const updatedMonth = await service.updateExpense({
     monthId: month.id,
@@ -776,7 +777,7 @@ test("updateExpense rejects cash changes that would exceed physical cash", async
     },
   );
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   await assert.rejects(
     () =>
@@ -828,7 +829,7 @@ test("deleteExpense removes only active-month expenses and recalculates balances
     },
   );
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const updatedMonth = await service.deleteExpense(month.id, "expense-1");
   const deleteArgs = dbStub.getCapturedMovementDeletes()[0] as { where: { id: string } };
@@ -853,7 +854,7 @@ test("updateExpense and deleteExpense reject expenses that belong to closed mont
     sourcePocketId: null,
     targetPocketId: null,
   });
-  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+  const service = createMonthlyCycleTestService(createDbStub({ monthById: month }).db);
 
   await assert.rejects(
     () =>
@@ -896,7 +897,7 @@ test("updateExpense and deleteExpense reject movements outside the active month 
     sourcePocketId: null,
     targetPocketId: null,
   });
-  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+  const service = createMonthlyCycleTestService(createDbStub({ monthById: month }).db);
 
   await assert.rejects(
     () =>
@@ -928,7 +929,7 @@ test("updateMonthCategory renames only the active-month snapshot category", asyn
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const categoryId = month.categories[0]?.id ?? "";
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const updatedMonth = await service.updateMonthCategory({ monthId: month.id, categoryId, name: "Hogar" });
 
@@ -940,7 +941,7 @@ test("updateMonthSubcategory updates snapshot fields and validates default pocke
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
   const dbStub = createDbStub({ monthById: month, targetPockets: { "pocket-savings": { id: "pocket-savings", active: true } } });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const updatedMonth = await service.updateMonthSubcategory({
     monthId: month.id,
@@ -959,7 +960,7 @@ test("updateMonthSubcategory preserves omitted defaultPocketId and clears explic
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const omittedDefaultPocket = await service.updateMonthSubcategory({
     monthId: month.id,
@@ -987,7 +988,7 @@ test("updateMonthSubcategory rejects inactive default pocket strings", async () 
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
   const dbStub = createDbStub({ monthById: month, targetPockets: { "pocket-inactive": { id: "pocket-inactive", active: false } } });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   await assert.rejects(
     () =>
@@ -1012,7 +1013,7 @@ test("updateMonthSubcategory rejects inactive default pocket strings", async () 
 test("createMonthCategory appends snapshot-only categories without mutating the template", async () => {
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const updatedMonth = await service.createMonthCategory({ monthId: month.id, name: "  Variables  ", addToTemplate: false });
   const createArgs = dbStub.getCapturedMonthCategoryCreates()[0] as {
@@ -1029,7 +1030,7 @@ test("createMonthCategory appends snapshot-only categories without mutating the 
 test("createMonthCategory promotes explicitly requested template categories and links the snapshot", async () => {
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const updatedMonth = await service.createMonthCategory({ monthId: month.id, name: "Variables", addToTemplate: true });
   const templateCreate = dbStub.getCapturedTemplateCategoryCreates()[0] as { data: { name: string; sortOrder: number } };
@@ -1046,10 +1047,10 @@ test("createMonthCategory promotes explicitly requested template categories and 
 
 test("createMonthCategory rejects duplicate names in snapshot and template scopes", async () => {
   const snapshotDuplicateMonth = buildCreatedMonth(templateFixture(), 2026, 5);
-  const serviceWithSnapshotDuplicate = createMonthlyCycleService(createDbStub({ monthById: snapshotDuplicateMonth }).db);
+  const serviceWithSnapshotDuplicate = createMonthlyCycleTestService(createDbStub({ monthById: snapshotDuplicateMonth }).db);
   const templateDuplicateMonth = buildCreatedMonth(templateFixture(), 2026, 5);
   templateDuplicateMonth.categories[0]!.name = "Fijos del mes";
-  const serviceWithTemplateDuplicate = createMonthlyCycleService(createDbStub({ monthById: templateDuplicateMonth }).db);
+  const serviceWithTemplateDuplicate = createMonthlyCycleTestService(createDbStub({ monthById: templateDuplicateMonth }).db);
 
   await assert.rejects(
     () => serviceWithSnapshotDuplicate.createMonthCategory({ monthId: snapshotDuplicateMonth.id, name: "  fijos ", addToTemplate: false }),
@@ -1076,7 +1077,7 @@ test("createMonthSubcategory appends snapshot-only subcategories and validates d
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const categoryId = month.categories[0]?.id ?? "";
   const dbStub = createDbStub({ monthById: month, targetPockets: { "pocket-buffer": { id: "pocket-buffer", active: true } } });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const updatedMonth = await service.createMonthSubcategory({
     monthId: month.id,
@@ -1103,7 +1104,7 @@ test("createMonthSubcategory promotes month-only parents before template subcate
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   month.categories.push({ id: "cat-month-only", name: "Mes", sortOrder: 1, templateCategoryId: null, subcategories: [] });
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const updatedMonth = await service.createMonthSubcategory({
     monthId: month.id,
@@ -1137,7 +1138,7 @@ test("createMonthSubcategory rejects duplicates, closed months, missing parents,
   const duplicateMonth = buildCreatedMonth(templateFixture(), 2026, 5);
   const duplicateCategoryId = duplicateMonth.categories[0]?.id ?? "";
   const duplicateStub = createDbStub({ monthById: duplicateMonth });
-  const duplicateService = createMonthlyCycleService(duplicateStub.db);
+  const duplicateService = createMonthlyCycleTestService(duplicateStub.db);
 
   await assert.rejects(
     () => duplicateService.createMonthSubcategory({ monthId: duplicateMonth.id, categoryId: duplicateCategoryId, name: " alquiler ", plannedAmount: 10, addToTemplate: false }),
@@ -1151,7 +1152,7 @@ test("createMonthSubcategory rejects duplicates, closed months, missing parents,
   assert.equal(duplicateStub.getCapturedMonthSubcategoryCreates().length, 0);
 
   const closedMonth = { ...buildCreatedMonth(templateFixture(), 2026, 5), status: MonthStatus.CLOSED };
-  const serviceForClosedMonth = createMonthlyCycleService(createDbStub({ monthById: closedMonth }).db);
+  const serviceForClosedMonth = createMonthlyCycleTestService(createDbStub({ monthById: closedMonth }).db);
   await assert.rejects(
     () => serviceForClosedMonth.createMonthSubcategory({ monthId: closedMonth.id, categoryId: closedMonth.categories[0]?.id ?? "", name: "Taxi", plannedAmount: 10, addToTemplate: false }),
     (error: unknown) => {
@@ -1163,7 +1164,7 @@ test("createMonthSubcategory rejects duplicates, closed months, missing parents,
   );
 
   const activeMonth = buildCreatedMonth(templateFixture(), 2026, 5);
-  const serviceForMissingParent = createMonthlyCycleService(createDbStub({ monthById: activeMonth }).db);
+  const serviceForMissingParent = createMonthlyCycleTestService(createDbStub({ monthById: activeMonth }).db);
   await assert.rejects(
     () => serviceForMissingParent.createMonthSubcategory({ monthId: activeMonth.id, categoryId: "missing-category", name: "Taxi", plannedAmount: 10, addToTemplate: false }),
     (error: unknown) => {
@@ -1176,7 +1177,7 @@ test("createMonthSubcategory rejects duplicates, closed months, missing parents,
 
   const inactivePocketMonth = buildCreatedMonth(templateFixture(), 2026, 5);
   const inactivePocketStub = createDbStub({ monthById: inactivePocketMonth, targetPockets: { "pocket-inactive": { id: "pocket-inactive", active: false } } });
-  const serviceForInactivePocket = createMonthlyCycleService(inactivePocketStub.db);
+  const serviceForInactivePocket = createMonthlyCycleTestService(inactivePocketStub.db);
   await assert.rejects(
     () => serviceForInactivePocket.createMonthSubcategory({ monthId: inactivePocketMonth.id, categoryId: inactivePocketMonth.categories[0]?.id ?? "", name: "Taxi", plannedAmount: 10, defaultPocketId: "pocket-inactive", addToTemplate: false }),
     (error: unknown) => {
@@ -1205,7 +1206,7 @@ test("month structure deletes reject movement-linked subcategories and non-empty
     sourcePocketId: null,
     targetPocketId: null,
   });
-  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+  const service = createMonthlyCycleTestService(createDbStub({ monthById: month }).db);
 
   await assert.rejects(() => service.deleteMonthSubcategory(month.id, subcategoryId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
@@ -1224,7 +1225,7 @@ test("month structure deletes reject movement-linked subcategories and non-empty
 
 test("month structure mutations reject closed months and missing snapshot nodes", async () => {
   const closedMonth = { ...buildCreatedMonth(templateFixture(), 2026, 5), status: MonthStatus.CLOSED };
-  const serviceForClosedMonth = createMonthlyCycleService(createDbStub({ monthById: closedMonth }).db);
+  const serviceForClosedMonth = createMonthlyCycleTestService(createDbStub({ monthById: closedMonth }).db);
 
   await assert.rejects(
     () => serviceForClosedMonth.updateMonthCategory({ monthId: closedMonth.id, categoryId: closedMonth.categories[0]?.id ?? "", name: "Hogar" }),
@@ -1237,7 +1238,7 @@ test("month structure mutations reject closed months and missing snapshot nodes"
   );
 
   const activeMonth = buildCreatedMonth(templateFixture(), 2026, 5);
-  const serviceForActiveMonth = createMonthlyCycleService(createDbStub({ monthById: activeMonth }).db);
+  const serviceForActiveMonth = createMonthlyCycleTestService(createDbStub({ monthById: activeMonth }).db);
 
   await assert.rejects(() => serviceForActiveMonth.deleteMonthCategory(activeMonth.id, "missing-category"), (error: unknown) => {
     assert.ok(error instanceof DomainError);
@@ -1257,7 +1258,7 @@ test("month structure mutations reject closed months and missing snapshot nodes"
 test("createMonthlyIncome persists active-month income and recalculates available money", async () => {
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const updatedMonth = await service.createMonthlyIncome({
     monthId: month.id,
@@ -1277,7 +1278,7 @@ test("createMonthlyIncome persists active-month income and recalculates availabl
 
 test("createMonthlyIncome rejects income dates outside the linked month", async () => {
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
-  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+  const service = createMonthlyCycleTestService(createDbStub({ monthById: month }).db);
 
   await assert.rejects(
     () =>
@@ -1324,7 +1325,7 @@ test("updateMonthlyIncome rejects received dates outside the linked month", asyn
     createdAt: new Date("2026-05-10T00:00:00.000Z"),
     updatedAt: new Date("2026-05-10T00:00:00.000Z"),
   });
-  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+  const service = createMonthlyCycleTestService(createDbStub({ monthById: month }).db);
 
   await assert.rejects(
     () =>
@@ -1356,7 +1357,7 @@ test("update and delete monthly income require mutable linked month ownership", 
     createdAt: new Date("2026-05-10T00:00:00.000Z"),
     updatedAt: new Date("2026-05-10T00:00:00.000Z"),
   });
-  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+  const service = createMonthlyCycleTestService(createDbStub({ monthById: month }).db);
 
   const updatedMonth = await service.updateMonthlyIncome({
     monthId: month.id,
@@ -1374,7 +1375,7 @@ test("update and delete monthly income require mutable linked month ownership", 
 
 test("createMonthlyIncome rejects closed months", async () => {
   const month = { ...buildCreatedMonth(templateFixture(), 2026, 5), status: MonthStatus.CLOSED };
-  const service = createMonthlyCycleService(createDbStub({ monthById: month }).db);
+  const service = createMonthlyCycleTestService(createDbStub({ monthById: month }).db);
 
   await assert.rejects(
     () =>
@@ -1397,7 +1398,7 @@ test("depositToPocket rejects source subcategory deposits in closed months", asy
   const month = { ...buildCreatedMonth(templateFixture(), 2026, 5), status: MonthStatus.CLOSED };
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   await assert.rejects(
     () =>
@@ -1433,7 +1434,7 @@ test("getClosureReview returns pending surpluses and deficits without mutating m
     targetPocketId: null,
   });
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const review = await service.getClosureReview(month.id);
 
@@ -1475,8 +1476,8 @@ test("getClosureReview blocks close when available money is positive or negative
     targetPocketId: "pocket-home",
   });
 
-  const surplusReview = await createMonthlyCycleService(createDbStub({ monthById: surplusMonth }).db).getClosureReview(surplusMonth.id);
-  const deficitReview = await createMonthlyCycleService(createDbStub({ monthById: deficitMonth }).db).getClosureReview(deficitMonth.id);
+  const surplusReview = await createMonthlyCycleTestService(createDbStub({ monthById: surplusMonth }).db).getClosureReview(surplusMonth.id);
+  const deficitReview = await createMonthlyCycleTestService(createDbStub({ monthById: deficitMonth }).db).getClosureReview(deficitMonth.id);
 
   assert.equal(surplusReview.availableMoney, 50);
   assert.equal(surplusReview.availableMoneyBlocker, "SURPLUS");
@@ -1505,7 +1506,7 @@ test("applyClosureAction persists surplus transfer using the default pocket", as
   }
 
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   const review = await service.applyClosureAction({
     monthId: month.id,
@@ -1533,7 +1534,7 @@ test("applyClosureAction requires explicit target pocket when surplus has no def
 
   subcategory.defaultPocketId = null;
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   await assert.rejects(
     () =>
@@ -1560,7 +1561,7 @@ test("closeMonth rejects pending closure balances and closes after explicit move
   }
 
   const dbStub = createDbStub({ monthById: month });
-  const service = createMonthlyCycleService(dbStub.db);
+  const service = createMonthlyCycleTestService(dbStub.db);
 
   await assert.rejects(() => service.closeMonth(month.id), (error: unknown) => {
     assert.ok(error instanceof DomainError);
@@ -1650,7 +1651,7 @@ test("getBasicReport returns summary totals, spending ranking, and positive or n
     },
   );
   const dbStub = createDbStub({ monthById: month });
-  const report = await createMonthlyCycleService(dbStub.db).getBasicReport(month.id);
+  const report = await createMonthlyCycleTestService(dbStub.db).getBasicReport(month.id);
 
   assert.deepEqual(report.summary, {
     monthId: month.id,
@@ -1682,7 +1683,7 @@ test("getBasicReport returns summary totals, spending ranking, and positive or n
 
 test("getBasicReport returns zero totals and empty lists for an empty month", async () => {
   const month = buildCreatedMonth(templateFixture(), 2026, 6);
-  const report = await createMonthlyCycleService(createDbStub({ monthById: month }).db).getBasicReport(month.id);
+  const report = await createMonthlyCycleTestService(createDbStub({ monthById: month }).db).getBasicReport(month.id);
 
   assert.equal(report.summary.monthlyIncomeTotal, 0);
   assert.equal(report.summary.availableMoney, 0);
