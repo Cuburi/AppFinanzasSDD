@@ -5,7 +5,7 @@ import type { ErrorRequestHandler } from "express";
 import { PaymentMethod } from "../../lib/prisma-client.js";
 
 import { monthlyCycleRouter } from "./routes.js";
-import { DomainError } from "./service.js";
+import { DomainError } from "./shared/service-errors.js";
 import type { BasicMonthlyReportView, MonthView } from "./dto/index.js";
 
 const report: BasicMonthlyReportView = {
@@ -137,6 +137,132 @@ test("monthlyCycleRouter maps missing report months to 404", async () => {
 
     assert.equal(response.status, 404);
     assert.deepEqual(await response.json(), { message: "Month was not found." });
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter delegates template, month lifecycle, and pocket deposit routes through injected service", async () => {
+  const calls: unknown[] = [];
+  const server = createTestServer({
+    async getTemplate() {
+      calls.push({ type: "getTemplate" });
+      return { categories: [{ id: "cat-template", name: "Template", sortOrder: 0, subcategories: [] }] };
+    },
+    async openMonth(input: unknown) {
+      calls.push({ type: "openMonth", input });
+      return month;
+    },
+    async depositToPocket(input: unknown) {
+      calls.push({ type: "depositToPocket", input });
+      return month;
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+
+    const templateResponse = await fetch(`http://127.0.0.1:${address.port}/api/template`);
+    const openResponse = await fetch(`http://127.0.0.1:${address.port}/api/months/open`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ year: 2026, month: 5 }),
+    });
+    const depositResponse = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-1", amount: 75, description: "Deposit" }),
+    });
+
+    assert.equal(templateResponse.status, 200);
+    assert.deepEqual(await templateResponse.json(), { categories: [{ id: "cat-template", name: "Template", sortOrder: 0, subcategories: [] }] });
+    assert.equal(openResponse.status, 201);
+    assert.deepEqual(await openResponse.json(), month);
+    assert.equal(depositResponse.status, 201);
+    assert.deepEqual(await depositResponse.json(), { month });
+    assert.deepEqual(calls, [
+      { type: "getTemplate" },
+      { type: "openMonth", input: { year: 2026, month: 5 } },
+      {
+        type: "depositToPocket",
+        input: {
+          monthId: "month-1",
+          sourceSubcategoryId: "sub-market",
+          targetPocketId: "pocket-1",
+          amount: 75,
+          description: "Deposit",
+          externalSourceLabel: null,
+        },
+      },
+    ]);
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter preserves PUT /api/template payload and response contract", async () => {
+  const calls: unknown[] = [];
+  const server = createTestServer({
+    async updateTemplate(input: unknown) {
+      calls.push(input);
+      return {
+        categories: [
+          {
+            id: "cat-template",
+            name: "Template",
+            sortOrder: 0,
+            subcategories: [
+              {
+                id: "sub-buffer",
+                name: "Buffer",
+                plannedAmount: 100,
+                defaultPocketId: "pocket-buffer",
+                active: true,
+                sortOrder: 0,
+              },
+            ],
+          },
+        ],
+      };
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/template`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        categories: [{ name: " Template ", subcategories: [{ name: " Buffer ", plannedAmount: 100, defaultPocketId: "pocket-buffer" }] }],
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      categories: [
+        {
+          id: "cat-template",
+          name: "Template",
+          sortOrder: 0,
+          subcategories: [
+            {
+              id: "sub-buffer",
+              name: "Buffer",
+              plannedAmount: 100,
+              defaultPocketId: "pocket-buffer",
+              active: true,
+              sortOrder: 0,
+            },
+          ],
+        },
+      ],
+    });
+    assert.deepEqual(calls, [
+      { categories: [{ name: "Template", subcategories: [{ name: "Buffer", plannedAmount: 100, defaultPocketId: "pocket-buffer" }] }] },
+    ]);
   } finally {
     server.close();
   }

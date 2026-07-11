@@ -1,4 +1,4 @@
-import { MovementType, PaymentMethod } from "../../../lib/prisma-client.js";
+import { MovementType, PaymentMethod } from "../application/monthly-cycle-types.js";
 
 import type { BasicMonthlyReportView, BasicReportSubcategoryView } from "../dto/index.js";
 import { calculateMonthBalances } from "../balance-calculator.js";

@@ -1,40 +1,25 @@
 import type { TemplateInput, TemplateView } from "../dto/index.js";
 import { mapTemplate } from "../mappers/monthly-cycle-mappers.js";
-import { decimal } from "../shared/money.js";
-import { readTemplateCategories, assertTemplateDefaultPocketsAreActive } from "../shared/month-queries.js";
-import type { MonthlyCycleDb } from "../shared/service-types.js";
+import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflow-dependencies.js";
 
-export const createTemplateService = (db: MonthlyCycleDb) => ({
-  async getTemplate(): Promise<TemplateView> {
-    const categories = await readTemplateCategories(db);
-    return mapTemplate(categories);
-  },
+export const createTemplateService = (dependencies: MonthlyCycleWorkflowDependencies) => {
+  const ports = resolveMonthlyCyclePorts(dependencies);
 
-  async updateTemplate(input: TemplateInput): Promise<TemplateView> {
-    const categories = await db.$transaction(async (tx) => {
-      await assertTemplateDefaultPocketsAreActive(tx, input);
-      await tx.templateCategory.deleteMany();
+  return {
+    async getTemplate(): Promise<TemplateView> {
+      const categories = await ports.templates.readCategories();
+      return mapTemplate(categories);
+    },
 
-      for (const [categoryIndex, category] of input.categories.entries()) {
-        await tx.templateCategory.create({
-          data: {
-            name: category.name,
-            sortOrder: categoryIndex,
-            subcategories: {
-              create: category.subcategories.map((subcategory, subcategoryIndex) => ({
-                name: subcategory.name,
-                plannedAmount: decimal(subcategory.plannedAmount),
-                defaultPocketId: subcategory.defaultPocketId ?? null,
-                sortOrder: subcategoryIndex,
-              })),
-            },
-          },
-        });
-      }
+    async updateTemplate(input: TemplateInput): Promise<TemplateView> {
+      const categories = await ports.transactionRunner.run(async (txPorts) => {
+        await txPorts.pockets.ensureTemplateDefaultPocketsAreActive(input);
+        await txPorts.templates.replaceCategories(input);
 
-      return readTemplateCategories(tx);
-    });
+        return txPorts.templates.readCategories();
+      });
 
-    return mapTemplate(categories);
-  },
-});
+      return mapTemplate(categories);
+    },
+  };
+};

@@ -1,4 +1,4 @@
-import { PaymentMethod } from "../../../lib/prisma-client.js";
+import { PaymentMethod } from "../application/monthly-cycle-types.js";
 
 import { readIsoDateString, readNonEmptyString, readOptionalString, readPositiveAmount } from "./shared-parsers.js";
 
