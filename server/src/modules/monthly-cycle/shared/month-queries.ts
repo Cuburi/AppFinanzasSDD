@@ -1,4 +1,4 @@
-import { MonthStatus } from "../../../lib/prisma-client.js";
+import { MonthStatus } from "../application/monthly-cycle-types.js";
 
 import type { TemplateInput } from "../dto/index.js";
 import { DomainError } from "./service-errors.js";

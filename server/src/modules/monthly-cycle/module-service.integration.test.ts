@@ -2,9 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../lib/prisma-client.js";
 
-import { createMonthlyCycleService, DomainError } from "./service.js";
+import { createMonthlyCycleModule } from "./monthly-cycle.module.js";
+import { DomainError } from "./shared/service-errors.js";
 
 const money = (value: number) => new Prisma.Decimal(value.toFixed(2));
+const createMonthlyCycleTestService = (db: unknown) => createMonthlyCycleModule({ db: db as never }).service;
 
 type TemplateCategoryState = {
   id: string;
@@ -496,7 +498,7 @@ const createIntegrationDb = (
 
 test("service integration: opening a month snapshots the template and later template edits do not mutate it", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
 
   const openedMonth = await service.openMonth({ year: 2026, month: 5 });
 
@@ -519,7 +521,7 @@ test("service integration: opening a month snapshots the template and later temp
 
 test("service integration: promoted subcategory relinks stale parent template ids after a template rewrite", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
 
   const openedMonth = await service.openMonth({ year: 2026, month: 5 });
   const snapshotCategory = openedMonth.categories[0];
@@ -560,7 +562,7 @@ test("service integration: promoted subcategory relinks stale parent template id
 
 test("service integration: promoted subcategory recreates a missing template parent after a template rewrite", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
 
   const openedMonth = await service.openMonth({ year: 2026, month: 5 });
   const snapshotCategory = openedMonth.categories[0];
@@ -601,7 +603,7 @@ test("service integration: promoted subcategory recreates a missing template par
 
 test("service integration: opening a second active month is rejected", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
 
   await service.openMonth({ year: 2026, month: 5 });
 
@@ -615,7 +617,7 @@ test("service integration: opening a second active month is rejected", async () 
 
 test("service integration: closed months are immutable", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
@@ -653,7 +655,7 @@ test("service integration: closed months are immutable", async () => {
 
 test("service integration: rejects cash withdrawal for closed months", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
@@ -683,7 +685,7 @@ test("service integration: rejects cash withdrawal for closed months", async () 
 
 test("service integration: rejects reopening a previously closed month", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
@@ -710,7 +712,7 @@ test("service integration: rejects reopening a previously closed month", async (
 
 test("service integration: rejects unknown month and subcategory references for expenses and history", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
 
   await assert.rejects(
@@ -753,7 +755,7 @@ test("service integration: rejects unknown month and subcategory references for 
 
 test("service integration: closing is rejected while closure review has pending balances", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
 
   await assert.rejects(() => service.closeMonth(month.id), (error: unknown) => {
@@ -766,7 +768,7 @@ test("service integration: closing is rejected while closure review has pending 
 
 test("service integration: valid subcategory deposits persist and decrease the source balance", async () => {
   const { db, getCapturedMovements } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
@@ -789,7 +791,7 @@ test("service integration: valid subcategory deposits persist and decrease the s
 
 test("service integration: valid external deposits persist without a month ledger entry", async () => {
   const { db, getCapturedMovements } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
 
   const updatedMonth = await service.depositToPocket({
     targetPocketId: "pocket-buffer",
@@ -810,7 +812,7 @@ test("service integration: valid external deposits persist without a month ledge
 
 test("service integration: income CRUD updates month totals while active", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
 
   const withIncome = await service.createMonthlyIncome({
@@ -833,7 +835,7 @@ test("service integration: income CRUD updates month totals while active", async
 
 test("service integration: income CRUD rejects closed month mutations", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
   const withIncome = await service.createMonthlyIncome({
@@ -879,7 +881,7 @@ test("service integration: income CRUD rejects closed month mutations", async ()
 
 test("service integration: opening next month does not carry forward prior income", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const may = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = may.categories[0]?.subcategories[0]?.id ?? "";
 
@@ -903,7 +905,7 @@ test("service integration: opening next month does not carry forward prior incom
 
 test("service integration: overspend is persisted and recalculates the month as negative", async () => {
   const { db, getCapturedMovements } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
@@ -950,7 +952,7 @@ test("service integration: deficit coverage from one subcategory persists a sing
       ],
     },
   ]);
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const surplusSourceId = month.categories[0]?.subcategories[0]?.id ?? "";
   const deficitTargetId = month.categories[0]?.subcategories[1]?.id ?? "";
@@ -982,7 +984,7 @@ test("service integration: deficit coverage from one subcategory persists a sing
 
 test("service integration: template edits are readable after persistence", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
 
   await service.updateTemplate({
     categories: [
@@ -1002,7 +1004,7 @@ test("service integration: template edits are readable after persistence", async
 
 test("service integration: records non-cash expense with occurred date and exposes cash balance", async () => {
   const { db, getCapturedMovements } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
@@ -1018,7 +1020,7 @@ test("service integration: records non-cash expense with occurred date and expos
 
 test("service integration: rejects expense dates outside the linked month", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
@@ -1035,7 +1037,7 @@ test("service integration: rejects expense dates outside the linked month", asyn
 
 test("service integration: withdraws cash only when available money is sufficient", async () => {
   const { db, getCapturedMovements } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
 
   await assert.rejects(
@@ -1060,7 +1062,7 @@ test("service integration: withdraws cash only when available money is sufficien
 
 test("service integration: cash expense is rejected when physical cash is insufficient", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
@@ -1077,7 +1079,7 @@ test("service integration: cash expense is rejected when physical cash is insuff
 
 test("service integration: updates active-month expenses and recalculates balances", async () => {
   const { db, getCapturedMovements } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
   await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 200, receivedAt: "2026-05-01T00:00:00.000Z" });
@@ -1113,7 +1115,7 @@ test("service integration: updates active-month expenses and recalculates balanc
 
 test("service integration: deletes active-month expenses and recalculates balances", async () => {
   const { db, getCapturedMovements } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
   await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 100, receivedAt: "2026-05-01T00:00:00.000Z" });
@@ -1137,7 +1139,7 @@ test("service integration: deletes active-month expenses and recalculates balanc
 
 test("service integration: rejects expense corrections for expenses that belong to closed months", async () => {
   const { db, getCapturedMovements } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const may = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = may.categories[0]?.subcategories[0]?.id ?? "";
   await service.recordExpense({
@@ -1180,7 +1182,7 @@ test("service integration: rejects expense corrections for expenses that belong 
 
 test("service integration: rejects foreign expense ids from another month", async () => {
   const { db, getCapturedMovements } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const may = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = may.categories[0]?.subcategories[0]?.id ?? "";
   await service.recordExpense({
@@ -1225,7 +1227,7 @@ test("service integration: rejects foreign expense ids from another month", asyn
 
 test("service integration: category and subcategory edits mutate only the active-month snapshot", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const categoryId = month.categories[0]?.id ?? "";
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
@@ -1250,7 +1252,7 @@ test("service integration: category and subcategory edits mutate only the active
 
 test("service integration: active-month category creation can stay snapshot-only or promote to template", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
 
   const snapshotOnly = await service.createMonthCategory({ monthId: month.id, name: "Variables", addToTemplate: false });
@@ -1265,7 +1267,7 @@ test("service integration: active-month category creation can stay snapshot-only
 
 test("service integration: promoted subcategory under a month-only parent links parent and child template records", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const withMonthOnlyCategory = await service.createMonthCategory({ monthId: month.id, name: "Mes", addToTemplate: false });
   const monthOnlyCategory = withMonthOnlyCategory.categories.find((category) => category.name === "Mes");
@@ -1291,7 +1293,7 @@ test("service integration: promoted subcategory under a month-only parent links 
 
 test("service integration: failed template promotion rolls back snapshot and template writes", async () => {
   const { db } = createIntegrationDb(undefined, { failTemplateSubcategoryNames: ["Rollback"] });
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const withMonthOnlyCategory = await service.createMonthCategory({ monthId: month.id, name: "Temporal", addToTemplate: false });
   const monthOnlyCategory = withMonthOnlyCategory.categories.find((category) => category.name === "Temporal");
@@ -1318,7 +1320,7 @@ test("service integration: failed template promotion rolls back snapshot and tem
 
 test("service integration: deletes empty subcategories before deleting their category", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const categoryId = month.categories[0]?.id ?? "";
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
@@ -1339,7 +1341,7 @@ test("service integration: deletes empty subcategories before deleting their cat
 
 test("service integration: rejects deleting movement-linked month structure nodes", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const categoryId = month.categories[0]?.id ?? "";
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
@@ -1368,7 +1370,7 @@ test("service integration: rejects deleting movement-linked month structure node
 
 test("service integration: month structure corrections reject closed months and missing nodes", async () => {
   const { db } = createIntegrationDb();
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
   await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01T00:00:00.000Z" });
@@ -1403,7 +1405,7 @@ test("service integration: month structure corrections reject closed months and 
 
 test("service integration: filters expense history by payment method, date range, and subcategory", async () => {
   const { db } = createIntegrationDb([{ id: "template-category-1", name: "Base", sortOrder: 0, subcategories: [{ id: "template-food", name: "Comida", plannedAmount: money(300), defaultPocketId: "pocket-buffer", active: true, sortOrder: 0 }, { id: "template-transport", name: "Transporte", plannedAmount: money(200), defaultPocketId: "pocket-buffer", active: true, sortOrder: 1 }] }]);
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const foodId = month.categories[0]?.subcategories[0]?.id ?? "";
   const transportId = month.categories[0]?.subcategories[1]?.id ?? "";
@@ -1423,7 +1425,7 @@ test("service integration: filters expense history by payment method, date range
 
 test("service integration: opening next month creates cash carryover from latest prior closed month", async () => {
   const { db, getCapturedMovements } = createIntegrationDb([{ id: "template-category-cash", name: "Base", sortOrder: 0, subcategories: [{ id: "template-cash-food", name: "Comida", plannedAmount: money(20), defaultPocketId: "pocket-buffer", active: true, sortOrder: 0 }] }]);
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const may = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = may.categories[0]?.subcategories[0]?.id ?? "";
   await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 50, receivedAt: "2026-05-01T00:00:00.000Z" });
@@ -1441,7 +1443,7 @@ test("service integration: opening next month creates cash carryover from latest
 
 test("service integration: opening next month creates no cash carryover when prior closed cash is zero", async () => {
   const { db, getCapturedMovements } = createIntegrationDb([{ id: "template-category-cash", name: "Base", sortOrder: 0, subcategories: [{ id: "template-cash-food", name: "Comida", plannedAmount: money(20), defaultPocketId: "pocket-buffer", active: true, sortOrder: 0 }] }]);
-  const service = createMonthlyCycleService(db);
+  const service = createMonthlyCycleTestService(db);
   const may = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = may.categories[0]?.subcategories[0]?.id ?? "";
 

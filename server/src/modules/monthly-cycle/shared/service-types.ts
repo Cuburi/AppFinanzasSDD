@@ -1,4 +1,5 @@
-import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../lib/prisma-client.js";
+import type { MonthStatus, MovementType, PaymentMethod } from "../application/monthly-cycle-types.js";
+import type { MonthlyCycleMoney } from "./money.js";
 
 export const templateInclude = {
   subcategories: {
@@ -30,7 +31,7 @@ export type TemplateCategoryRecord = {
   subcategories: Array<{
     id: string;
     name: string;
-    plannedAmount: Prisma.Decimal;
+    plannedAmount: MonthlyCycleMoney;
     defaultPocketId: string | null;
     active: boolean;
     sortOrder: number;
@@ -48,7 +49,7 @@ export type MonthRecord = {
     id: string;
     monthId: string;
     sourceName: string;
-    amount: Prisma.Decimal;
+    amount: MonthlyCycleMoney;
     receivedAt: Date;
     notes: string | null;
     createdAt: Date;
@@ -62,7 +63,7 @@ export type MonthRecord = {
     subcategories: Array<{
       id: string;
       name: string;
-      plannedAmount: Prisma.Decimal;
+      plannedAmount: MonthlyCycleMoney;
       defaultPocketId: string | null;
       templateSubcategoryId: string | null;
       sortOrder: number;
@@ -71,7 +72,7 @@ export type MonthRecord = {
   movements: Array<{
     id?: string;
     type: MovementType;
-    amount: Prisma.Decimal;
+    amount: MonthlyCycleMoney;
     monthId?: string | null;
     occurredAt?: Date;
     description?: string | null;
@@ -97,7 +98,7 @@ export type MonthlyCycleDb = {
         subcategories: {
           create: Array<{
             name: string;
-            plannedAmount: Prisma.Decimal;
+            plannedAmount: MonthlyCycleMoney;
             defaultPocketId: string | null;
             sortOrder: number;
           }>;
@@ -110,7 +111,7 @@ export type MonthlyCycleDb = {
       data: {
         categoryId: string;
         name: string;
-        plannedAmount: Prisma.Decimal;
+        plannedAmount: MonthlyCycleMoney;
         defaultPocketId: string | null;
         sortOrder: number;
       };
@@ -123,8 +124,8 @@ export type MonthlyCycleDb = {
       data: {
         year: number;
         month: number;
-          status: MonthStatus;
-          categories: {
+        status: MonthStatus;
+        categories: {
           create: Array<{
             name: string;
             sortOrder: number;
@@ -132,13 +133,13 @@ export type MonthlyCycleDb = {
             subcategories: {
               create: Array<{
                 name: string;
-                plannedAmount: Prisma.Decimal;
+                plannedAmount: MonthlyCycleMoney;
                 defaultPocketId: string | null;
                 templateSubcategoryId: string;
                 sortOrder: number;
               }>;
-          };
-          movements?: { create: Array<{ type: MovementType; amount: Prisma.Decimal; description?: string | null; occurredAt?: Date }> };
+            };
+            movements?: { create: Array<{ type: MovementType; amount: MonthlyCycleMoney; description?: string | null; occurredAt?: Date }> };
           }>;
         };
       };
@@ -156,7 +157,7 @@ export type MonthlyCycleDb = {
       Array<{
         id?: string;
         type: MovementType;
-        amount: Prisma.Decimal;
+        amount: MonthlyCycleMoney;
         occurredAt?: Date;
         description?: string | null;
         paymentMethod?: PaymentMethod | null;
@@ -170,7 +171,7 @@ export type MonthlyCycleDb = {
     create(args: {
       data: {
         type: MovementType;
-        amount: Prisma.Decimal;
+        amount: MonthlyCycleMoney;
         description?: string | null;
         occurredAt?: Date;
         paymentMethod?: PaymentMethod | null;
@@ -185,7 +186,7 @@ export type MonthlyCycleDb = {
     update(args: {
       where: { id: string };
       data: {
-        amount?: Prisma.Decimal;
+        amount?: MonthlyCycleMoney;
         description?: string | null;
         occurredAt?: Date;
         paymentMethod?: PaymentMethod;
@@ -204,7 +205,7 @@ export type MonthlyCycleDb = {
       data: {
         monthCategoryId: string;
         name: string;
-        plannedAmount: Prisma.Decimal;
+        plannedAmount: MonthlyCycleMoney;
         defaultPocketId: string | null;
         templateSubcategoryId: string | null;
         sortOrder: number;
@@ -212,7 +213,7 @@ export type MonthlyCycleDb = {
     }): Promise<{ id: string }>;
     update(args: {
       where: { id: string };
-      data: { name?: string; plannedAmount?: Prisma.Decimal; defaultPocketId?: string | null; templateSubcategoryId?: string | null };
+      data: { name?: string; plannedAmount?: MonthlyCycleMoney; defaultPocketId?: string | null; templateSubcategoryId?: string | null };
     }): Promise<unknown>;
     delete(args: { where: { id: string } }): Promise<unknown>;
   };
@@ -222,7 +223,7 @@ export type MonthlyCycleDb = {
       data: {
         monthId: string;
         sourceName: string;
-        amount: Prisma.Decimal;
+        amount: MonthlyCycleMoney;
         receivedAt: Date;
         notes: string | null;
       };
@@ -231,7 +232,7 @@ export type MonthlyCycleDb = {
       where: { id: string };
       data: {
         sourceName?: string;
-        amount?: Prisma.Decimal;
+        amount?: MonthlyCycleMoney;
         receivedAt?: Date;
         notes?: string | null;
       };

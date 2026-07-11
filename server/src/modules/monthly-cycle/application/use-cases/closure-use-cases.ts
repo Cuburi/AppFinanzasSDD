@@ -1,11 +1,19 @@
-import { MonthStatus, MovementType } from "../../../lib/prisma-client.js";
+import type { ClosureActionInput, ClosureReviewView, MonthView } from "../../dto/index.js";
+import { mapMonth } from "../../mappers/monthly-cycle-mappers.js";
+import { calculateMonthBalances } from "../../balance-calculator.js";
+import { findMonthSubcategory, listMonthSubcategories, assertMonthIsMutable } from "../../shared/month-queries.js";
+import { decimal, decimalToNumber, isZero } from "../../shared/money.js";
+import { DomainError } from "../../shared/service-errors.js";
+import type { MonthRecord } from "../../shared/service-types.js";
+import { MonthStatus, MovementType, type MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 
-import type { ClosureActionInput, ClosureReviewView } from "../dto/index.js";
-import { calculateMonthBalances } from "../balance-calculator.js";
-import { decimal, decimalToNumber, isZero } from "../shared/money.js";
-import { assertMonthIsMutable, assertPocketIsActive, findMonthSubcategory, listMonthSubcategories, readMonthById } from "../shared/month-queries.js";
-import { DomainError } from "../shared/service-errors.js";
-import type { MonthRecord, MonthlyCycleDb } from "../shared/service-types.js";
+export const CLOSURE_USE_CASE_NAMES = ["getClosureReview", "applyClosureAction", "closeMonth"] as const;
+
+export type ClosureUseCases = {
+  getClosureReview(monthId: string): Promise<ClosureReviewView>;
+  applyClosureAction(input: ClosureActionInput): Promise<ClosureReviewView>;
+  closeMonth(monthId: string): Promise<MonthView>;
+};
 
 export const buildClosureReview = (month: MonthRecord): ClosureReviewView => {
   const balances = calculateMonthBalances(month);
@@ -68,17 +76,16 @@ const readActionAmount = (requestedAmount: number | null | undefined, pendingAmo
   return amount;
 };
 
-export const createClosureService = (db: MonthlyCycleDb) => ({
-  async getClosureReview(monthId: string): Promise<ClosureReviewView> {
-    const month = await readMonthById(db, monthId);
+export const createClosureUseCases = (ports: MonthlyCyclePorts): ClosureUseCases => ({
+  async getClosureReview(monthId) {
+    const month = await ports.months.findById(monthId);
     return buildClosureReview(month);
   },
 
-  async applyClosureAction(input: ClosureActionInput): Promise<ClosureReviewView> {
-    const month = await db.$transaction(async (tx) => {
-      const existingMonth = await readMonthById(tx, input.monthId);
+  async applyClosureAction(input) {
+    const month = await ports.transactionRunner.run(async (txPorts) => {
+      const existingMonth = await txPorts.months.findById(input.monthId);
       assertMonthIsMutable(existingMonth);
-
       const balances = calculateMonthBalances(existingMonth);
 
       if (input.type === MovementType.SURPLUS_TO_POCKET_ON_CLOSE) {
@@ -106,16 +113,14 @@ export const createClosureService = (db: MonthlyCycleDb) => ({
           throw new DomainError(400, "Target pocket is required because this subcategory has no default pocket.");
         }
 
-        await assertPocketIsActive(tx, targetPocketId, "Target pocket");
-        await tx.movement.create({
-          data: {
-            type: MovementType.SURPLUS_TO_POCKET_ON_CLOSE,
-            amount: decimal(readActionAmount(input.amount, pendingSurplus)),
-            description: input.description,
-            monthId: input.monthId,
-            sourceSubcategoryId: sourceSubcategory.id,
-            targetPocketId,
-          },
+        await txPorts.pockets.ensurePocketIsActive(targetPocketId, "Target pocket");
+        await txPorts.movements.create({
+          type: MovementType.SURPLUS_TO_POCKET_ON_CLOSE,
+          amount: decimal(readActionAmount(input.amount, pendingSurplus)),
+          description: input.description,
+          monthId: input.monthId,
+          sourceSubcategoryId: sourceSubcategory.id,
+          targetPocketId,
         });
       }
 
@@ -151,15 +156,13 @@ export const createClosureService = (db: MonthlyCycleDb) => ({
           throw new DomainError(400, "Source subcategory does not have enough available balance.");
         }
 
-        await tx.movement.create({
-          data: {
-            type: MovementType.DEFICIT_COVER_FROM_SUBCATEGORY,
-            amount: decimal(amount),
-            description: input.description,
-            monthId: input.monthId,
-            sourceSubcategoryId: sourceSubcategory.id,
-            targetSubcategoryId: targetSubcategory.id,
-          },
+        await txPorts.movements.create({
+          type: MovementType.DEFICIT_COVER_FROM_SUBCATEGORY,
+          amount: decimal(amount),
+          description: input.description,
+          monthId: input.monthId,
+          sourceSubcategoryId: sourceSubcategory.id,
+          targetSubcategoryId: targetSubcategory.id,
         });
       }
 
@@ -183,22 +186,36 @@ export const createClosureService = (db: MonthlyCycleDb) => ({
           throw new DomainError(400, "Target subcategory does not have a pending deficit.");
         }
 
-        await assertPocketIsActive(tx, sourcePocketId, "Source pocket");
-        await tx.movement.create({
-          data: {
-            type: MovementType.DEFICIT_COVER_FROM_POCKET,
-            amount: decimal(readActionAmount(input.amount, Math.abs(targetAvailable))),
-            description: input.description,
-            monthId: input.monthId,
-            sourcePocketId,
-            targetSubcategoryId: targetSubcategory.id,
-          },
+        await txPorts.pockets.ensurePocketIsActive(sourcePocketId, "Source pocket");
+        await txPorts.movements.create({
+          type: MovementType.DEFICIT_COVER_FROM_POCKET,
+          amount: decimal(readActionAmount(input.amount, Math.abs(targetAvailable))),
+          description: input.description,
+          monthId: input.monthId,
+          sourcePocketId,
+          targetSubcategoryId: targetSubcategory.id,
         });
       }
 
-      return readMonthById(tx, input.monthId);
+      return txPorts.months.findById(input.monthId);
     });
 
     return buildClosureReview(month);
+  },
+
+  async closeMonth(monthId) {
+    const month = await ports.transactionRunner.run(async (txPorts) => {
+      const existingMonth = await txPorts.months.findById(monthId);
+      assertMonthIsMutable(existingMonth);
+      const review = buildClosureReview(existingMonth);
+
+      if (!review.canClose) {
+        throw new DomainError(409, "Month cannot be closed while pending subcategory balances or available money remain unresolved.");
+      }
+
+      return txPorts.months.close(monthId);
+    });
+
+    return mapMonth(month);
   },
 });

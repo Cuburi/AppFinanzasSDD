@@ -1,19 +1,16 @@
-import { MovementType, PaymentMethod, Prisma } from "../../../lib/prisma-client.js";
+import { MovementType, PaymentMethod } from "../application/monthly-cycle-types.js";
+import { decimalToNumber, roundMoney, type MonthlyCycleMoney } from "./money.js";
 
 type CashMovement = {
   type: MovementType;
   paymentMethod?: PaymentMethod | null;
-  amount: Prisma.Decimal;
+  amount: MonthlyCycleMoney;
 };
 
 type MonthPeriod = {
   year: number;
   month: number;
 };
-
-const decimalToNumber = (value: Prisma.Decimal): number => Number(value.toString());
-
-const roundMoney = (value: number) => Number(value.toFixed(2));
 
 export const isCashWithdrawal = (movement: Pick<CashMovement, "type">) =>
   movement.type === MovementType.CASH_WITHDRAWAL;

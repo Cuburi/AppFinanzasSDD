@@ -1,6 +1,20 @@
 import { Router } from "express";
 
 import {
+  type BasicMonthlyReportView,
+  type CreateMonthCategoryInput,
+  type CreateMonthSubcategoryInput,
+  type CreateMonthlyIncomeInput,
+  type DepositToPocketInput,
+  type ExpenseHistoryQueryInput,
+  type ExpenseHistoryView,
+  type MonthView,
+  type OpenMonthInput,
+  type RecordExpenseInput,
+  type UpdateExpenseInput,
+  type UpdateMonthCategoryInput,
+  type UpdateMonthSubcategoryInput,
+  type UpdateMonthlyIncomeInput,
   parseCreateMonthlyIncomeInput,
   parseClosureActionInput,
   parseCreateMonthCategoryInput,
@@ -21,75 +35,46 @@ import {
   parseUpdateMonthSubcategoryInput,
   parseWithdrawCashInput,
 } from "./dto/index.js";
-import {
-  DomainError,
-  applyClosureAction,
-  closeMonth,
-  createMonthCategory,
-  createMonthlyIncome,
-  createMonthSubcategory,
-  deleteExpense,
-  deleteMonthCategory,
-  deleteMonthlyIncome,
-  deleteMonthSubcategory,
-  depositToPocket,
-  getActiveMonth,
-  getClosureReview,
-  getCashSummary,
-  getBasicReport,
-  getTemplate,
-  listExpenseHistory,
-  openMonth,
-  recordExpense,
-  updateExpense,
-  updateMonthCategory,
-  withdrawCash,
-  updateMonthlyIncome,
-  updateMonthSubcategory,
-  updateTemplate,
-} from "./service.js";
+import type { LifecycleUseCases } from "./application/use-cases/lifecycle-use-cases.js";
+import type { MovementUseCases } from "./application/use-cases/movement-use-cases.js";
+import type { TemplateUseCases } from "./application/use-cases/template-use-cases.js";
+import type { IncomeUseCases } from "./application/use-cases/income-use-cases.js";
+import type { CashUseCases } from "./application/use-cases/cash-use-cases.js";
+import type { ClosureUseCases } from "./application/use-cases/closure-use-cases.js";
+import type { ReportsUseCases } from "./application/use-cases/reports-use-cases.js";
+import type { ExpenseHistoryUseCases } from "./application/use-cases/expense-history-use-cases.js";
+import type { MonthStructureUseCases } from "./application/use-cases/month-structure-use-cases.js";
+import { DomainError } from "./shared/service-errors.js";
 
 const isDomainError = (error: unknown): error is DomainError => error instanceof DomainError;
 
 const readMessage = (error: unknown) => (error instanceof Error ? error.message : "Unexpected error.");
 
-type MonthlyCycleRouteService = {
-  getBasicReport(monthId: string): ReturnType<typeof getBasicReport>;
-  updateExpense(input: Parameters<typeof updateExpense>[0]): ReturnType<typeof updateExpense>;
-  deleteExpense(monthId: string, expenseId: string): ReturnType<typeof deleteExpense>;
-  createMonthCategory(input: Parameters<typeof createMonthCategory>[0]): ReturnType<typeof createMonthCategory>;
-  updateMonthCategory(input: Parameters<typeof updateMonthCategory>[0]): ReturnType<typeof updateMonthCategory>;
-  deleteMonthCategory(monthId: string, categoryId: string): ReturnType<typeof deleteMonthCategory>;
-  createMonthSubcategory(input: Parameters<typeof createMonthSubcategory>[0]): ReturnType<typeof createMonthSubcategory>;
-  updateMonthSubcategory(input: Parameters<typeof updateMonthSubcategory>[0]): ReturnType<typeof updateMonthSubcategory>;
-  deleteMonthSubcategory(monthId: string, subcategoryId: string): ReturnType<typeof deleteMonthSubcategory>;
-};
+export type TemplateRouteService = TemplateUseCases;
+export type IncomeRouteService = IncomeUseCases;
+export type CashRouteService = CashUseCases;
+export type ClosureRouteService = ClosureUseCases;
+export type ReportsRouteService = ReportsUseCases;
+export type ExpenseHistoryRouteService = ExpenseHistoryUseCases;
+export type LifecycleRouteService = Pick<LifecycleUseCases, "openMonth" | "getActiveMonth">;
+export type MovementRouteService = MovementUseCases;
+export type MonthStructureRouteService = MonthStructureUseCases;
 
-const defaultMonthlyCycleRouteService: MonthlyCycleRouteService = {
-  getBasicReport,
-  updateExpense,
-  deleteExpense,
-  createMonthCategory,
-  updateMonthCategory,
-  deleteMonthCategory,
-  createMonthSubcategory,
-  updateMonthSubcategory,
-  deleteMonthSubcategory,
-};
+export type MonthlyCycleRouteService = TemplateRouteService & IncomeRouteService & CashRouteService & ClosureRouteService & ReportsRouteService & ExpenseHistoryRouteService & LifecycleRouteService & MovementRouteService & MonthStructureRouteService;
 
-export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteService> = {}) => {
-  const service = { ...defaultMonthlyCycleRouteService, ...serviceOverrides };
+export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRouteService>) => {
+  const service = routeService as MonthlyCycleRouteService;
   const router = Router();
 
   router.get("/template", async (_request, response) => {
-    const template = await getTemplate();
+    const template = await service.getTemplate();
     response.json(template);
   });
 
   router.put("/template", async (request, response) => {
     try {
       const payload = parseTemplateInput(request.body);
-      const template = await updateTemplate(payload);
+      const template = await service.updateTemplate(payload);
       response.json(template);
     } catch (error) {
       if (isDomainError(error)) {
@@ -104,7 +89,7 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
   router.post("/months/open", async (request, response) => {
     try {
       const payload = parseOpenMonthInput(request.body);
-      const month = await openMonth(payload);
+      const month = await service.openMonth(payload);
       response.status(201).json(month);
     } catch (error) {
       if (isDomainError(error)) {
@@ -117,14 +102,14 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
   });
 
   router.get("/months/active", async (_request, response) => {
-    const month = await getActiveMonth();
+    const month = await service.getActiveMonth();
     response.json({ month });
   });
 
   router.post("/months/:id/expenses", async (request, response) => {
     try {
       const payload = parseRecordExpenseInput(request.params.id, request.body);
-      const month = await recordExpense(payload);
+      const month = await service.recordExpense(payload);
       response.status(201).json(month);
     } catch (error) {
       if (isDomainError(error)) {
@@ -259,7 +244,7 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
   router.get("/months/:id/expenses", async (request, response) => {
     try {
       const payload = parseExpenseHistoryQueryInput(request.params.id, request.query);
-      const history = await listExpenseHistory(payload);
+      const history = await service.listExpenseHistory(payload);
       response.json(history);
     } catch (error) {
       if (isDomainError(error)) {
@@ -289,7 +274,7 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
   router.post("/months/:id/cash-withdrawals", async (request, response) => {
     try {
       const payload = parseWithdrawCashInput(request.params.id, request.body);
-      const result = await withdrawCash(payload);
+      const result = await service.withdrawCash(payload);
       response.status(201).json(result);
     } catch (error) {
       if (isDomainError(error)) {
@@ -304,7 +289,7 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
   router.get("/months/:id/cash", async (request, response) => {
     try {
       const payload = parseCashSummaryInput(request.params.id);
-      const summary = await getCashSummary(payload.monthId);
+      const summary = await service.getCashSummary(payload.monthId);
       response.json(summary);
     } catch (error) {
       if (isDomainError(error)) {
@@ -319,7 +304,7 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
   router.post("/months/:id/incomes", async (request, response) => {
     try {
       const payload = parseCreateMonthlyIncomeInput(request.params.id, request.body);
-      const month = await createMonthlyIncome(payload);
+      const month = await service.createMonthlyIncome(payload);
       response.status(201).json(month);
     } catch (error) {
       if (isDomainError(error)) {
@@ -334,7 +319,7 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
   router.patch("/months/:id/incomes/:incomeId", async (request, response) => {
     try {
       const payload = parseUpdateMonthlyIncomeInput(request.params.id, request.params.incomeId, request.body);
-      const month = await updateMonthlyIncome(payload);
+      const month = await service.updateMonthlyIncome(payload);
       response.json(month);
     } catch (error) {
       if (isDomainError(error)) {
@@ -348,7 +333,7 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
 
   router.delete("/months/:id/incomes/:incomeId", async (request, response) => {
     try {
-      const month = await deleteMonthlyIncome(request.params.id, request.params.incomeId);
+      const month = await service.deleteMonthlyIncome(request.params.id, request.params.incomeId);
       response.json(month);
     } catch (error) {
       if (isDomainError(error)) {
@@ -363,7 +348,7 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
   router.post("/pockets/deposits", async (request, response) => {
     try {
       const payload = parseDepositToPocketInput(request.body);
-      const month = await depositToPocket(payload);
+      const month = await service.depositToPocket(payload);
       response.status(201).json({ month });
     } catch (error) {
       if (isDomainError(error)) {
@@ -377,7 +362,7 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
 
   router.get("/months/:id/closure-review", async (request, response) => {
     try {
-      const review = await getClosureReview(request.params.id);
+      const review = await service.getClosureReview(request.params.id);
       response.json(review);
     } catch (error) {
       if (isDomainError(error)) {
@@ -392,7 +377,7 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
   router.post("/months/:id/closure-actions", async (request, response) => {
     try {
       const payload = parseClosureActionInput(request.params.id, request.body);
-      const review = await applyClosureAction(payload);
+      const review = await service.applyClosureAction(payload);
       response.status(201).json(review);
     } catch (error) {
       if (isDomainError(error)) {
@@ -406,7 +391,7 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
 
   router.post("/months/:id/close", async (request, response) => {
     try {
-      const month = await closeMonth(request.params.id);
+      const month = await service.closeMonth(request.params.id);
       response.json(month);
     } catch (error) {
       if (isDomainError(error)) {
@@ -420,3 +405,5 @@ export const monthlyCycleRouter = (serviceOverrides: Partial<MonthlyCycleRouteSe
 
   return router;
 };
+
+export const monthlyCycleRouter = createMonthlyCycleRouter;
