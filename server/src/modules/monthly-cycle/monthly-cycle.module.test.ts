@@ -89,6 +89,7 @@ test("monthly-cycle port scaffold names the initial explicit boundaries", () => 
     "incomes",
     "structure",
     "pockets",
+    "creditCards",
     "transactionRunner",
   ]);
 });
