@@ -95,6 +95,7 @@ export const mapExpenseHistory = (month: MonthRecord, movements: MovementHistory
       paymentMethod: movement.paymentMethod ?? PaymentMethod.NON_CASH,
       amount: decimalToNumber(movement.amount),
       description: movement.description ?? null,
+      creditCardId: movement.creditCardId ?? null,
       category: context.category,
       subcategory: context.subcategory,
     };

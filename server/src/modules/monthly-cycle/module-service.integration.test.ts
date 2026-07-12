@@ -62,6 +62,7 @@ type MonthState = {
     targetSubcategoryId: string | null;
     sourcePocketId: string | null;
     targetPocketId: string | null;
+    creditCardId?: string | null;
     externalSourceLabel?: string | null;
     occurredAt?: Date;
     paymentMethod?: PaymentMethod | null;
@@ -127,6 +128,11 @@ const createIntegrationDb = (
   ];
   const months: MonthState[] = [];
   const pockets = new Map([["pocket-buffer", { id: "pocket-buffer", active: true }]]);
+  const creditCards = new Map([
+    ["card-active", { id: "card-active", ownerId: "single-user", active: true }],
+    ["card-inactive", { id: "card-inactive", ownerId: "single-user", active: false }],
+    ["card-foreign", { id: "card-foreign", ownerId: "other-user", active: true }],
+  ]);
   const capturedMovements: MonthState["movements"] = [];
 
   const db: any = {
@@ -294,6 +300,7 @@ const createIntegrationDb = (
           type?: MovementType | { in: MovementType[] };
           paymentMethod?: PaymentMethod;
           sourceSubcategoryId?: string;
+          creditCardId?: string;
           occurredAt?: { gte?: Date; lte?: Date };
         };
       }) {
@@ -311,6 +318,7 @@ const createIntegrationDb = (
             typeMatches(movement) &&
             (!args.where?.paymentMethod || movement.paymentMethod === args.where.paymentMethod) &&
             (!args.where?.sourceSubcategoryId || movement.sourceSubcategoryId === args.where.sourceSubcategoryId) &&
+            (!args.where?.creditCardId || movement.creditCardId === args.where.creditCardId) &&
             (!args.where?.occurredAt?.gte || occurredAt >= args.where.occurredAt.gte) &&
             (!args.where?.occurredAt?.lte || occurredAt <= args.where.occurredAt.lte)
           );
@@ -328,6 +336,7 @@ const createIntegrationDb = (
           targetSubcategoryId?: string | null;
           sourcePocketId?: string | null;
           targetPocketId?: string | null;
+          creditCardId?: string | null;
           externalSourceLabel?: string | null;
         };
       }) {
@@ -344,6 +353,7 @@ const createIntegrationDb = (
           targetSubcategoryId: args.data.targetSubcategoryId ?? null,
           sourcePocketId: args.data.sourcePocketId ?? null,
           targetPocketId: args.data.targetPocketId ?? null,
+          creditCardId: args.data.creditCardId ?? null,
           externalSourceLabel: args.data.externalSourceLabel ?? null,
         };
         capturedMovements.push(movement);
@@ -363,6 +373,7 @@ const createIntegrationDb = (
           occurredAt?: Date;
           paymentMethod?: PaymentMethod;
           sourceSubcategoryId?: string;
+          creditCardId?: string | null;
         };
       }) {
         const movement = capturedMovements.find((candidate) => candidate.id === args.where.id);
@@ -489,6 +500,13 @@ const createIntegrationDb = (
     savingsPocket: {
       async findUnique(args: { where: { id: string } }) {
         return pockets.get(args.where.id) ?? null;
+      },
+    },
+    creditCard: {
+      async findFirst(args: { where: { id: string; ownerId: string; active: boolean } }) {
+        const card = creditCards.get(args.where.id) ?? null;
+        if (!card || card.ownerId !== args.where.ownerId || card.active !== args.where.active) return null;
+        return { id: card.id };
       },
     },
   };
@@ -1016,6 +1034,62 @@ test("service integration: records non-cash expense with occurred date and expos
   assert.equal(movement?.occurredAt?.toISOString(), "2026-05-17T00:00:00.000Z");
   assert.equal(updatedMonth.availableMoney, -75);
   assert.equal(updatedMonth.cashBalance, 0);
+});
+
+test("service integration: records card-paid expenses once and exposes the credit-card reference in history", async () => {
+  const { db, getCapturedMovements } = createIntegrationDb();
+  const service = createMonthlyCycleTestService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+
+  const updatedMonth = await service.recordExpense({
+    monthId: month.id,
+    sourceSubcategoryId: subcategoryId,
+    amount: 75,
+    description: "Card market",
+    occurredAt: "2026-05-17T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+    creditCardId: "card-active",
+  });
+  const history = await service.listExpenseHistory({ monthId: month.id, creditCardId: "card-active" });
+  const movement = getCapturedMovements()[0];
+
+  assert.equal(movement?.creditCardId, "card-active");
+  assert.equal(updatedMonth.availableMoney, -75);
+  assert.equal(updatedMonth.categories[0]?.subcategories[0]?.available, 225);
+  assert.deepEqual(history.expenses.map((expense) => [expense.id, expense.amount, expense.creditCardId]), [[movement?.id, 75, "card-active"]]);
+});
+
+test("service integration: rejects inactive missing or unowned card expense links without changing totals", async () => {
+  const { db, getCapturedMovements } = createIntegrationDb();
+  const service = createMonthlyCycleTestService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
+
+  for (const creditCardId of ["card-inactive", "card-missing", "card-foreign"]) {
+    await assert.rejects(
+      () =>
+        service.recordExpense({
+          monthId: month.id,
+          sourceSubcategoryId: subcategoryId,
+          amount: 25,
+          occurredAt: "2026-05-17T00:00:00.000Z",
+          paymentMethod: PaymentMethod.NON_CASH,
+          creditCardId,
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof DomainError);
+        assert.equal(error.statusCode, 400);
+        assert.match(error.message, /credit card must exist/i);
+        return true;
+      },
+    );
+  }
+
+  const activeMonth = await service.getActiveMonth();
+  assert.equal(getCapturedMovements().length, 0);
+  assert.equal(activeMonth?.availableMoney, 0);
+  assert.equal(activeMonth?.categories[0]?.subcategories[0]?.available, 300);
 });
 
 test("service integration: rejects expense dates outside the linked month", async () => {

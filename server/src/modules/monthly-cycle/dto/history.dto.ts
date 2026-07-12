@@ -6,6 +6,7 @@ export type ExpenseHistoryItemView = {
   paymentMethod: PaymentMethod;
   amount: number;
   description: string | null;
+  creditCardId: string | null;
   category: { id: string; name: string };
   subcategory: { id: string; name: string };
 };

@@ -81,6 +81,7 @@ export type MonthRecord = {
     targetSubcategoryId: string | null;
     sourcePocketId: string | null;
     targetPocketId: string | null;
+    creditCardId?: string | null;
   }>;
 };
 
@@ -166,6 +167,7 @@ export type MonthlyCycleDb = {
         targetSubcategoryId: string | null;
         sourcePocketId: string | null;
         targetPocketId: string | null;
+        creditCardId?: string | null;
       }>
     >;
     create(args: {
@@ -181,6 +183,7 @@ export type MonthlyCycleDb = {
         sourcePocketId?: string | null;
         targetPocketId?: string | null;
         externalSourceLabel?: string | null;
+        creditCardId?: string | null;
       };
     }): Promise<unknown>;
     update(args: {
@@ -191,6 +194,7 @@ export type MonthlyCycleDb = {
         occurredAt?: Date;
         paymentMethod?: PaymentMethod;
         sourceSubcategoryId?: string;
+        creditCardId?: string | null;
       };
     }): Promise<unknown>;
     delete(args: { where: { id: string } }): Promise<unknown>;
@@ -241,5 +245,8 @@ export type MonthlyCycleDb = {
   };
   savingsPocket: {
     findUnique(args: { where: { id: string }; select: { id: true; active: true } }): Promise<{ id: string; active: boolean } | null>;
+  };
+  creditCard: {
+    findFirst(args: { where: { id: string; ownerId: string; active: boolean }; select: { id: true } }): Promise<{ id: string } | null>;
   };
 };
