@@ -76,6 +76,22 @@ model SavingsPocket {
   updatedAt             DateTime            @updatedAt
 }
 
+model CreditCard {
+  id         String     @id @default(cuid())
+  ownerId    String
+  issuer     String
+  name       String
+  limit      Decimal?   @db.Decimal(12, 2)
+  closingDay Int
+  dueDay     Int
+  active     Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([ownerId, name])
+  @@index([ownerId, active])
+}
+
 model Month {
   id        String        @id @default(cuid())
   year      Int
