@@ -2,11 +2,12 @@ import { type Response, Router } from "express";
 
 import { CreditCardNotFoundError } from "../application/use-cases/credit-card-use-cases.js";
 import { CreditCardValidationError } from "../domain/credit-card.js";
-import type { CreateCreditCardInput, CreditCardListFilter, CreditCardListView, CreditCardView, UpdateCreditCardInput } from "../shared/types.js";
+import type { CreateCreditCardInput, CreditCardListFilter, CreditCardListView, CreditCardStatementSummaryListView, CreditCardView, UpdateCreditCardInput } from "../shared/types.js";
 import { parseCreateCreditCardInput, parseCreditCardListFilter, parseUpdateCreditCardInput } from "./credit-cards.schemas.js";
 
 export type CreditCardsHttpService = {
   listCreditCards: (ownerId: string, filter: CreditCardListFilter) => Promise<CreditCardListView>;
+  listCurrentStatementSummaries: (ownerId: string) => Promise<CreditCardStatementSummaryListView>;
   getCreditCard: (ownerId: string, id: string) => Promise<CreditCardView>;
   createCreditCard: (ownerId: string, input: CreateCreditCardInput) => Promise<CreditCardView>;
   updateCreditCard: (ownerId: string, id: string, input: UpdateCreditCardInput) => Promise<CreditCardView>;
@@ -36,6 +37,14 @@ export const createCreditCardsRouter = ({ service, ownerProvider }: { service: C
   router.get("/credit-cards", async (request, response) => {
     try {
       response.json(await service.listCreditCards(ownerProvider(), parseCreditCardListFilter(request.query.active)));
+    } catch (error) {
+      handleError(response, error);
+    }
+  });
+
+  router.get("/credit-cards/statements/current", async (_request, response) => {
+    try {
+      response.json(await service.listCurrentStatementSummaries(ownerProvider()));
     } catch (error) {
       handleError(response, error);
     }
