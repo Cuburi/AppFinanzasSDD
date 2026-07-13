@@ -14,6 +14,7 @@ type CreateAppOptions = {
   modules: {
     debts: AppModule;
     pockets: AppModule;
+    creditCards?: AppModule;
     monthlyCycle: AppModule;
   };
 };
@@ -25,6 +26,7 @@ export const createApp = ({ health, modules }: CreateAppOptions) => {
   app.use(createHealthRouter(health));
   app.use("/api", modules.debts.router);
   app.use("/api", modules.pockets.router);
+  if (modules.creditCards) app.use("/api", modules.creditCards.router);
   app.use("/api", modules.monthlyCycle.router);
 
   return app;

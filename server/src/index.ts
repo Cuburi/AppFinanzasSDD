@@ -2,6 +2,7 @@ import "./load-env.js";
 
 import { createApp } from "./app.js";
 import { prisma } from "./lib/prisma.js";
+import { createCreditCardsModule } from "./modules/credit-cards/credit-cards.module.js";
 import { createDebtsModule } from "./modules/debts/debts.module.js";
 import { createMonthlyCycleModule } from "./modules/monthly-cycle/monthly-cycle.module.js";
 import { createPocketsModule } from "./modules/pockets/pockets.module.js";
@@ -17,6 +18,7 @@ const app = createApp({
   modules: {
     debts: createDebtsModule(),
     pockets: createPocketsModule(),
+    creditCards: createCreditCardsModule(),
     monthlyCycle: createMonthlyCycleModule(),
   },
 });
