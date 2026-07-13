@@ -9,6 +9,7 @@ export type RecordExpenseInput = {
   description?: string | null;
   occurredAt: string;
   paymentMethod: PaymentMethod;
+  creditCardId?: string | null;
 };
 
 export type UpdateExpenseInput = RecordExpenseInput & {
@@ -26,6 +27,7 @@ export type ExpenseHistoryQueryInput = {
   to?: string;
   paymentMethod?: PaymentMethod;
   subcategoryId?: string;
+  creditCardId?: string;
 };
 
 const readPaymentMethod = (value: unknown): PaymentMethod => {
@@ -41,7 +43,7 @@ export const parseRecordExpenseInput = (monthId: string, payload: unknown): Reco
     throw new Error("Expense payload is required.");
   }
 
-  const rawPayload = payload as { sourceSubcategoryId?: unknown; amount?: unknown; description?: unknown; occurredAt?: unknown; paymentMethod?: unknown };
+  const rawPayload = payload as { sourceSubcategoryId?: unknown; amount?: unknown; description?: unknown; occurredAt?: unknown; paymentMethod?: unknown; creditCardId?: unknown };
 
   return {
     monthId: readNonEmptyString(monthId, "Month id"),
@@ -50,6 +52,7 @@ export const parseRecordExpenseInput = (monthId: string, payload: unknown): Reco
     description: readOptionalString(rawPayload.description),
     occurredAt: readIsoDateString(rawPayload.occurredAt, "Expense date"),
     paymentMethod: readPaymentMethod(rawPayload.paymentMethod),
+    ...(rawPayload.creditCardId === undefined ? {} : { creditCardId: readOptionalString(rawPayload.creditCardId) }),
   };
 };
 
@@ -77,5 +80,6 @@ export const parseExpenseHistoryQueryInput = (monthId: string, query: unknown): 
     to: rawQuery.to === undefined ? undefined : readIsoDateString(rawQuery.to, "To date"),
     paymentMethod,
     subcategoryId: rawQuery.subcategoryId === undefined ? undefined : readNonEmptyString(rawQuery.subcategoryId, "Subcategory"),
+    ...(rawQuery.creditCardId === undefined ? {} : { creditCardId: readNonEmptyString(rawQuery.creditCardId, "Credit card") }),
   };
 };

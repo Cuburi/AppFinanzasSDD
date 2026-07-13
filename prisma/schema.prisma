@@ -76,6 +76,23 @@ model SavingsPocket {
   updatedAt             DateTime            @updatedAt
 }
 
+model CreditCard {
+  id         String     @id @default(cuid())
+  ownerId    String
+  issuer     String
+  name       String
+  limit      Decimal?   @db.Decimal(12, 2)
+  closingDay Int
+  dueDay     Int
+  active     Boolean    @default(true)
+  movements  Movement[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([ownerId, name])
+  @@index([ownerId, active])
+}
+
 model Month {
   id        String        @id @default(cuid())
   year      Int
@@ -159,6 +176,8 @@ model Movement {
   targetPocketId      String?
   targetPocket        SavingsPocket?    @relation("MovementTargetPocket", fields: [targetPocketId], references: [id], onDelete: SetNull)
   externalSourceLabel String?
+  creditCardId        String?
+  creditCard          CreditCard?       @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 
@@ -169,6 +188,7 @@ model Movement {
   @@index([targetSubcategoryId])
   @@index([sourcePocketId])
   @@index([targetPocketId])
+  @@index([creditCardId])
 }
 
 model Debt {

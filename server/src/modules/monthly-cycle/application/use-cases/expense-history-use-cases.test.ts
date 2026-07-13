@@ -29,7 +29,7 @@ const month = {
   movements: [],
 };
 
-const expense = { id: "expense-1", type: MovementType.EXPENSE, amount: amount(75), occurredAt: new Date("2026-05-10T00:00:00.000Z"), description: "Market", paymentMethod: PaymentMethod.NON_CASH, sourceSubcategoryId: "sub-market", targetSubcategoryId: null, sourcePocketId: null, targetPocketId: null };
+const expense = { id: "expense-1", type: MovementType.EXPENSE, amount: amount(75), occurredAt: new Date("2026-05-10T00:00:00.000Z"), description: "Market", paymentMethod: PaymentMethod.NON_CASH, sourceSubcategoryId: "sub-market", targetSubcategoryId: null, sourcePocketId: null, targetPocketId: null, creditCardId: "card-1" };
 
 const createHistoryPorts = () => {
   const calls: unknown[] = [];
@@ -68,7 +68,7 @@ test("listExpenseHistory validates subcategory ownership and reads filtered expe
 
   const history = await useCases.listExpenseHistory(input);
 
-  assert.deepEqual(history.expenses.map((item) => [item.id, item.amount, item.subcategory.id]), [["expense-1", 75, "sub-market"]]);
+  assert.deepEqual(history.expenses.map((item) => [item.id, item.amount, item.subcategory.id, item.creditCardId]), [["expense-1", 75, "sub-market", "card-1"]]);
   assert.deepEqual(calls, [
     ["months.findById", "month-1"],
     ["movements.findExpenseHistory", input],

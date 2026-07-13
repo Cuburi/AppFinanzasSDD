@@ -12,6 +12,7 @@ export const MONTHLY_CYCLE_PORT_NAMES = [
   "incomes",
   "structure",
   "pockets",
+  "creditCards",
   "transactionRunner",
 ] as const;
 
@@ -55,6 +56,7 @@ export interface MovementRepositoryPort {
     sourcePocketId?: string | null;
     targetPocketId?: string | null;
     externalSourceLabel?: string | null;
+    creditCardId?: string | null;
   }): Promise<void>;
   updateExpense(input: {
     expenseId: string;
@@ -63,6 +65,7 @@ export interface MovementRepositoryPort {
     occurredAt: Date;
     paymentMethod: MonthlyCyclePaymentMethod;
     sourceSubcategoryId: string;
+    creditCardId?: string | null;
   }): Promise<void>;
   delete(movementId: string): Promise<void>;
   findExpenseHistory(input: ExpenseHistoryQueryInput): Promise<MovementRecord[]>;
@@ -101,6 +104,10 @@ export interface PocketValidationPort {
   ensureTemplateDefaultPocketsAreActive(input: TemplateInput): Promise<void>;
 }
 
+export interface CreditCardValidationPort {
+  ensureCreditCardIsActive(ownerId: string, creditCardId: string): Promise<void>;
+}
+
 export type MonthlyCyclePorts = {
   months: MonthRepositoryPort;
   templates: TemplateRepositoryPort;
@@ -108,6 +115,7 @@ export type MonthlyCyclePorts = {
   incomes: IncomeRepositoryPort;
   structure: MonthStructureRepositoryPort;
   pockets: PocketValidationPort;
+  creditCards: CreditCardValidationPort;
   transactionRunner: MonthlyCycleTransactionRunner;
 };
 

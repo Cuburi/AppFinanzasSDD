@@ -43,11 +43,11 @@ const createMovementPorts = () => {
         calls.push(["tx.movements.findById", movementId]);
         return { id: movementId, type: MovementType.EXPENSE, monthId: month.id };
       },
-      async create(args: { type: MovementType; amount: Prisma.Decimal; targetPocketId?: string | null }) {
-        calls.push(["tx.movements.create", args.type, args.amount.toString(), args.targetPocketId ?? null]);
+      async create(args: { type: MovementType; amount: Prisma.Decimal; targetPocketId?: string | null; creditCardId?: string | null }) {
+        calls.push(["tx.movements.create", args.type, args.amount.toString(), args.targetPocketId ?? null, args.creditCardId ?? null]);
       },
-      async updateExpense(input: { expenseId: string; amount: Prisma.Decimal }) {
-        calls.push(["tx.movements.updateExpense", input.expenseId, input.amount.toString()]);
+      async updateExpense(input: { expenseId: string; amount: Prisma.Decimal; creditCardId?: string | null }) {
+        calls.push(["tx.movements.updateExpense", input.expenseId, input.amount.toString(), input.creditCardId ?? null]);
       },
       async delete(movementId: string) {
         calls.push(["tx.movements.delete", movementId]);
@@ -56,6 +56,11 @@ const createMovementPorts = () => {
     pockets: {
       async ensurePocketIsActive(pocketId: string, label: string) {
         calls.push(["tx.pockets.ensurePocketIsActive", pocketId, label]);
+      },
+    },
+    creditCards: {
+      async ensureCreditCardIsActive(ownerId: string, creditCardId: string) {
+        calls.push(["tx.creditCards.ensureCreditCardIsActive", ownerId, creditCardId]);
       },
     },
   };
@@ -99,8 +104,66 @@ test("recordExpense persists an expense inside the transaction runner and return
   assert.deepEqual(calls, [
     ["transactionRunner.run"],
     ["tx.months.findById", "month-1"],
-    ["tx.movements.create", "EXPENSE", "75", null],
+    ["tx.movements.create", "EXPENSE", "75", null, null],
     ["tx.months.findById", "month-1"],
+  ]);
+});
+
+test("recordExpense validates an active owned credit card before persisting the linked expense", async () => {
+  const { calls, ports } = createMovementPorts();
+  const useCases = createMovementUseCases(ports);
+
+  const updated = await useCases.recordExpense({
+    monthId: "month-1",
+    sourceSubcategoryId: "sub-market",
+    amount: 75,
+    description: "Market",
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+    creditCardId: "card-1",
+  });
+
+  assert.equal(updated.id, "month-1");
+  assert.deepEqual(calls, [
+    ["transactionRunner.run"],
+    ["tx.months.findById", "month-1"],
+    ["tx.creditCards.ensureCreditCardIsActive", "single-user", "card-1"],
+    ["tx.movements.create", "EXPENSE", "75", null, "card-1"],
+    ["tx.months.findById", "month-1"],
+  ]);
+});
+
+test("recordExpense rejects inactive or unowned credit-card links before creating an expense", async () => {
+  const { calls, ports } = createMovementPorts();
+  const txPorts = await new Promise<Omit<MonthlyCyclePorts, "transactionRunner">>((resolve) => {
+    void ports.transactionRunner.run(async (resolvedPorts) => {
+      resolve(resolvedPorts);
+      return undefined;
+    });
+  });
+  txPorts.creditCards.ensureCreditCardIsActive = async (ownerId: string, creditCardId: string) => {
+    calls.push(["tx.creditCards.ensureCreditCardIsActive", ownerId, creditCardId]);
+    throw new Error("Credit card must exist, be owned by the current user, and be active.");
+  };
+  calls.splice(0, calls.length);
+  const useCases = createMovementUseCases(ports);
+
+  await assert.rejects(
+    () =>
+      useCases.recordExpense({
+        monthId: "month-1",
+        sourceSubcategoryId: "sub-market",
+        amount: 75,
+        occurredAt: "2026-05-10T00:00:00.000Z",
+        paymentMethod: PaymentMethod.NON_CASH,
+        creditCardId: "inactive-card",
+      }),
+    /credit card must exist/i,
+  );
+  assert.deepEqual(calls, [
+    ["transactionRunner.run"],
+    ["tx.months.findById", "month-1"],
+    ["tx.creditCards.ensureCreditCardIsActive", "single-user", "inactive-card"],
   ]);
 });
 
@@ -114,8 +177,9 @@ test("updateExpense and deleteExpense operate on the transaction-scoped expense 
     sourceSubcategoryId: "sub-market",
     amount: 90,
     occurredAt: "2026-05-11T00:00:00.000Z",
-    paymentMethod: PaymentMethod.NON_CASH,
-  });
+      paymentMethod: PaymentMethod.NON_CASH,
+      creditCardId: "card-1",
+    });
   const deleted = await useCases.deleteExpense("month-1", "expense-1");
 
   assert.equal(updated.id, "month-1");
@@ -124,7 +188,8 @@ test("updateExpense and deleteExpense operate on the transaction-scoped expense 
     ["transactionRunner.run"],
     ["tx.months.findById", "month-1"],
     ["tx.movements.findById", "expense-1"],
-    ["tx.movements.updateExpense", "expense-1", "90"],
+    ["tx.creditCards.ensureCreditCardIsActive", "single-user", "card-1"],
+    ["tx.movements.updateExpense", "expense-1", "90", "card-1"],
     ["tx.months.findById", "month-1"],
     ["transactionRunner.run"],
     ["tx.months.findById", "month-1"],
@@ -144,6 +209,6 @@ test("depositToPocket validates the target pocket and preserves the external dep
   assert.deepEqual(calls, [
     ["transactionRunner.run"],
     ["tx.pockets.ensurePocketIsActive", "pocket-safe", "Target pocket"],
-    ["tx.movements.create", "POCKET_DEPOSIT_EXTERNAL", "25", "pocket-safe"],
+    ["tx.movements.create", "POCKET_DEPOSIT_EXTERNAL", "25", "pocket-safe", null],
   ]);
 });
