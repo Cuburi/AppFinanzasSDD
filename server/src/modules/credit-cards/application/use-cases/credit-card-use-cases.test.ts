@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { CreditCardValidationError, rehydrateCreditCard, type CreditCard, type NewCreditCard } from "../../domain/credit-card.js";
+import type { CreditCardMovementSummaryPort } from "../ports/credit-card-movement-summary.port.js";
 import type { CreditCardRepository } from "../ports/credit-card-repository.port.js";
 import { CreditCardNotFoundError, createCreditCardUseCases } from "./credit-card-use-cases.js";
 
@@ -43,9 +44,21 @@ const createRepositoryStub = (initial: CreditCard[] = [buildCard("card-1")]) => 
   return { repository, calls };
 };
 
+const createMovementSummaryStub = (totals: Record<string, number> = {}) => {
+  const calls: unknown[] = [];
+  const movementSummary: CreditCardMovementSummaryPort = {
+    async sumExpensesByCardInWindow(input) {
+      calls.push(input);
+      return totals[input.creditCardId] ?? 0;
+    },
+  };
+
+  return { movementSummary, calls };
+};
+
 test("credit card use cases create, list, and get owner-scoped cards", async () => {
   const { repository, calls } = createRepositoryStub([buildCard("card-1"), buildCard("card-2", "owner-2")]);
-  const useCases = createCreditCardUseCases({ creditCards: repository });
+  const useCases = createCreditCardUseCases({ creditCards: repository, movementSummary: createMovementSummaryStub().movementSummary });
 
   const created = await useCases.createCreditCard("owner-1", { issuer: "Visa", name: "Travel", closingDay: 10, dueDay: 25 });
   const listed = await useCases.listCreditCards("owner-1", { active: true });
@@ -59,7 +72,7 @@ test("credit card use cases create, list, and get owner-scoped cards", async () 
 
 test("credit card use cases reject duplicate names and another owner's card", async () => {
   const { repository } = createRepositoryStub([buildCard("card-1", "owner-1", "Main"), buildCard("card-2", "owner-2", "Other")]);
-  const useCases = createCreditCardUseCases({ creditCards: repository });
+  const useCases = createCreditCardUseCases({ creditCards: repository, movementSummary: createMovementSummaryStub().movementSummary });
 
   await assert.rejects(
     () => useCases.createCreditCard("owner-1", { issuer: "Visa", name: " main ", closingDay: 10, dueDay: 25 }),
@@ -70,11 +83,38 @@ test("credit card use cases reject duplicate names and another owner's card", as
 
 test("credit card use cases inactivate and reactivate owned cards", async () => {
   const { repository } = createRepositoryStub([buildCard("card-1", "owner-1", "Main", true)]);
-  const useCases = createCreditCardUseCases({ creditCards: repository });
+  const useCases = createCreditCardUseCases({ creditCards: repository, movementSummary: createMovementSummaryStub().movementSummary });
 
   const inactive = await useCases.inactivateCreditCard("owner-1", "card-1");
   const active = await useCases.activateCreditCard("owner-1", "card-1");
 
   assert.equal(inactive.active, false);
   assert.equal(active.active, true);
+});
+
+test("credit card use cases return app-estimated current statement summaries for active owned cards", async () => {
+  const { repository, calls: repositoryCalls } = createRepositoryStub([
+    buildCard("card-1", "owner-1", "Main", true),
+    buildCard("card-2", "owner-1", "Backup", true),
+    buildCard("card-3", "owner-1", "Inactive", false),
+    buildCard("card-4", "owner-2", "Other", true),
+  ]);
+  const { movementSummary, calls: movementCalls } = createMovementSummaryStub({ "card-1": 125.5, "card-2": 75 });
+  const useCases = createCreditCardUseCases({ creditCards: repository, movementSummary });
+
+  const summary = await useCases.listCurrentStatementSummaries("owner-1", new Date("2026-07-10T12:00:00.000Z"));
+
+  assert.equal(summary.estimation, "APP_ESTIMATED");
+  assert.deepEqual(
+    summary.cards.map((card) => ({ creditCardId: card.creditCardId, estimatedSpent: card.estimatedSpent, cycleStart: card.cycleStart, cycleEnd: card.cycleEnd, dueDate: card.dueDate })),
+    [
+      { creditCardId: "card-1", estimatedSpent: 125.5, cycleStart: "2026-06-16", cycleEnd: "2026-07-15", dueDate: "2026-08-28" },
+      { creditCardId: "card-2", estimatedSpent: 75, cycleStart: "2026-06-16", cycleEnd: "2026-07-15", dueDate: "2026-08-28" },
+    ],
+  );
+  assert.deepEqual(repositoryCalls.at(-1), { findAllByOwner: { ownerId: "owner-1", filter: { active: true } } });
+  assert.deepEqual(
+    movementCalls.map((call) => (call as { creditCardId: string }).creditCardId),
+    ["card-1", "card-2"],
+  );
 });

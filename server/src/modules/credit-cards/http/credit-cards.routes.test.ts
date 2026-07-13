@@ -5,6 +5,47 @@ import express from "express";
 import { createCreditCardsRouter, type CreditCardsHttpService } from "./credit-cards.routes.js";
 
 const card = { id: "card-1", ownerId: "owner-1", issuer: "Visa", name: "Main", limit: null, closingDay: 15, dueDay: 28, active: true };
+const statementSummary = {
+  estimation: "APP_ESTIMATED" as const,
+  cards: [
+    {
+      creditCardId: "card-1",
+      name: "Main",
+      issuer: "Visa",
+      limit: null,
+      cycleStart: "2026-06-16",
+      cycleEnd: "2026-07-15",
+      cutoffDate: "2026-07-15",
+      dueDate: "2026-08-28",
+      estimatedSpent: 125.5,
+    },
+  ],
+};
+
+const baseService = (overrides: Partial<CreditCardsHttpService> = {}): CreditCardsHttpService => ({
+  async listCreditCards() {
+    return { cards: [] };
+  },
+  async listCurrentStatementSummaries() {
+    return { estimation: "APP_ESTIMATED", cards: [] };
+  },
+  async getCreditCard() {
+    return card;
+  },
+  async createCreditCard() {
+    return card;
+  },
+  async updateCreditCard() {
+    return card;
+  },
+  async activateCreditCard() {
+    return card;
+  },
+  async inactivateCreditCard() {
+    return card;
+  },
+  ...overrides,
+});
 
 const createTestServer = (service: CreditCardsHttpService) => {
   const app = express();
@@ -21,7 +62,7 @@ const request = async (server: ReturnType<typeof createTestServer>, path: string
 
 test("credit card router exposes lifecycle endpoints with owner seam", async () => {
   const owners: string[] = [];
-  const service: CreditCardsHttpService = {
+  const service: CreditCardsHttpService = baseService({
     async listCreditCards(ownerId) {
       owners.push(ownerId);
       return { cards: [card] };
@@ -46,7 +87,7 @@ test("credit card router exposes lifecycle endpoints with owner seam", async () 
       owners.push(ownerId);
       return { ...card, active: false };
     },
-  };
+  });
   const server = createTestServer(service);
 
   try {
@@ -65,26 +106,11 @@ test("credit card router exposes lifecycle endpoints with owner seam", async () 
 });
 
 test("credit card router rejects invalid create payload before persistence", async () => {
-  const service: CreditCardsHttpService = {
-    async listCreditCards() {
-      return { cards: [] };
-    },
-    async getCreditCard() {
-      return card;
-    },
+  const service: CreditCardsHttpService = baseService({
     async createCreditCard() {
       throw new Error("Should not persist invalid payload.");
     },
-    async updateCreditCard() {
-      return card;
-    },
-    async activateCreditCard() {
-      return card;
-    },
-    async inactivateCreditCard() {
-      return card;
-    },
-  };
+  });
   const server = createTestServer(service);
 
   try {
@@ -99,27 +125,12 @@ test("credit card router rejects invalid create payload before persistence", asy
 
 test("credit card router returns one owned card by id", async () => {
   const calls: unknown[] = [];
-  const service: CreditCardsHttpService = {
-    async listCreditCards() {
-      return { cards: [] };
-    },
+  const service: CreditCardsHttpService = baseService({
     async getCreditCard(ownerId, id) {
       calls.push({ ownerId, id });
       return card;
     },
-    async createCreditCard() {
-      return card;
-    },
-    async updateCreditCard() {
-      return card;
-    },
-    async activateCreditCard() {
-      return card;
-    },
-    async inactivateCreditCard() {
-      return card;
-    },
-  };
+  });
   const server = createTestServer(service);
 
   try {
@@ -135,27 +146,12 @@ test("credit card router returns one owned card by id", async () => {
 
 test("credit card router patches one owned card with parsed update input", async () => {
   const calls: unknown[] = [];
-  const service: CreditCardsHttpService = {
-    async listCreditCards() {
-      return { cards: [] };
-    },
-    async getCreditCard() {
-      return card;
-    },
-    async createCreditCard() {
-      return card;
-    },
+  const service: CreditCardsHttpService = baseService({
     async updateCreditCard(ownerId, id, input) {
       calls.push({ ownerId, id, input });
       return { ...card, name: "Renamed", limit: 999.99 };
     },
-    async activateCreditCard() {
-      return card;
-    },
-    async inactivateCreditCard() {
-      return card;
-    },
-  };
+  });
   const server = createTestServer(service);
 
   try {
@@ -171,19 +167,7 @@ test("credit card router patches one owned card with parsed update input", async
 
 test("credit card router activates one owned card", async () => {
   const calls: unknown[] = [];
-  const service: CreditCardsHttpService = {
-    async listCreditCards() {
-      return { cards: [] };
-    },
-    async getCreditCard() {
-      return card;
-    },
-    async createCreditCard() {
-      return card;
-    },
-    async updateCreditCard() {
-      return card;
-    },
+  const service: CreditCardsHttpService = baseService({
     async activateCreditCard(ownerId, id) {
       calls.push({ ownerId, id });
       return { ...card, active: true };
@@ -191,7 +175,7 @@ test("credit card router activates one owned card", async () => {
     async inactivateCreditCard() {
       return { ...card, active: false };
     },
-  };
+  });
   const server = createTestServer(service);
 
   try {
@@ -200,6 +184,30 @@ test("credit card router activates one owned card", async () => {
     assert.equal(response.status, 200);
     assert.equal((await response.json()).active, true);
     assert.deepEqual(calls, [{ ownerId: "owner-1", id: "card-1" }]);
+  } finally {
+    server.close();
+  }
+});
+
+test("credit card router exposes current statement summaries before id capture", async () => {
+  const calls: unknown[] = [];
+  const service = baseService({
+    async listCurrentStatementSummaries(ownerId) {
+      calls.push({ listCurrentStatementSummaries: { ownerId } });
+      return statementSummary;
+    },
+    async getCreditCard() {
+      throw new Error("Statement route should not be captured as a card id.");
+    },
+  });
+  const server = createTestServer(service);
+
+  try {
+    const response = await request(server, "/api/credit-cards/statements/current");
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), statementSummary);
+    assert.deepEqual(calls, [{ listCurrentStatementSummaries: { ownerId: "owner-1" } }]);
   } finally {
     server.close();
   }
