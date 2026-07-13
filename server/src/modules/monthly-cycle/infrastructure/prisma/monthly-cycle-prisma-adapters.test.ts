@@ -51,6 +51,78 @@ test("monthly-cycle Prisma adapters expose template reads and pocket validation 
   ]);
 });
 
+test("monthly-cycle Prisma adapters expose active owned credit-card validation through an explicit port", async () => {
+  const calls: unknown[] = [];
+  const db: any = {
+    creditCard: {
+      async findFirst(args: unknown) {
+        calls.push(args);
+        return { id: "card-1", ownerId: "single-user", active: true };
+      },
+    },
+  };
+  const ports = createMonthlyCyclePrismaAdapters(db);
+
+  await ports.creditCards.ensureCreditCardIsActive("single-user", "card-1");
+
+  assert.deepEqual(calls, [
+    {
+      where: {
+        id: "card-1",
+        ownerId: "single-user",
+        active: true,
+      },
+      select: { id: true },
+    },
+  ]);
+});
+
+test("monthly-cycle Prisma credit-card validation rejects missing inactive or unowned cards", async () => {
+  const db: any = {
+    creditCard: {
+      async findFirst() {
+        return null;
+      },
+    },
+  };
+  const ports = createMonthlyCyclePrismaAdapters(db);
+
+  await assert.rejects(() => ports.creditCards.ensureCreditCardIsActive("single-user", "missing-card"), {
+    name: "DomainError",
+    statusCode: 400,
+    message: "Credit card must exist, be owned by the current user, and be active.",
+  } as DomainError);
+});
+
+test("monthly-cycle Prisma movements persist and filter nullable credit-card references", async () => {
+  const calls: unknown[] = [];
+  const db: any = {
+    movement: {
+      async create(args: unknown) {
+        calls.push(["create", args]);
+      },
+      async update(args: unknown) {
+        calls.push(["update", args]);
+      },
+      async findMany(args: unknown) {
+        calls.push(["findMany", args]);
+        return [];
+      },
+    },
+  };
+  const ports = createMonthlyCyclePrismaAdapters(db);
+
+  await ports.movements.create({ type: "EXPENSE", amount: amount(75), monthId: "month-1", sourceSubcategoryId: "sub-1", creditCardId: "card-1" });
+  await ports.movements.updateExpense({ expenseId: "expense-1", amount: amount(90), occurredAt: new Date("2026-05-11T00:00:00.000Z"), paymentMethod: "NON_CASH", sourceSubcategoryId: "sub-1", creditCardId: null });
+  await ports.movements.findExpenseHistory({ monthId: "month-1", creditCardId: "card-1" });
+
+  assert.deepEqual(calls, [
+    ["create", { data: { type: "EXPENSE", amount: amount(75), monthId: "month-1", sourceSubcategoryId: "sub-1", creditCardId: "card-1" } }],
+    ["update", { where: { id: "expense-1" }, data: { amount: amount(90), description: undefined, occurredAt: new Date("2026-05-11T00:00:00.000Z"), paymentMethod: "NON_CASH", sourceSubcategoryId: "sub-1", creditCardId: null } }],
+    ["findMany", { where: { monthId: "month-1", type: "EXPENSE", creditCardId: "card-1" }, orderBy: { occurredAt: "desc" } }],
+  ]);
+});
+
 test("monthly-cycle Prisma pocket validation preserves existing domain error semantics", async () => {
   const db: any = {
     savingsPocket: {

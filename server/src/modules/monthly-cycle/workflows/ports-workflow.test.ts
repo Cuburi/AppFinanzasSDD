@@ -51,6 +51,9 @@ test("template workflow updates through transaction-scoped ports instead of a Pr
         calls.push("pockets.ensureTemplateDefaultPocketsAreActive");
       },
     },
+    creditCards: {
+      async ensureCreditCardIsActive() {},
+    },
   };
   const service = createTemplateService({
     ...txPorts,
@@ -98,6 +101,9 @@ test("movement workflow validates pocket deposits through ports inside the trans
         calls.push(["pockets.ensurePocketIsActive", pocketId, label]);
       },
       async ensureTemplateDefaultPocketsAreActive() {},
+    },
+    creditCards: {
+      async ensureCreditCardIsActive() {},
     },
     movements: {
       async findById() {

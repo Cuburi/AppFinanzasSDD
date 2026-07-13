@@ -29,6 +29,17 @@ const ensurePocketIsActive = async (db: MonthlyCycleDb, pocketId: string, label:
   }
 };
 
+const ensureCreditCardIsActive = async (db: MonthlyCycleDb, ownerId: string, creditCardId: string) => {
+  const creditCard = await db.creditCard.findFirst({
+    where: { id: creditCardId, ownerId, active: true },
+    select: { id: true },
+  });
+
+  if (!creditCard) {
+    throw new DomainError(400, "Credit card must exist, be owned by the current user, and be active.");
+  }
+};
+
 const toPrismaDecimal = (value: MonthlyCycleMoney) => new Prisma.Decimal(value.toString());
 
 export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyclePrismaPortSet => ({
@@ -144,6 +155,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       sourcePocketId?: string | null;
       targetPocketId?: string | null;
       externalSourceLabel?: string | null;
+      creditCardId?: string | null;
     }) {
       await db.movement.create({ data: { ...args, amount: toPrismaDecimal(args.amount) } });
     },
@@ -156,6 +168,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
           occurredAt: input.occurredAt,
           paymentMethod: input.paymentMethod,
           sourceSubcategoryId: input.sourceSubcategoryId,
+          creditCardId: input.creditCardId,
         },
       });
     },
@@ -169,6 +182,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
           type: MovementType.EXPENSE,
           ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
           ...(input.subcategoryId ? { sourceSubcategoryId: input.subcategoryId } : {}),
+          ...(input.creditCardId ? { creditCardId: input.creditCardId } : {}),
           ...(input.from || input.to
             ? {
                 occurredAt: {
@@ -279,6 +293,11 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       for (const defaultPocketId of defaultPocketIds) {
         await ensurePocketIsActive(db, defaultPocketId, "Default pocket");
       }
+    },
+  },
+  creditCards: {
+    ensureCreditCardIsActive(ownerId, creditCardId) {
+      return ensureCreditCardIsActive(db, ownerId, creditCardId);
     },
   },
 });

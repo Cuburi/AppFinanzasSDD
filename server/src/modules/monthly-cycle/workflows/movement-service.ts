@@ -9,6 +9,8 @@ import { DomainError } from "../shared/service-errors.js";
 import type { MovementRecord } from "../application/ports/monthly-cycle-ports.js";
 import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflow-dependencies.js";
 
+const SINGLE_USER_OWNER_ID = "single-user";
+
 const assertExpenseDateWithinMonth = (occurredAt: Date, month: Parameters<typeof assertOccurredAtWithinMonth>[1]) => {
   try {
     assertOccurredAtWithinMonth(occurredAt, month);
@@ -52,6 +54,10 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
           throw new DomainError(409, "Insufficient cash for this expense.");
         }
 
+        if (input.creditCardId) {
+          await txPorts.creditCards.ensureCreditCardIsActive(SINGLE_USER_OWNER_ID, input.creditCardId);
+        }
+
         await txPorts.movements.create({
           type: MovementType.EXPENSE,
           amount: decimal(input.amount),
@@ -60,6 +66,7 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
           paymentMethod: input.paymentMethod,
           monthId: input.monthId,
           sourceSubcategoryId: input.sourceSubcategoryId,
+          creditCardId: input.creditCardId ?? null,
         });
 
         return txPorts.months.findById(input.monthId);
@@ -87,6 +94,10 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
           throw new DomainError(409, "Insufficient cash for this expense.");
         }
 
+        if (input.creditCardId) {
+          await txPorts.creditCards.ensureCreditCardIsActive(SINGLE_USER_OWNER_ID, input.creditCardId);
+        }
+
         await txPorts.movements.updateExpense({
           expenseId: input.expenseId,
           amount: decimal(input.amount),
@@ -94,6 +105,7 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
           occurredAt,
           paymentMethod: input.paymentMethod,
           sourceSubcategoryId: input.sourceSubcategoryId,
+          creditCardId: input.creditCardId ?? null,
         });
 
         return txPorts.months.findById(input.monthId);
