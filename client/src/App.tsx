@@ -2,6 +2,7 @@ import { Link, Navigate, Route, Routes } from "react-router-dom";
 
 import { ActiveMonthPage } from "./pages/ActiveMonthPage";
 import { CloseMonthPage } from "./pages/CloseMonthPage";
+import { CreditCardsPage } from "./pages/CreditCardsPage";
 import { DebtsPage } from "./pages/DebtsPage";
 import { PocketsPage } from "./pages/PocketsPage";
 import { ReportsPage } from "./pages/ReportsPage";
@@ -22,6 +23,7 @@ export default function App() {
           <Link to="/active-month">Mes activo</Link>
           <Link to="/pockets">Bolsillos</Link>
           <Link to="/debts">Deudas</Link>
+          <Link to="/credit-cards">Credit Cards</Link>
           <Link to="/close-month">Cierre</Link>
           <Link to="/reports">Reports</Link>
         </nav>
@@ -34,6 +36,7 @@ export default function App() {
           <Route path="/active-month" element={<ActiveMonthPage />} />
           <Route path="/pockets" element={<PocketsPage />} />
           <Route path="/debts" element={<DebtsPage />} />
+          <Route path="/credit-cards" element={<CreditCardsPage />} />
           <Route path="/close-month" element={<CloseMonthPage />} />
           <Route path="/reports" element={<ReportsPage />} />
         </Routes>

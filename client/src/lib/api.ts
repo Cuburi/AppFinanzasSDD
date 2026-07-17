@@ -4,6 +4,9 @@ import type {
   BasicMonthlyReport,
   CashSummary,
   CreateDebtInput,
+  CreditCardListFilter,
+  CreditCardStatementSummaryListView,
+  CreditCardView,
   CreateMonthCategoryInput,
   CreateMonthSubcategoryInput,
   CreateMonthlyIncomeInput,
@@ -80,6 +83,17 @@ export const api = {
     const payload = await readJson<{ pockets: SavingsPocket[] }>(response);
 
     return payload.pockets;
+  },
+  async getCreditCards(filter: CreditCardListFilter = "active"): Promise<CreditCardView[]> {
+    const activeQuery = filter === "all" ? "all" : String(filter === "active");
+    const response = await fetch(`/api/credit-cards?active=${activeQuery}`);
+    const payload = await readJson<{ cards: CreditCardView[] }>(response);
+
+    return payload.cards;
+  },
+  async getCurrentCreditCardStatements(): Promise<CreditCardStatementSummaryListView> {
+    const response = await fetch("/api/credit-cards/statements/current");
+    return readJson<CreditCardStatementSummaryListView>(response);
   },
   async getPocket(id: string): Promise<SavingsPocket> {
     const response = await fetch(`/api/pockets/${id}`);
