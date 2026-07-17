@@ -49,7 +49,7 @@ const createMovementSummaryStub = (totals: Record<string, number> = {}) => {
   const movementSummary: CreditCardMovementSummaryPort = {
     async sumExpensesByCardInWindow(input) {
       calls.push(input);
-      return totals[input.creditCardId] ?? 0;
+      return totals[`${input.creditCardId}:${input.from.toISOString().slice(0, 10)}`] ?? 0;
     },
   };
 
@@ -92,29 +92,47 @@ test("credit card use cases inactivate and reactivate owned cards", async () => 
   assert.equal(active.active, true);
 });
 
-test("credit card use cases return app-estimated current statement summaries for active owned cards", async () => {
+test("credit card use cases return separate closed and open statement buckets for active owned cards", async () => {
   const { repository, calls: repositoryCalls } = createRepositoryStub([
     buildCard("card-1", "owner-1", "Main", true),
     buildCard("card-2", "owner-1", "Backup", true),
     buildCard("card-3", "owner-1", "Inactive", false),
     buildCard("card-4", "owner-2", "Other", true),
   ]);
-  const { movementSummary, calls: movementCalls } = createMovementSummaryStub({ "card-1": 125.5, "card-2": 75 });
+  const { movementSummary, calls: movementCalls } = createMovementSummaryStub({
+    "card-1:2026-05-16": 125.5,
+    "card-1:2026-06-16": 75,
+    "card-2:2026-05-16": 0,
+    "card-2:2026-06-16": 20,
+  });
   const useCases = createCreditCardUseCases({ creditCards: repository, movementSummary });
 
   const summary = await useCases.listCurrentStatementSummaries("owner-1", new Date("2026-07-10T12:00:00.000Z"));
 
   assert.equal(summary.estimation, "APP_ESTIMATED");
   assert.deepEqual(
-    summary.cards.map((card) => ({ creditCardId: card.creditCardId, estimatedSpent: card.estimatedSpent, cycleStart: card.cycleStart, cycleEnd: card.cycleEnd, dueDate: card.dueDate })),
+    summary.cards.map((card) => ({ creditCardId: card.creditCardId, closedStatement: card.closedStatement, inProgressCycle: card.inProgressCycle })),
     [
-      { creditCardId: "card-1", estimatedSpent: 125.5, cycleStart: "2026-06-16", cycleEnd: "2026-07-15", dueDate: "2026-08-28" },
-      { creditCardId: "card-2", estimatedSpent: 75, cycleStart: "2026-06-16", cycleEnd: "2026-07-15", dueDate: "2026-08-28" },
+      {
+        creditCardId: "card-1",
+        closedStatement: { periodStart: "2026-05-16", periodEnd: "2026-06-15", cutoffDate: "2026-06-15", dueDate: "2026-07-28", amount: 125.5 },
+        inProgressCycle: { periodStart: "2026-06-16", periodEnd: "2026-07-15", cutoffDate: "2026-07-15", amount: 75 },
+      },
+      {
+        creditCardId: "card-2",
+        closedStatement: { periodStart: "2026-05-16", periodEnd: "2026-06-15", cutoffDate: "2026-06-15", dueDate: "2026-07-28", amount: 0 },
+        inProgressCycle: { periodStart: "2026-06-16", periodEnd: "2026-07-15", cutoffDate: "2026-07-15", amount: 20 },
+      },
     ],
   );
   assert.deepEqual(repositoryCalls.at(-1), { findAllByOwner: { ownerId: "owner-1", filter: { active: true } } });
   assert.deepEqual(
-    movementCalls.map((call) => (call as { creditCardId: string }).creditCardId),
-    ["card-1", "card-2"],
+    movementCalls.map((call) => ({ creditCardId: (call as { creditCardId: string }).creditCardId, from: (call as { from: Date }).from.toISOString(), to: (call as { to: Date }).to.toISOString() })),
+    [
+      { creditCardId: "card-1", from: "2026-05-16T00:00:00.000Z", to: "2026-06-15T23:59:59.999Z" },
+      { creditCardId: "card-1", from: "2026-06-16T00:00:00.000Z", to: "2026-07-15T23:59:59.999Z" },
+      { creditCardId: "card-2", from: "2026-05-16T00:00:00.000Z", to: "2026-06-15T23:59:59.999Z" },
+      { creditCardId: "card-2", from: "2026-06-16T00:00:00.000Z", to: "2026-07-15T23:59:59.999Z" },
+    ],
   );
 });
