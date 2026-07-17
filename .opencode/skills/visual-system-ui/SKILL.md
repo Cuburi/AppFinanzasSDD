@@ -15,6 +15,7 @@ Use this skill when changing AppFinanzasSDD client UI, dashboard surfaces, month
 
 ## Hard Rules
 
+- Read `docs/frontend/visual-direction.md` before changing AppFinanzas UI; UI work must align with that brief unless the task explicitly documents a deviation.
 - Use existing CSS custom properties in `client/src/styles.css` before adding new visual values.
 - Reuse `client/src/components/ui` primitives for cards, buttons, status pills, section headers, and KPI cards.
 - Do not adopt Tailwind, shadcn, CSS-in-JS, or a new component library inside the current visual-system SDD.
@@ -33,10 +34,11 @@ Use this skill when changing AppFinanzasSDD client UI, dashboard surfaces, month
 
 ## Execution Steps
 
-1. Read the affected page and existing primitive API before editing.
-2. Write behavior/accessibility tests first when changing rendered UI.
-3. Implement the smallest token-backed change that satisfies the scenario.
-4. Run the relevant client tests; run the full client test command for final visual-system slices.
+1. Read `docs/frontend/visual-direction.md` and identify the relevant product/visual principles.
+2. Read the affected page and existing primitive API before editing.
+3. Write behavior/accessibility tests first when changing rendered UI.
+4. Implement the smallest token-backed change that satisfies the scenario.
+5. Run the relevant client tests; run the full client test command for final visual-system slices.
 
 ## Output Contract
 
@@ -44,5 +46,6 @@ Report changed files, tests run, accessibility/responsive checks, and any intent
 
 ## References
 
+- `docs/frontend/visual-direction.md` — AppFinanzas visual direction and UI review checklist.
 - `client/src/components/ui/` — shared visual-system primitives.
 - `client/src/styles.css` — token and responsive style source of truth.

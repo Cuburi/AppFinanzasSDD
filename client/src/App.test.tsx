@@ -11,6 +11,7 @@ vi.mock("./pages/CloseMonthPage", () => ({ CloseMonthPage: () => <h2>Cierre test
 vi.mock("./pages/PocketsPage", () => ({ PocketsPage: () => <h2>Gestión de bolsillos test</h2> }));
 vi.mock("./pages/DebtsPage", () => ({ DebtsPage: () => <h2>Control de deudas test</h2> }));
 vi.mock("./pages/ReportsPage", () => ({ ReportsPage: () => <h2>Basic reports test</h2> }));
+vi.mock("./pages/CreditCardsPage", () => ({ CreditCardsPage: () => <h2>Credit Cards dashboard test</h2> }));
 
 afterEach(() => {
   cleanup();
@@ -66,5 +67,18 @@ describe("App reports route", () => {
       screen.getByRole("link", { name: "Reports" }),
     );
     expect(screen.getByRole("main")).toContainElement(screen.getByRole("heading", { name: "Basic reports test" }));
+  });
+});
+
+describe("App credit cards route", () => {
+  it("exposes Credit Cards navigation and renders the direct route", () => {
+    render(
+      <MemoryRouter future={routerFutureFlags} initialEntries={["/credit-cards"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "Credit Cards" })).toHaveAttribute("href", "/credit-cards");
+    expect(screen.getByRole("heading", { name: "Credit Cards dashboard test" })).toBeInTheDocument();
   });
 });

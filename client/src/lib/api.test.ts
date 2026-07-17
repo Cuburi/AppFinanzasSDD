@@ -63,6 +63,66 @@ describe("pockets api", () => {
   });
 });
 
+describe("credit cards api", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("lists credit cards with the backend active filter and unwraps cards", async () => {
+    const cards = [
+      {
+        id: "card-1",
+        ownerId: "owner-1",
+        issuer: "Visa",
+        name: "Main",
+        limit: 2500,
+        closingDay: 20,
+        dueDay: 28,
+        active: true,
+      },
+    ];
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ cards }), { status: 200 }));
+
+    await expect(api.getCreditCards("all")).resolves.toEqual(cards);
+
+    expect(fetch).toHaveBeenCalledWith("/api/credit-cards?active=all");
+  });
+
+  it("reads current statement summaries without unwrapping the estimation label", async () => {
+    const statementPayload = {
+      estimation: "APP_ESTIMATED",
+      cards: [
+        {
+          creditCardId: "card-1",
+          issuer: "Visa",
+          name: "Main",
+          limit: 2500,
+          cycleStart: "2026-07-21",
+          cycleEnd: "2026-08-20",
+          cutoffDate: "2026-08-20",
+          dueDate: "2026-08-28",
+          estimatedSpent: 410.5,
+        },
+      ],
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(statementPayload), { status: 200 }));
+
+    await expect(api.getCurrentCreditCardStatements()).resolves.toEqual(statementPayload);
+
+    expect(fetch).toHaveBeenCalledWith("/api/credit-cards/statements/current");
+  });
+
+  it("propagates backend error messages from credit-card endpoints", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ message: "Credit cards unavailable." }), { status: 503 }));
+
+    await expect(api.getCreditCards()).rejects.toThrow("Credit cards unavailable.");
+  });
+});
+
 describe("monthly cash and expense api", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
