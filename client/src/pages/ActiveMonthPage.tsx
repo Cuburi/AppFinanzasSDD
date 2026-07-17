@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
 import { Button, Card, KpiCard, SectionHeader, StatusPill } from "../components/ui";
-import type { ExpenseHistoryItem, Month, MonthCategory, MonthlyIncome, MonthSubcategory, PaymentMethod, SavingsPocket } from "../types";
+import type { CreditCardView, ExpenseHistoryItem, Month, MonthCategory, MonthlyIncome, MonthSubcategory, PaymentMethod, SavingsPocket } from "../types";
 
 const now = new Date();
 
@@ -10,6 +10,7 @@ const formatMonthDate = (month: Month) => `${month.year}-${String(month.month).p
 const formatDisplayDate = (value: string) => new Date(value).toLocaleDateString("es-AR", { timeZone: "UTC" });
 const formatPaymentMethod = (paymentMethod: PaymentMethod) => (paymentMethod === "CASH" ? "Efectivo" : "No efectivo");
 const balanceTrend = (amount: number) => (amount < 0 ? "negative" : amount > 0 ? "positive" : "neutral");
+const formatCreditCardLabel = (card: CreditCardView) => `${card.issuer} ${card.name}`;
 
 export const ActiveMonthPage = () => {
   const [activeMonth, setActiveMonth] = useState<Month | null>(null);
@@ -18,6 +19,8 @@ export const ActiveMonthPage = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [activePockets, setActivePockets] = useState<SavingsPocket[]>([]);
+  const [activeCreditCards, setActiveCreditCards] = useState<CreditCardView[]>([]);
+  const [creditCardLoadError, setCreditCardLoadError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expenseSubcategoryId, setExpenseSubcategoryId] = useState("");
@@ -25,8 +28,10 @@ export const ActiveMonthPage = () => {
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseOccurredAt, setExpenseOccurredAt] = useState("");
   const [expensePaymentMethod, setExpensePaymentMethod] = useState<PaymentMethod>("NON_CASH");
+  const [expenseCreditCardId, setExpenseCreditCardId] = useState("");
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [expenseHistory, setExpenseHistory] = useState<ExpenseHistoryItem[]>([]);
+  const [historyCreditCardId, setHistoryCreditCardId] = useState("");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalOccurredAt, setWithdrawalOccurredAt] = useState("");
   const [withdrawalDescription, setWithdrawalDescription] = useState("");
@@ -53,8 +58,8 @@ export const ActiveMonthPage = () => {
   const [newSubcategoryDefaultPocketId, setNewSubcategoryDefaultPocketId] = useState("");
   const [newSubcategoryAddToTemplate, setNewSubcategoryAddToTemplate] = useState(false);
 
-  const refreshExpenseHistory = async (monthId: string) => {
-    const expenses = await api.getExpenseHistory(monthId);
+  const refreshExpenseHistory = async (monthId: string, creditCardId = historyCreditCardId) => {
+    const expenses = creditCardId ? await api.getExpenseHistory(monthId, { creditCardId }) : await api.getExpenseHistory(monthId);
     setExpenseHistory(expenses);
   };
 
@@ -80,9 +85,23 @@ export const ActiveMonthPage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [monthData, pockets] = await Promise.all([api.getActiveMonth(), api.getPockets("active")]);
+        const [monthData, pockets, creditCards] = await Promise.all([
+          api.getActiveMonth(),
+          api.getPockets("active"),
+          api
+            .getCreditCards("active")
+            .then((cards) => {
+              setCreditCardLoadError(null);
+              return cards;
+            })
+            .catch(() => {
+              setCreditCardLoadError("No se pudieron cargar las tarjetas activas. Podés registrar gastos sin tarjeta.");
+              return [];
+            }),
+        ]);
         setActiveMonth(monthData);
         setActivePockets(pockets);
+        setActiveCreditCards(creditCards);
         if (monthData) {
           setExpenseOccurredAt(formatMonthDate(monthData));
           setWithdrawalOccurredAt(formatMonthDate(monthData));
@@ -139,6 +158,7 @@ export const ActiveMonthPage = () => {
     setExpenseDescription("");
     setExpenseOccurredAt(monthData ? formatMonthDate(monthData) : "");
     setExpensePaymentMethod("NON_CASH");
+    setExpenseCreditCardId("");
     setEditingExpenseId(null);
   };
 
@@ -207,7 +227,32 @@ export const ActiveMonthPage = () => {
     setExpenseDescription(expense.description ?? "");
     setExpenseOccurredAt(expense.occurredAt.slice(0, 10));
     setExpensePaymentMethod(expense.paymentMethod);
+    setExpenseCreditCardId(expense.paymentMethod === "CASH" ? "" : expense.creditCardId ?? "");
     setEditingExpenseId(expense.id);
+  };
+
+  const getCreditCardLabel = (creditCardId: string | null) => {
+    if (!creditCardId) return null;
+    const card = activeCreditCards.find((item) => item.id === creditCardId);
+    return card ? formatCreditCardLabel(card) : "Card unavailable";
+  };
+
+  const handleExpensePaymentMethodChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const paymentMethod = event.target.value as PaymentMethod;
+    setExpensePaymentMethod(paymentMethod);
+    if (paymentMethod === "CASH") setExpenseCreditCardId("");
+  };
+
+  const handleExpenseCreditCardChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const creditCardId = event.target.value;
+    setExpenseCreditCardId(creditCardId);
+    if (creditCardId) setExpensePaymentMethod("NON_CASH");
+  };
+
+  const handleHistoryCreditCardChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const creditCardId = event.target.value;
+    setHistoryCreditCardId(creditCardId);
+    if (activeMonth) void refreshExpenseHistory(activeMonth.id, creditCardId);
   };
 
   const startEditingCategory = (category: MonthCategory) => {
@@ -231,7 +276,8 @@ export const ActiveMonthPage = () => {
       amount: Number(expenseAmount),
       description: expenseDescription,
       occurredAt: expenseOccurredAt || formatMonthDate(activeMonth),
-      paymentMethod: expensePaymentMethod,
+      paymentMethod: expenseCreditCardId ? "NON_CASH" : expensePaymentMethod,
+      creditCardId: expensePaymentMethod === "CASH" ? null : expenseCreditCardId || null,
     };
 
     await applyActiveMonthCorrection(
@@ -577,9 +623,20 @@ export const ActiveMonthPage = () => {
             </label>
             <label className="field small-field">
               <span>Método de pago</span>
-              <select value={expensePaymentMethod} onChange={(event) => setExpensePaymentMethod(event.target.value as PaymentMethod)} required>
+              <select value={expensePaymentMethod} onChange={handleExpensePaymentMethodChange} required>
                 <option value="NON_CASH">No efectivo</option>
                 <option value="CASH">Efectivo</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Tarjeta de crédito (opcional)</span>
+              <select value={expenseCreditCardId} onChange={handleExpenseCreditCardChange}>
+                <option value="">Sin tarjeta / efectivo</option>
+                {activeCreditCards.map((card) => (
+                  <option key={card.id} value={card.id}>
+                    {formatCreditCardLabel(card)}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="field">
@@ -652,30 +709,51 @@ export const ActiveMonthPage = () => {
 
           <section className="stack-sm">
             <h3>Historial de gastos del mes</h3>
+            {creditCardLoadError ? (
+              <p className="error" role="alert">
+                {creditCardLoadError}
+              </p>
+            ) : null}
+            <label className="field">
+              <span>Filtrar historial por tarjeta</span>
+              <select value={historyCreditCardId} onChange={handleHistoryCreditCardChange}>
+                <option value="">Todas las tarjetas y efectivo</option>
+                {activeCreditCards.map((card) => (
+                  <option key={card.id} value={card.id}>
+                    {formatCreditCardLabel(card)}
+                  </option>
+                ))}
+              </select>
+            </label>
             {expenseHistory.length === 0 ? <p>No hay gastos registrados para este mes.</p> : null}
-            {expenseHistory.map((expense) => (
-              <div className="budget-line align-start" key={expense.id}>
-                <div>
-                  <strong>{expense.description || "Gasto sin descripción"}</strong>
-                  <p>
-                    {formatDisplayDate(expense.occurredAt)} · {expense.subcategory.name} · {expense.category.name} · {formatPaymentMethod(expense.paymentMethod)}
-                  </p>
+            {expenseHistory.map((expense) => {
+              const creditCardLabel = getCreditCardLabel(expense.creditCardId);
+
+              return (
+                <div className="budget-line align-start" key={expense.id}>
+                  <div>
+                    <strong>{expense.description || "Gasto sin descripción"}</strong>
+                    <p>
+                      {formatDisplayDate(expense.occurredAt)} · {expense.subcategory.name} · {expense.category.name} · {formatPaymentMethod(expense.paymentMethod)}
+                    </p>
+                    {creditCardLabel ? <StatusPill tone="neutral">Card: {creditCardLabel}</StatusPill> : null}
+                  </div>
+                  <div className="row gap-sm wrap">
+                    <StatusPill tone="danger">Gasto -${expense.amount.toFixed(2)}</StatusPill>
+                    {canMutateActiveMonth ? (
+                      <>
+                        <Button variant="secondary" disabled={submitting} onClick={() => startEditingExpense(expense)} type="button">
+                          Editar gasto {expense.description || "sin descripción"}
+                        </Button>
+                        <Button variant="tertiary" disabled={submitting} onClick={() => void handleDeleteExpense(expense)} type="button">
+                          Eliminar gasto {expense.description || "sin descripción"}
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="row gap-sm wrap">
-                  <StatusPill tone="danger">Gasto -${expense.amount.toFixed(2)}</StatusPill>
-                  {canMutateActiveMonth ? (
-                    <>
-                      <Button variant="secondary" disabled={submitting} onClick={() => startEditingExpense(expense)} type="button">
-                        Editar gasto {expense.description || "sin descripción"}
-                      </Button>
-                      <Button variant="tertiary" disabled={submitting} onClick={() => void handleDeleteExpense(expense)} type="button">
-                        Eliminar gasto {expense.description || "sin descripción"}
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </section>
         </Card>
       ) : null}

@@ -3,11 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ActiveMonthPage } from "./ActiveMonthPage";
-import type { Month, SavingsPocket } from "../types";
+import type { CreditCardView, Month, SavingsPocket } from "../types";
 
 const apiMock = vi.hoisted(() => ({
   getActiveMonth: vi.fn(),
   getPockets: vi.fn(),
+  getCreditCards: vi.fn(),
   openMonth: vi.fn(),
   recordExpense: vi.fn(),
   updateExpense: vi.fn(),
@@ -78,6 +79,11 @@ const activePockets: SavingsPocket[] = [
   { id: "pocket-travel", name: "Viaje", goalAmount: null, active: true, balance: 0 },
 ];
 
+const activeCreditCards: CreditCardView[] = [
+  { id: "card-1", ownerId: "owner-1", issuer: "Visa", name: "Daily", limit: 2500, closingDay: 20, dueDay: 28, active: true },
+  { id: "card-2", ownerId: "owner-1", issuer: "Mastercard", name: "Travel", limit: null, closingDay: 10, dueDay: 18, active: true },
+];
+
 describe("ActiveMonthPage", () => {
   afterEach(() => {
     cleanup();
@@ -87,6 +93,7 @@ describe("ActiveMonthPage", () => {
     vi.clearAllMocks();
     apiMock.getActiveMonth.mockResolvedValue(activeMonth);
     apiMock.getPockets.mockResolvedValue(activePockets);
+    apiMock.getCreditCards.mockResolvedValue(activeCreditCards);
     apiMock.depositToPocket.mockResolvedValue(activeMonth);
     apiMock.createMonthlyIncome.mockResolvedValue(activeMonth);
     apiMock.updateMonthlyIncome.mockResolvedValue(activeMonth);
@@ -108,6 +115,7 @@ describe("ActiveMonthPage", () => {
         paymentMethod: "CASH",
         amount: 20,
         description: "Café",
+        creditCardId: null,
         category: { id: "cat-income", name: "Ingresos" },
         subcategory: { id: "sub-bonus", name: "Bonus" },
       },
@@ -117,6 +125,7 @@ describe("ActiveMonthPage", () => {
         paymentMethod: "NON_CASH",
         amount: 35,
         description: null,
+        creditCardId: "card-1",
         category: { id: "cat-income", name: "Ingresos" },
         subcategory: { id: "sub-bonus", name: "Bonus" },
       },
@@ -187,8 +196,95 @@ describe("ActiveMonthPage", () => {
     expect(await screen.findByRole("region", { name: "Efectivo físico" })).toHaveTextContent("$80.00");
     expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1");
     expect(await screen.findByText("Café")).toBeInTheDocument();
+    expect(screen.getByText("Card: Visa Daily")).toBeInTheDocument();
     expect(screen.getByText("12/5/2026 · Bonus · Ingresos · Efectivo")).toBeInTheDocument();
     expect(screen.getByText("15/5/2026 · Bonus · Ingresos · No efectivo")).toBeInTheDocument();
+  });
+
+  it("offers active credit cards while keeping the default cash/no-card expense path", async () => {
+    render(<ActiveMonthPage />);
+
+    const cardSelect = await screen.findByLabelText("Tarjeta de crédito (opcional)");
+
+    expect(apiMock.getCreditCards).toHaveBeenCalledWith("active");
+    expect(cardSelect).toHaveValue("");
+    expect(screen.getByRole("option", { name: "Sin tarjeta / efectivo" })).toBeInTheDocument();
+    expect(screen.getAllByRole("option", { name: "Visa Daily" })).toHaveLength(2);
+    expect(screen.getAllByRole("option", { name: "Mastercard Travel" })).toHaveLength(2);
+  });
+
+  it("records a card-linked expense as non-cash", async () => {
+    const user = userEvent.setup();
+
+    render(<ActiveMonthPage />);
+
+    const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
+    if (!expenseForm) throw new Error("Missing expense form.");
+
+    await user.selectOptions(within(expenseForm).getByLabelText("Subcategoría del gasto"), "sub-bonus");
+    await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "35");
+    fireEvent.change(within(expenseForm).getByLabelText("Fecha del gasto"), { target: { value: "2026-05-15" } });
+    await user.selectOptions(within(expenseForm).getByLabelText("Tarjeta de crédito (opcional)"), "card-1");
+    await user.type(within(expenseForm).getByLabelText("Descripción"), "Groceries");
+    await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
+
+    await waitFor(() =>
+      expect(apiMock.recordExpense).toHaveBeenCalledWith({
+        monthId: "month-1",
+        sourceSubcategoryId: "sub-bonus",
+        amount: 35,
+        description: "Groceries",
+        occurredAt: "2026-05-15",
+        paymentMethod: "NON_CASH",
+        creditCardId: "card-1",
+      }),
+    );
+  });
+
+  it("clears the selected credit card when recording a cash expense", async () => {
+    const user = userEvent.setup();
+
+    render(<ActiveMonthPage />);
+
+    const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
+    if (!expenseForm) throw new Error("Missing expense form.");
+
+    await user.selectOptions(within(expenseForm).getByLabelText("Subcategoría del gasto"), "sub-bonus");
+    await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
+    await user.selectOptions(within(expenseForm).getByLabelText("Tarjeta de crédito (opcional)"), "card-1");
+    await user.selectOptions(within(expenseForm).getByLabelText("Método de pago"), "CASH");
+    expect(within(expenseForm).getByLabelText("Tarjeta de crédito (opcional)")).toHaveValue("");
+    await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
+
+    await waitFor(() =>
+      expect(apiMock.recordExpense).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentMethod: "CASH",
+          creditCardId: null,
+        }),
+      ),
+    );
+  });
+
+  it("filters expense history by selected credit card", async () => {
+    const user = userEvent.setup();
+
+    render(<ActiveMonthPage />);
+
+    const historyFilter = await screen.findByLabelText("Filtrar historial por tarjeta");
+    await user.selectOptions(historyFilter, "card-1");
+
+    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenLastCalledWith("month-1", { creditCardId: "card-1" }));
+  });
+
+  it("keeps the active month usable when credit cards cannot be loaded", async () => {
+    apiMock.getCreditCards.mockRejectedValueOnce(new Error("Credit cards unavailable."));
+
+    render(<ActiveMonthPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudieron cargar las tarjetas activas. Podés registrar gastos sin tarjeta.");
+    expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Sin tarjeta / efectivo" })).toBeInTheDocument();
   });
 
   it("records an expense with date and payment method", async () => {
@@ -214,6 +310,7 @@ describe("ActiveMonthPage", () => {
         description: "Café",
         occurredAt: "2026-05-12",
         paymentMethod: "CASH",
+        creditCardId: null,
       }),
     );
   });
@@ -262,6 +359,7 @@ describe("ActiveMonthPage", () => {
         description: "Café corregido",
         occurredAt: "2026-05-12",
         paymentMethod: "CASH",
+        creditCardId: null,
       }),
     );
     expect(await screen.findByText("Gasto actualizado en el mes activo y saldos recalculados.")).toBeInTheDocument();

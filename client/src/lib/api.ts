@@ -171,6 +171,7 @@ export const api = {
         description: input.description,
         occurredAt: input.occurredAt,
         paymentMethod: input.paymentMethod,
+        creditCardId: input.creditCardId,
       }),
     });
 
@@ -188,6 +189,7 @@ export const api = {
         description: input.description,
         occurredAt: input.occurredAt,
         paymentMethod: input.paymentMethod,
+        creditCardId: input.creditCardId,
       }),
     });
 
@@ -206,6 +208,7 @@ export const api = {
     if (filters.to) params.set("to", filters.to);
     if (filters.paymentMethod) params.set("paymentMethod", filters.paymentMethod);
     if (filters.subcategoryId) params.set("subcategoryId", filters.subcategoryId);
+    if (filters.creditCardId) params.set("creditCardId", filters.creditCardId);
 
     const query = params.toString();
     const response = await fetch(`/api/months/${monthId}/expenses${query ? `?${query}` : ""}`);

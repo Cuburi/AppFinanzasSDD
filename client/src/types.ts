@@ -165,6 +165,7 @@ export type RecordExpenseInput = {
   amount: number;
   occurredAt: string;
   paymentMethod: PaymentMethod;
+  creditCardId?: string | null;
   description?: string;
 };
 
@@ -206,6 +207,7 @@ export type ExpenseHistoryFilters = {
   to?: string;
   paymentMethod?: PaymentMethod;
   subcategoryId?: string;
+  creditCardId?: string;
 };
 
 export type ExpenseHistoryItem = {
@@ -214,6 +216,7 @@ export type ExpenseHistoryItem = {
   paymentMethod: PaymentMethod;
   amount: number;
   description: string | null;
+  creditCardId: string | null;
   category: {
     id: string;
     name: string;

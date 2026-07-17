@@ -132,7 +132,7 @@ describe("monthly cash and expense api", () => {
     vi.unstubAllGlobals();
   });
 
-  it("records expenses with payment method and occurred date", async () => {
+  it("records expenses with payment method, occurred date, and selected credit card", async () => {
     const monthPayload = { id: "month-1", cashBalance: 40 };
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 200 }));
 
@@ -144,6 +144,7 @@ describe("monthly cash and expense api", () => {
         description: "Lunch",
         occurredAt: "2026-05-12",
         paymentMethod: "CASH",
+        creditCardId: "card-1",
       }),
     ).resolves.toEqual(monthPayload);
 
@@ -156,6 +157,37 @@ describe("monthly cash and expense api", () => {
         description: "Lunch",
         occurredAt: "2026-05-12",
         paymentMethod: "CASH",
+        creditCardId: "card-1",
+      }),
+    });
+  });
+
+  it("records cash/no-card expenses with an explicit null credit card", async () => {
+    const monthPayload = { id: "month-1", cashBalance: 40 };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 200 }));
+
+    await expect(
+      api.recordExpense({
+        monthId: "month-1",
+        sourceSubcategoryId: "sub-food",
+        amount: 25,
+        description: "Cash lunch",
+        occurredAt: "2026-05-12",
+        paymentMethod: "CASH",
+        creditCardId: null,
+      }),
+    ).resolves.toEqual(monthPayload);
+
+    expect(fetch).toHaveBeenCalledWith("/api/months/month-1/expenses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceSubcategoryId: "sub-food",
+        amount: 25,
+        description: "Cash lunch",
+        occurredAt: "2026-05-12",
+        paymentMethod: "CASH",
+        creditCardId: null,
       }),
     });
   });
@@ -169,6 +201,7 @@ describe("monthly cash and expense api", () => {
           paymentMethod: "NON_CASH",
           amount: 75,
           description: "Groceries",
+          creditCardId: "card-1",
           category: { id: "cat-food", name: "Food" },
           subcategory: { id: "sub-grocery", name: "Groceries" },
         },
@@ -182,10 +215,11 @@ describe("monthly cash and expense api", () => {
         to: "2026-05-31",
         paymentMethod: "NON_CASH",
         subcategoryId: "sub-grocery",
+        creditCardId: "card-1",
       }),
     ).resolves.toEqual(historyPayload.expenses);
 
-    expect(fetch).toHaveBeenCalledWith("/api/months/month-1/expenses?from=2026-05-01&to=2026-05-31&paymentMethod=NON_CASH&subcategoryId=sub-grocery");
+    expect(fetch).toHaveBeenCalledWith("/api/months/month-1/expenses?from=2026-05-01&to=2026-05-31&paymentMethod=NON_CASH&subcategoryId=sub-grocery&creditCardId=card-1");
   });
 
   it("updates and deletes active-month expenses through correction endpoints", async () => {
@@ -203,6 +237,7 @@ describe("monthly cash and expense api", () => {
         description: "Dinner",
         occurredAt: "2026-05-14",
         paymentMethod: "NON_CASH",
+        creditCardId: null,
       }),
     ).resolves.toEqual(monthPayload);
     await expect(api.deleteExpense("month-1", "expense-1")).resolves.toMatchObject({ availableMoney: 450 });
@@ -216,6 +251,7 @@ describe("monthly cash and expense api", () => {
         description: "Dinner",
         occurredAt: "2026-05-14",
         paymentMethod: "NON_CASH",
+        creditCardId: null,
       }),
     });
     expect(fetch).toHaveBeenNthCalledWith(2, "/api/months/month-1/expenses/expense-1", { method: "DELETE" });
