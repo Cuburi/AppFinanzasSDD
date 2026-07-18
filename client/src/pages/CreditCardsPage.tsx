@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { Card, KpiCard, SectionHeader, StatusPill } from "../components/ui";
 import { api } from "../lib/api";
-import type { CreditCardStatementSummaryListView, CreditCardStatementSummaryView, CreditCardView } from "../types";
+import type { CreditCardStatementBucketView, CreditCardStatementSummaryListView, CreditCardStatementSummaryView, CreditCardView } from "../types";
 
 const formatMoney = (amount: number) => `${amount < 0 ? "-" : ""}$${Math.abs(amount).toFixed(2)}`;
 
@@ -15,15 +15,16 @@ const formatDate = (value?: string | null) => {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
 };
 
-const formatCycle = (statement?: CreditCardStatementSummaryView) => {
-  if (!statement) return "unavailable";
-  const start = formatDate(statement.cycleStart);
-  const end = formatDate(statement.cycleEnd);
+const formatPeriod = (bucket?: CreditCardStatementBucketView) => {
+  if (!bucket) return "unavailable";
+  const start = formatDate(bucket.periodStart);
+  const end = formatDate(bucket.periodEnd);
 
   return start === "unavailable" || end === "unavailable" ? "unavailable" : `${start} – ${end}`;
 };
 
-const sumStatements = (statements: CreditCardStatementSummaryView[]) => statements.reduce((total, statement) => total + statement.estimatedSpent, 0);
+const sumBucketAmounts = (statements: CreditCardStatementSummaryView[], bucket: "closedStatement" | "inProgressCycle") =>
+  statements.reduce((total, statement) => total + statement[bucket].amount, 0);
 
 const errorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
 
@@ -70,8 +71,8 @@ export const CreditCardsPage = () => {
   }, []);
 
   const statements = statementState.data?.cards ?? [];
-  const primaryStatement = statements[0];
-  const total = sumStatements(statements);
+  const closedStatementTotal = sumBucketAmounts(statements, "closedStatement");
+  const inProgressCycleTotal = sumBucketAmounts(statements, "inProgressCycle");
 
   return (
     <section className="page stack-lg">
@@ -79,37 +80,35 @@ export const CreditCardsPage = () => {
         <div>
           <p className="eyebrow">Credit Cards</p>
           <h1>Credit Cards</h1>
-          <p>Read-only current statement dashboard with app-estimated amounts.</p>
+          <p>Read-only statement periods and current-cycle consumption from the credit-card API.</p>
         </div>
       </header>
 
-      <Card aria-label="Current statement" className="stack-md">
+      <Card aria-label="Current credit card state" className="stack-md">
         <SectionHeader
-          description="App-estimated current statement usage across all cards, not bank-confirmed debt."
-          title="Current statement"
+          description="Closed statement periods and in-progress consumption are provided separately by the credit-card API."
+          title="Credit card statement periods"
         />
 
-        {statementState.loading ? <p>Loading current statement...</p> : null}
+        {statementState.loading ? <p>Loading credit card statement periods...</p> : null}
         {statementState.error ? <p role="alert" className="error">{statementState.error}</p> : null}
-        {!statementState.loading && !statementState.error && statements.length === 0 ? <p>No current credit-card statement usage yet.</p> : null}
+        {!statementState.loading && !statementState.error && statements.length === 0 ? <p>No credit-card statement periods are available yet.</p> : null}
 
         {statements.length > 0 ? (
           <>
             <div className="dashboard-kpi-grid">
               <KpiCard
-                detail={`App-estimated from ${statements.length} current card statement${statements.length === 1 ? "" : "s"}`}
-                label="Current statement total"
-                trend={total > 0 ? "negative" : "neutral"}
-                value={formatMoney(total)}
+                detail={`Amount from ${statements.length} closed statement period${statements.length === 1 ? "" : "s"}`}
+                label="Closed statement total"
+                trend={closedStatementTotal > 0 ? "negative" : "neutral"}
+                value={formatMoney(closedStatementTotal)}
               />
-              <KpiCard detail="Across the leading current statement" label="Cycle" value={formatCycle(primaryStatement)} />
-              <KpiCard detail="Payment timing from statement data" label="Due date" value={formatDate(primaryStatement?.dueDate)} />
-            </div>
-            <div className="row gap-sm wrap">
-              <StatusPill>Cycle: {formatCycle(primaryStatement)}</StatusPill>
-              <StatusPill>Cutoff: {formatDate(primaryStatement?.cutoffDate)}</StatusPill>
-              <StatusPill tone="warning">Due: {formatDate(primaryStatement?.dueDate)}</StatusPill>
-              <StatusPill tone="neutral">App-estimated</StatusPill>
+              <KpiCard
+                detail={`New consumption from ${statements.length} open cycle${statements.length === 1 ? "" : "s"}`}
+                label="In-progress cycle total"
+                trend={inProgressCycleTotal > 0 ? "negative" : "neutral"}
+                value={formatMoney(inProgressCycleTotal)}
+              />
             </div>
           </>
         ) : null}
@@ -123,9 +122,13 @@ export const CreditCardsPage = () => {
               <article className="budget-line align-start" key={statement.creditCardId}>
                 <div>
                   <strong>{statement.name}</strong>
-                  <p>{statement.issuer} · {formatMoney(statement.estimatedSpent)} app-estimated</p>
+                  <p>{statement.issuer}</p>
+                  <p>Closed statement: {formatMoney(statement.closedStatement.amount)} · {formatPeriod(statement.closedStatement)}</p>
+                  <p>Due date: {formatDate(statement.closedStatement.dueDate)} · Cutoff: {formatDate(statement.closedStatement.cutoffDate)}</p>
+                  <p>In-progress cycle: {formatMoney(statement.inProgressCycle.amount)} · {formatPeriod(statement.inProgressCycle)}</p>
+                  <p>Cutoff: {formatDate(statement.inProgressCycle.cutoffDate)}</p>
                 </div>
-                <StatusPill tone="warning">Payment due {formatDate(statement.dueDate)}</StatusPill>
+                <StatusPill tone="neutral">App-estimated</StatusPill>
               </article>
             ))}
           </div>
