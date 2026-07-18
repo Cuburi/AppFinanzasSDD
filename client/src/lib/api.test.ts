@@ -92,7 +92,7 @@ describe("credit cards api", () => {
     expect(fetch).toHaveBeenCalledWith("/api/credit-cards?active=all");
   });
 
-  it("reads current statement summaries without unwrapping the estimation label", async () => {
+  it("preserves backend-owned statement buckets without client classification", async () => {
     const statementPayload = {
       estimation: "APP_ESTIMATED",
       cards: [
@@ -101,11 +101,19 @@ describe("credit cards api", () => {
           issuer: "Visa",
           name: "Main",
           limit: 2500,
-          cycleStart: "2026-07-21",
-          cycleEnd: "2026-08-20",
-          cutoffDate: "2026-08-20",
-          dueDate: "2026-08-28",
-          estimatedSpent: 410.5,
+          closedStatement: {
+            periodStart: "2026-06-21",
+            periodEnd: "2026-07-20",
+            cutoffDate: "2026-07-20",
+            dueDate: "2026-07-28",
+            amount: 410.5,
+          },
+          inProgressCycle: {
+            periodStart: "2026-07-21",
+            periodEnd: "2026-08-20",
+            cutoffDate: "2026-08-20",
+            amount: 89.5,
+          },
         },
       ],
     };

@@ -100,16 +100,20 @@ export type CreditCardView = {
   active: boolean;
 };
 
+export type CreditCardStatementBucketView = {
+  periodStart: string;
+  periodEnd: string;
+  cutoffDate: string;
+  amount: number;
+};
+
 export type CreditCardStatementSummaryView = {
   creditCardId: string;
   name: string;
   issuer: string;
   limit: number | null;
-  cycleStart: string;
-  cycleEnd: string;
-  cutoffDate: string;
-  dueDate: string;
-  estimatedSpent: number;
+  closedStatement: CreditCardStatementBucketView & { dueDate: string };
+  inProgressCycle: CreditCardStatementBucketView;
 };
 
 export type CreditCardStatementSummaryListView = {

@@ -44,22 +44,38 @@ const statements: CreditCardStatementSummaryListView = {
       issuer: "Visa",
       name: "Main card",
       limit: 2500,
-      cycleStart: "2026-07-21",
-      cycleEnd: "2026-08-20",
-      cutoffDate: "2026-08-20",
-      dueDate: "2026-08-28",
-      estimatedSpent: 410.5,
+      closedStatement: {
+        periodStart: "2026-06-21",
+        periodEnd: "2026-07-20",
+        cutoffDate: "2026-07-20",
+        dueDate: "2026-07-28",
+        amount: 410.5,
+      },
+      inProgressCycle: {
+        periodStart: "2026-07-21",
+        periodEnd: "2026-08-20",
+        cutoffDate: "2026-08-20",
+        amount: 89.5,
+      },
     },
     {
       creditCardId: "card-2",
       issuer: "Mastercard",
       name: "Travel card",
       limit: null,
-      cycleStart: "2026-07-06",
-      cycleEnd: "2026-08-05",
-      cutoffDate: "2026-08-05",
-      dueDate: "2026-08-12",
-      estimatedSpent: 89.5,
+      closedStatement: {
+        periodStart: "2026-06-06",
+        periodEnd: "2026-07-05",
+        cutoffDate: "2026-07-05",
+        dueDate: "2026-07-12",
+        amount: 89.5,
+      },
+      inProgressCycle: {
+        periodStart: "2026-07-06",
+        periodEnd: "2026-08-05",
+        cutoffDate: "2026-08-05",
+        amount: 0,
+      },
     },
   ],
 };
@@ -75,25 +91,28 @@ describe("CreditCardsPage", () => {
     apiMock.getCurrentCreditCardStatements.mockResolvedValue(statements);
   });
 
-  it("renders a statement-first dashboard with an aggregate app-estimated amount before card details", async () => {
+  it("renders backend-owned closed and in-progress totals as peer financial blocks", async () => {
     render(<CreditCardsPage />);
 
-    expect(screen.getByText("Loading current statement...")).toBeInTheDocument();
+    expect(screen.getByText("Loading credit card statement periods...")).toBeInTheDocument();
     expect(screen.getByText("Loading credit cards...")).toBeInTheDocument();
 
-    const total = await screen.findByRole("region", { name: "Current statement total" });
-    expect(within(total).getByText("$500.00")).toBeInTheDocument();
-    expect(within(total).getByText("App-estimated from 2 current card statements")).toBeInTheDocument();
-
-    expect(screen.getByText("Cycle: Jul 21, 2026 – Aug 20, 2026")).toBeInTheDocument();
-    expect(screen.getByText("Cutoff: Aug 20, 2026")).toBeInTheDocument();
-    expect(screen.getByText("Due: Aug 28, 2026")).toBeInTheDocument();
+    const closedStatement = await screen.findByRole("region", { name: "Closed statement total" });
+    expect(within(closedStatement).getByText("$500.00")).toBeInTheDocument();
+    expect(within(closedStatement).getByText("Amount from 2 closed statement periods")).toBeInTheDocument();
+    const inProgressCycle = screen.getByRole("region", { name: "In-progress cycle total" });
+    expect(within(inProgressCycle).getByText("$89.50")).toBeInTheDocument();
+    expect(within(inProgressCycle).getByText("New consumption from 2 open cycles")).toBeInTheDocument();
 
     const breakdown = screen.getByRole("region", { name: "Statement breakdown by card" });
     expect(within(breakdown).getByText("Main card")).toBeInTheDocument();
-    expect(within(breakdown).getByText("Visa · $410.50 app-estimated")).toBeInTheDocument();
+    expect(within(breakdown).getByText("Closed statement: $410.50 · Jun 21, 2026 – Jul 20, 2026")).toBeInTheDocument();
+    expect(within(breakdown).getByText("Due date: Jul 28, 2026 · Cutoff: Jul 20, 2026")).toBeInTheDocument();
+    expect(within(breakdown).getByText("In-progress cycle: $89.50 · Jul 21, 2026 – Aug 20, 2026")).toBeInTheDocument();
+    expect(within(breakdown).getByText("Cutoff: Aug 20, 2026")).toBeInTheDocument();
     expect(within(breakdown).getByText("Travel card")).toBeInTheDocument();
-    expect(within(breakdown).getByText("Mastercard · $89.50 app-estimated")).toBeInTheDocument();
+    expect(within(breakdown).getByText("Closed statement: $89.50 · Jun 6, 2026 – Jul 5, 2026")).toBeInTheDocument();
+    expect(within(breakdown).getByText("In-progress cycle: $0.00 · Jul 6, 2026 – Aug 5, 2026")).toBeInTheDocument();
   });
 
   it("keeps successful statement data visible when the card list fails", async () => {
@@ -101,7 +120,7 @@ describe("CreditCardsPage", () => {
 
     render(<CreditCardsPage />);
 
-    expect(await screen.findByRole("region", { name: "Current statement total" })).toHaveTextContent("$500.00");
+    expect(await screen.findByRole("region", { name: "Closed statement total" })).toHaveTextContent("$500.00");
     expect(screen.getByRole("alert")).toHaveTextContent("Cards unavailable.");
     expect(screen.getByText("Statement data remains visible while card inventory could not load.")).toBeInTheDocument();
   });
@@ -112,21 +131,29 @@ describe("CreditCardsPage", () => {
       cards: [
         {
           ...statements.cards[0],
-          cycleStart: "not-a-date",
-          cycleEnd: "",
-          cutoffDate: "",
-          dueDate: "not-a-date",
-          estimatedSpent: 125,
+          closedStatement: {
+            periodStart: "not-a-date",
+            periodEnd: "",
+            cutoffDate: "",
+            dueDate: "not-a-date",
+            amount: 125,
+          },
+          inProgressCycle: {
+            periodStart: "not-a-date",
+            periodEnd: "",
+            cutoffDate: "",
+            amount: 0,
+          },
         },
       ],
     });
 
     render(<CreditCardsPage />);
 
-    expect(await screen.findByRole("region", { name: "Current statement total" })).toHaveTextContent("$125.00");
-    expect(screen.getByText("Cycle: unavailable")).toBeInTheDocument();
-    expect(screen.getByText("Cutoff: unavailable")).toBeInTheDocument();
-    expect(screen.getByText("Due: unavailable")).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Closed statement total" })).toHaveTextContent("$125.00");
+    expect(screen.getByText("Closed statement: $125.00 · unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Due date: unavailable · Cutoff: unavailable")).toBeInTheDocument();
+    expect(screen.getByText("In-progress cycle: $0.00 · unavailable")).toBeInTheDocument();
   });
 
   it("shows empty read-only states without mutation controls", async () => {
@@ -135,7 +162,7 @@ describe("CreditCardsPage", () => {
 
     render(<CreditCardsPage />);
 
-    expect(await screen.findByText("No current credit-card statement usage yet.")).toBeInTheDocument();
+    expect(await screen.findByText("No credit-card statement periods are available yet.")).toBeInTheDocument();
     expect(screen.getByText("No credit cards are registered yet.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /create|edit|inactivate|delete|expense/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /create|edit|inactivate|delete|expense/i })).not.toBeInTheDocument();
