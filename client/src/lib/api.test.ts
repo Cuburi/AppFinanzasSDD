@@ -420,3 +420,24 @@ describe("monthly cash and expense api", () => {
     expect(fetch).toHaveBeenCalledWith("/api/months/month-1/reports/basic");
   });
 });
+
+describe("active month api contract", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ["an active month", { month: { id: "month-1", status: "ACTIVE" } }, { id: "month-1", status: "ACTIVE" }],
+    ["an unopened month", { month: null }, null],
+  ])("reads %s from the established envelope", async (_scenario, payload, expected) => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(payload), { status: 200 }));
+
+    await expect(api.getActiveMonth()).resolves.toEqual(expected);
+
+    expect(fetch).toHaveBeenCalledWith("/api/months/active");
+  });
+});

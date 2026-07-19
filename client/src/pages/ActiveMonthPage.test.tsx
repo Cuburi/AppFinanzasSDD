@@ -132,6 +132,24 @@ describe("ActiveMonthPage", () => {
     ]);
   });
 
+  it("keeps the loading and unopened states distinct", async () => {
+    let resolveMonth: (month: Month | null) => void;
+    apiMock.getActiveMonth.mockReturnValueOnce(
+      new Promise<Month | null>((resolve) => {
+        resolveMonth = resolve;
+      }),
+    );
+
+    render(<ActiveMonthPage />);
+
+    expect(screen.getByText("Cargando mes activo...")).toBeInTheDocument();
+
+    resolveMonth!(null);
+
+    expect(await screen.findByText("Todavía no hay un mes activo.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abrir mes" })).toBeInTheDocument();
+  });
+
   it("uses an active-pocket selector for deposits instead of a manual pocket ID", async () => {
     const user = userEvent.setup();
 
@@ -285,6 +303,25 @@ describe("ActiveMonthPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudieron cargar las tarjetas activas. Podés registrar gastos sin tarjeta.");
     expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Sin tarjeta / efectivo" })).toBeInTheDocument();
+  });
+
+  it("uses the current fallback label when an expense references an unavailable card", async () => {
+    apiMock.getExpenseHistory.mockResolvedValueOnce([
+      {
+        id: "expense-with-missing-card",
+        occurredAt: "2026-05-16T00:00:00.000Z",
+        paymentMethod: "NON_CASH",
+        amount: 15,
+        description: "Compra anterior",
+        creditCardId: "card-removed",
+        category: { id: "cat-income", name: "Ingresos" },
+        subcategory: { id: "sub-bonus", name: "Bonus" },
+      },
+    ]);
+
+    render(<ActiveMonthPage />);
+
+    expect(await screen.findByText("Card: Card unavailable")).toBeInTheDocument();
   });
 
   it("records an expense with date and payment method", async () => {

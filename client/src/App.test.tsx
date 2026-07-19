@@ -30,6 +30,19 @@ describe("App pocket route", () => {
   });
 });
 
+describe("App active month route", () => {
+  it("keeps Mes activo routed to the current page contract", () => {
+    render(
+      <MemoryRouter future={routerFutureFlags} initialEntries={["/active-month"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "Mes activo" })).toHaveAttribute("href", "/active-month");
+    expect(screen.getByRole("heading", { name: "Mes activo test" })).toBeInTheDocument();
+  });
+});
+
 describe("App debt route", () => {
   it("exposes Deudas navigation and renders the debt management route", () => {
     render(
