@@ -27,9 +27,22 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
 
 ## Requisitos
 
-- Node.js
-- pnpm vía Corepack
+- Node.js 22
+- pnpm 11.1.2 vía Corepack
 - Docker Desktop para la base de datos local PostgreSQL
+
+### Validación rápida del frontend
+
+Con Node.js 22 activo, prepará pnpm y ejecutá el check completo:
+
+```bash
+corepack enable
+pnpm --version
+pnpm install --frozen-lockfile
+pnpm check:client
+```
+
+El último comando ejecuta typecheck, tests y build de producción del frontend.
 
 ## Configuración local
 
@@ -146,6 +159,7 @@ No crees `prisma/.env`: el `.env` raíz es la fuente de verdad local. Por seguri
 | `pnpm db:personal:reset` | Reseteo personal guardado por `CONFIRM_PERSONAL_RESET=RESET_APPFINANZAS_PERSONAL`. **Destruye datos personales.** |
 | `pnpm local:setup` | Valida `.env.example`, levanta PostgreSQL, genera Prisma Client y ejecuta migraciones sobre una base limpia. |
 | `pnpm local:check-readme` | Valida que el README mantenga el checklist local mínimo. |
+| `pnpm check:client` | Ejecuta typecheck, tests y build de producción del frontend. |
 | `pnpm --dir client dev` | Levanta solo el frontend. |
 | `pnpm --dir server dev` | Levanta solo el backend. |
 | `pnpm --dir server test` | Ejecuta las pruebas del backend. |
