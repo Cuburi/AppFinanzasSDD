@@ -1,6 +1,10 @@
 {
   "packageManager": "pnpm@11.1.2",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
+    "check:client": "pnpm --dir client check",
     "dev": "node scripts/dev.mjs",
     "env:dev": "node scripts/use-env-profile.mjs dev",
     "env:personal": "node scripts/use-env-profile.mjs personal",
