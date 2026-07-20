@@ -62,6 +62,27 @@ describe("ActiveMonthDashboard", () => {
     expect(screen.queryByRole("region", { name: "Operación del mes" })).not.toBeInTheDocument();
   });
 
+  it("keeps operations visible while announcing a degraded support source with a targeted retry", async () => {
+    const user = userEvent.setup();
+    const retrySupport = vi.fn();
+
+    render(
+      <ActiveMonthDashboard
+        onOpenMonth={vi.fn()}
+        onRetry={vi.fn()}
+        onRetrySupport={retrySupport}
+        viewModel={{ lifecycle: "degraded", month: activeMonth, action: { kind: "retry-support", source: "report" }, supportFailures: ["report"] }}
+      >
+        <p>Legacy operation</p>
+      </ActiveMonthDashboard>,
+    );
+
+    expect(screen.getByRole("region", { name: "Operación del mes" })).toHaveTextContent("Legacy operation");
+    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cargar el reporte.");
+    await user.click(screen.getByRole("button", { name: "Reintentar reporte" }));
+    expect(retrySupport).toHaveBeenCalledWith("report");
+  });
+
   it("uses native form submission for Enter and rejects out-of-range months before activation", async () => {
     const user = userEvent.setup();
     const submit = vi.fn();
