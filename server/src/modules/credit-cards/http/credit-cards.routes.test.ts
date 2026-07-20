@@ -2,10 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
 
+import type { CreditCardStatementSummaryListView } from "../shared/types.js";
 import { createCreditCardsRouter, type CreditCardsHttpService } from "./credit-cards.routes.js";
 
 const card = { id: "card-1", ownerId: "owner-1", issuer: "Visa", name: "Main", limit: null, closingDay: 15, dueDay: 28, active: true };
-const statementSummary = {
+const statementSummary: CreditCardStatementSummaryListView = {
   estimation: "APP_ESTIMATED" as const,
   cards: [
     {
@@ -13,11 +14,8 @@ const statementSummary = {
       name: "Main",
       issuer: "Visa",
       limit: null,
-      cycleStart: "2026-06-16",
-      cycleEnd: "2026-07-15",
-      cutoffDate: "2026-07-15",
-      dueDate: "2026-08-28",
-      estimatedSpent: 125.5,
+      closedStatement: { periodStart: "2026-06-16", periodEnd: "2026-07-15", cutoffDate: "2026-07-15", dueDate: "2026-08-28", amount: 125.5 },
+      inProgressCycle: { periodStart: "2026-07-16", periodEnd: "2026-08-15", cutoffDate: "2026-08-15", amount: 75 },
     },
   ],
 };

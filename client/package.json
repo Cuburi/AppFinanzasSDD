@@ -3,9 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check": "pnpm test && pnpm build",
     "dev": "vite",
     "test": "vitest run",
-    "build": "tsc -p tsconfig.json && vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "pnpm typecheck && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -1,5 +1,5 @@
 import { createCreditCard, CreditCardValidationError, normalizeCreditCardName, normalizeCreditCardUpdate, toCreditCardView } from "../../domain/credit-card.js";
-import { calculateStatementCycle } from "../../domain/statement-cycle.js";
+import { calculateStatementPeriodSplit } from "../../domain/statement-cycle.js";
 import type { CreateCreditCardInput, CreditCardListFilter, CreditCardStatementSummaryView, UpdateCreditCardInput } from "../../shared/types.js";
 import type { CreditCardMovementSummaryPort } from "../ports/credit-card-movement-summary.port.js";
 import type { CreditCardRepository } from "../ports/credit-card-repository.port.js";
@@ -28,19 +28,38 @@ export const createCreditCardUseCases = ({ creditCards, movementSummary }: { cre
     const summaries: CreditCardStatementSummaryView[] = [];
 
     for (const card of cards) {
-      const cycle = calculateStatementCycle({ closingDay: card.closingDay, dueDay: card.dueDay, today });
-      const estimatedSpent = await movementSummary.sumExpensesByCardInWindow({ ownerId, creditCardId: card.id, from: cycle.from, to: cycle.to });
+      const periods = calculateStatementPeriodSplit({ closingDay: card.closingDay, dueDay: card.dueDay, today });
+      const closedAmount = await movementSummary.sumExpensesByCardInWindow({
+        ownerId,
+        creditCardId: card.id,
+        from: periods.closedStatement.from,
+        to: periods.closedStatement.to,
+      });
+      const inProgressAmount = await movementSummary.sumExpensesByCardInWindow({
+        ownerId,
+        creditCardId: card.id,
+        from: periods.inProgressCycle.from,
+        to: periods.inProgressCycle.to,
+      });
 
       summaries.push({
         creditCardId: card.id,
         name: card.name,
         issuer: card.issuer,
         limit: card.limit,
-        cycleStart: cycle.cycleStart,
-        cycleEnd: cycle.cycleEnd,
-        cutoffDate: cycle.cutoffDate,
-        dueDate: cycle.dueDate,
-        estimatedSpent,
+        closedStatement: {
+          periodStart: periods.closedStatement.periodStart,
+          periodEnd: periods.closedStatement.periodEnd,
+          cutoffDate: periods.closedStatement.cutoffDate,
+          dueDate: periods.closedStatement.dueDate,
+          amount: closedAmount,
+        },
+        inProgressCycle: {
+          periodStart: periods.inProgressCycle.periodStart,
+          periodEnd: periods.inProgressCycle.periodEnd,
+          cutoffDate: periods.inProgressCycle.cutoffDate,
+          amount: inProgressAmount,
+        },
       });
     }
 

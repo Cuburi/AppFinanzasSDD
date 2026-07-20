@@ -87,6 +87,40 @@ export type RegisterDebtPaymentInput = {
 
 export type PocketListFilter = "active" | "inactive" | "all";
 
+export type CreditCardListFilter = "active" | "inactive" | "all";
+
+export type CreditCardView = {
+  id: string;
+  ownerId: string;
+  issuer: string;
+  name: string;
+  limit: number | null;
+  closingDay: number;
+  dueDay: number;
+  active: boolean;
+};
+
+export type CreditCardStatementBucketView = {
+  periodStart: string;
+  periodEnd: string;
+  cutoffDate: string;
+  amount: number;
+};
+
+export type CreditCardStatementSummaryView = {
+  creditCardId: string;
+  name: string;
+  issuer: string;
+  limit: number | null;
+  closedStatement: CreditCardStatementBucketView & { dueDate: string };
+  inProgressCycle: CreditCardStatementBucketView;
+};
+
+export type CreditCardStatementSummaryListView = {
+  estimation: "APP_ESTIMATED";
+  cards: CreditCardStatementSummaryView[];
+};
+
 export type CreatePocketInput = {
   name: string;
   goalAmount?: number | null;
@@ -135,6 +169,7 @@ export type RecordExpenseInput = {
   amount: number;
   occurredAt: string;
   paymentMethod: PaymentMethod;
+  creditCardId?: string | null;
   description?: string;
 };
 
@@ -176,6 +211,7 @@ export type ExpenseHistoryFilters = {
   to?: string;
   paymentMethod?: PaymentMethod;
   subcategoryId?: string;
+  creditCardId?: string;
 };
 
 export type ExpenseHistoryItem = {
@@ -184,6 +220,7 @@ export type ExpenseHistoryItem = {
   paymentMethod: PaymentMethod;
   amount: number;
   description: string | null;
+  creditCardId: string | null;
   category: {
     id: string;
     name: string;

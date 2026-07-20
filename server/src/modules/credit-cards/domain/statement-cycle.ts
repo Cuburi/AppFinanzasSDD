@@ -13,6 +13,19 @@ export type StatementCycle = {
   to: Date;
 };
 
+export type StatementPeriod = {
+  periodStart: string;
+  periodEnd: string;
+  cutoffDate: string;
+  from: Date;
+  to: Date;
+};
+
+export type StatementPeriodSplit = {
+  closedStatement: StatementPeriod & { dueDate: string };
+  inProgressCycle: StatementPeriod;
+};
+
 const dateOnlyUtc = (year: number, monthIndex: number, day: number) => new Date(Date.UTC(year, monthIndex, day));
 const daysInUtcMonth = (year: number, monthIndex: number) => dateOnlyUtc(year, monthIndex + 1, 0).getUTCDate();
 const clampDay = (year: number, monthIndex: number, day: number) => Math.min(day, daysInUtcMonth(year, monthIndex));
@@ -36,5 +49,30 @@ export const calculateStatementCycle = ({ closingDay, dueDay, today }: Statement
     dueDate: dateKey(dueDate),
     from: cycleStart,
     to: endOfUtcDate(cycleEnd),
+  };
+};
+
+const toStatementPeriod = (periodStart: Date, cutoff: Date): StatementPeriod => ({
+  periodStart: dateKey(periodStart),
+  periodEnd: dateKey(cutoff),
+  cutoffDate: dateKey(cutoff),
+  from: periodStart,
+  to: endOfUtcDate(cutoff),
+});
+
+export const calculateStatementPeriodSplit = ({ closingDay, dueDay, today }: StatementCycleInput): StatementPeriodSplit => {
+  const todayDate = dateOnlyUtc(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const thisMonthCutoff = clampedUtcDate(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), closingDay);
+  const closedCutoff = todayDate >= thisMonthCutoff ? thisMonthCutoff : clampedUtcDate(todayDate.getUTCFullYear(), todayDate.getUTCMonth() - 1, closingDay);
+  const previousCutoff = clampedUtcDate(closedCutoff.getUTCFullYear(), closedCutoff.getUTCMonth() - 1, closingDay);
+  const closedStatement = toStatementPeriod(addUtcDays(previousCutoff, 1), closedCutoff);
+  const openCutoff = clampedUtcDate(closedCutoff.getUTCFullYear(), closedCutoff.getUTCMonth() + 1, closingDay);
+
+  return {
+    closedStatement: {
+      ...closedStatement,
+      dueDate: dateKey(clampedUtcDate(closedCutoff.getUTCFullYear(), closedCutoff.getUTCMonth() + 1, dueDay)),
+    },
+    inProgressCycle: toStatementPeriod(addUtcDays(closedCutoff, 1), openCutoff),
   };
 };

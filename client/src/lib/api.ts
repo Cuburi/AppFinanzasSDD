@@ -4,6 +4,9 @@ import type {
   BasicMonthlyReport,
   CashSummary,
   CreateDebtInput,
+  CreditCardListFilter,
+  CreditCardStatementSummaryListView,
+  CreditCardView,
   CreateMonthCategoryInput,
   CreateMonthSubcategoryInput,
   CreateMonthlyIncomeInput,
@@ -81,6 +84,17 @@ export const api = {
 
     return payload.pockets;
   },
+  async getCreditCards(filter: CreditCardListFilter = "active"): Promise<CreditCardView[]> {
+    const activeQuery = filter === "all" ? "all" : String(filter === "active");
+    const response = await fetch(`/api/credit-cards?active=${activeQuery}`);
+    const payload = await readJson<{ cards: CreditCardView[] }>(response);
+
+    return payload.cards;
+  },
+  async getCurrentCreditCardStatements(): Promise<CreditCardStatementSummaryListView> {
+    const response = await fetch("/api/credit-cards/statements/current");
+    return readJson<CreditCardStatementSummaryListView>(response);
+  },
   async getPocket(id: string): Promise<SavingsPocket> {
     const response = await fetch(`/api/pockets/${id}`);
     return readJson<SavingsPocket>(response);
@@ -157,6 +171,7 @@ export const api = {
         description: input.description,
         occurredAt: input.occurredAt,
         paymentMethod: input.paymentMethod,
+        creditCardId: input.creditCardId,
       }),
     });
 
@@ -174,6 +189,7 @@ export const api = {
         description: input.description,
         occurredAt: input.occurredAt,
         paymentMethod: input.paymentMethod,
+        creditCardId: input.creditCardId,
       }),
     });
 
@@ -192,6 +208,7 @@ export const api = {
     if (filters.to) params.set("to", filters.to);
     if (filters.paymentMethod) params.set("paymentMethod", filters.paymentMethod);
     if (filters.subcategoryId) params.set("subcategoryId", filters.subcategoryId);
+    if (filters.creditCardId) params.set("creditCardId", filters.creditCardId);
 
     const query = params.toString();
     const response = await fetch(`/api/months/${monthId}/expenses${query ? `?${query}` : ""}`);

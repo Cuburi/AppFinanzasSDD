@@ -63,6 +63,74 @@ describe("pockets api", () => {
   });
 });
 
+describe("credit cards api", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("lists credit cards with the backend active filter and unwraps cards", async () => {
+    const cards = [
+      {
+        id: "card-1",
+        ownerId: "owner-1",
+        issuer: "Visa",
+        name: "Main",
+        limit: 2500,
+        closingDay: 20,
+        dueDay: 28,
+        active: true,
+      },
+    ];
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ cards }), { status: 200 }));
+
+    await expect(api.getCreditCards("all")).resolves.toEqual(cards);
+
+    expect(fetch).toHaveBeenCalledWith("/api/credit-cards?active=all");
+  });
+
+  it("preserves backend-owned statement buckets without client classification", async () => {
+    const statementPayload = {
+      estimation: "APP_ESTIMATED",
+      cards: [
+        {
+          creditCardId: "card-1",
+          issuer: "Visa",
+          name: "Main",
+          limit: 2500,
+          closedStatement: {
+            periodStart: "2026-06-21",
+            periodEnd: "2026-07-20",
+            cutoffDate: "2026-07-20",
+            dueDate: "2026-07-28",
+            amount: 410.5,
+          },
+          inProgressCycle: {
+            periodStart: "2026-07-21",
+            periodEnd: "2026-08-20",
+            cutoffDate: "2026-08-20",
+            amount: 89.5,
+          },
+        },
+      ],
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(statementPayload), { status: 200 }));
+
+    await expect(api.getCurrentCreditCardStatements()).resolves.toEqual(statementPayload);
+
+    expect(fetch).toHaveBeenCalledWith("/api/credit-cards/statements/current");
+  });
+
+  it("propagates backend error messages from credit-card endpoints", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ message: "Credit cards unavailable." }), { status: 503 }));
+
+    await expect(api.getCreditCards()).rejects.toThrow("Credit cards unavailable.");
+  });
+});
+
 describe("monthly cash and expense api", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -72,7 +140,7 @@ describe("monthly cash and expense api", () => {
     vi.unstubAllGlobals();
   });
 
-  it("records expenses with payment method and occurred date", async () => {
+  it("records expenses with payment method, occurred date, and selected credit card", async () => {
     const monthPayload = { id: "month-1", cashBalance: 40 };
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 200 }));
 
@@ -84,6 +152,7 @@ describe("monthly cash and expense api", () => {
         description: "Lunch",
         occurredAt: "2026-05-12",
         paymentMethod: "CASH",
+        creditCardId: "card-1",
       }),
     ).resolves.toEqual(monthPayload);
 
@@ -96,6 +165,37 @@ describe("monthly cash and expense api", () => {
         description: "Lunch",
         occurredAt: "2026-05-12",
         paymentMethod: "CASH",
+        creditCardId: "card-1",
+      }),
+    });
+  });
+
+  it("records cash/no-card expenses with an explicit null credit card", async () => {
+    const monthPayload = { id: "month-1", cashBalance: 40 };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 200 }));
+
+    await expect(
+      api.recordExpense({
+        monthId: "month-1",
+        sourceSubcategoryId: "sub-food",
+        amount: 25,
+        description: "Cash lunch",
+        occurredAt: "2026-05-12",
+        paymentMethod: "CASH",
+        creditCardId: null,
+      }),
+    ).resolves.toEqual(monthPayload);
+
+    expect(fetch).toHaveBeenCalledWith("/api/months/month-1/expenses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceSubcategoryId: "sub-food",
+        amount: 25,
+        description: "Cash lunch",
+        occurredAt: "2026-05-12",
+        paymentMethod: "CASH",
+        creditCardId: null,
       }),
     });
   });
@@ -109,6 +209,7 @@ describe("monthly cash and expense api", () => {
           paymentMethod: "NON_CASH",
           amount: 75,
           description: "Groceries",
+          creditCardId: "card-1",
           category: { id: "cat-food", name: "Food" },
           subcategory: { id: "sub-grocery", name: "Groceries" },
         },
@@ -122,10 +223,11 @@ describe("monthly cash and expense api", () => {
         to: "2026-05-31",
         paymentMethod: "NON_CASH",
         subcategoryId: "sub-grocery",
+        creditCardId: "card-1",
       }),
     ).resolves.toEqual(historyPayload.expenses);
 
-    expect(fetch).toHaveBeenCalledWith("/api/months/month-1/expenses?from=2026-05-01&to=2026-05-31&paymentMethod=NON_CASH&subcategoryId=sub-grocery");
+    expect(fetch).toHaveBeenCalledWith("/api/months/month-1/expenses?from=2026-05-01&to=2026-05-31&paymentMethod=NON_CASH&subcategoryId=sub-grocery&creditCardId=card-1");
   });
 
   it("updates and deletes active-month expenses through correction endpoints", async () => {
@@ -143,6 +245,7 @@ describe("monthly cash and expense api", () => {
         description: "Dinner",
         occurredAt: "2026-05-14",
         paymentMethod: "NON_CASH",
+        creditCardId: null,
       }),
     ).resolves.toEqual(monthPayload);
     await expect(api.deleteExpense("month-1", "expense-1")).resolves.toMatchObject({ availableMoney: 450 });
@@ -156,6 +259,7 @@ describe("monthly cash and expense api", () => {
         description: "Dinner",
         occurredAt: "2026-05-14",
         paymentMethod: "NON_CASH",
+        creditCardId: null,
       }),
     });
     expect(fetch).toHaveBeenNthCalledWith(2, "/api/months/month-1/expenses/expense-1", { method: "DELETE" });
@@ -314,5 +418,26 @@ describe("monthly cash and expense api", () => {
     await expect(api.getBasicReport("month-1")).resolves.toEqual(reportPayload);
 
     expect(fetch).toHaveBeenCalledWith("/api/months/month-1/reports/basic");
+  });
+});
+
+describe("active month api contract", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ["an active month", { month: { id: "month-1", status: "ACTIVE" } }, { id: "month-1", status: "ACTIVE" }],
+    ["an unopened month", { month: null }, null],
+  ])("reads %s from the established envelope", async (_scenario, payload, expected) => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(payload), { status: 200 }));
+
+    await expect(api.getActiveMonth()).resolves.toEqual(expected);
+
+    expect(fetch).toHaveBeenCalledWith("/api/months/active");
   });
 });
