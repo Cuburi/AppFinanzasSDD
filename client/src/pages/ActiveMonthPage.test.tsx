@@ -7,6 +7,8 @@ import type { CreditCardView, ExpenseHistoryItem, Month, SavingsPocket } from ".
 
 const apiMock = vi.hoisted(() => ({
   getActiveMonth: vi.fn(),
+  getBasicReport: vi.fn(),
+  getClosureReview: vi.fn(),
   getPockets: vi.fn(),
   getCreditCards: vi.fn(),
   openMonth: vi.fn(),
@@ -92,6 +94,8 @@ describe("ActiveMonthPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     apiMock.getActiveMonth.mockResolvedValue(activeMonth);
+    apiMock.getBasicReport.mockResolvedValue({});
+    apiMock.getClosureReview.mockResolvedValue({});
     apiMock.getPockets.mockResolvedValue(activePockets);
     apiMock.getCreditCards.mockResolvedValue(activeCreditCards);
     apiMock.depositToPocket.mockResolvedValue(activeMonth);

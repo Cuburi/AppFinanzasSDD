@@ -483,7 +483,7 @@ export const ActiveMonthPage = () => {
   };
 
   return (
-    <ActiveMonthDashboard input={openMonthInput} onInputChange={setOpenMonthInput} onOpenMonth={(input) => void handleOpenMonth(input)} onRetry={() => void dashboard.refresh()} onRetryOpenMonth={(input) => void handleOpenMonth(input)} pending={submitting} viewModel={dashboard.viewModel}>
+    <ActiveMonthDashboard input={openMonthInput} onInputChange={setOpenMonthInput} onOpenMonth={(input) => void handleOpenMonth(input)} onRetry={() => void dashboard.refresh()} onRetryOpenMonth={(input) => void handleOpenMonth(input)} onRetrySupport={(source) => void dashboard.retrySupport(source)} pending={submitting} viewModel={dashboard.viewModel}>
     <section className="page stack-lg">
       <SectionHeader title="Mes activo" description="Abrí manualmente un mes nuevo. La API bloquea abrir un segundo mes mientras exista uno activo." />
 

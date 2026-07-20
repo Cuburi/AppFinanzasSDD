@@ -15,6 +15,7 @@ export type DashboardViewModel = {
   lifecycle: "loading" | "unopened" | "active" | "closed" | "blocking" | "degraded";
   month?: Month;
   error?: string;
+  supportFailures?: DashboardSupportSource[];
   action: DashboardAction;
 };
 
