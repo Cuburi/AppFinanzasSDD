@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "../lib/api";
 import { Button, Card, KpiCard, SectionHeader, StatusPill } from "../components/ui";
+import { ActiveMonthDashboard } from "../features/monthly-cycle/active-month-dashboard/components/ActiveMonthDashboard";
+import { useActiveMonthDashboard } from "../features/monthly-cycle/active-month-dashboard/controllers/useActiveMonthDashboard";
 import type { CreditCardView, ExpenseHistoryItem, Month, MonthCategory, MonthlyIncome, MonthSubcategory, PaymentMethod, SavingsPocket } from "../types";
 
 const now = new Date();
@@ -13,10 +15,11 @@ const balanceTrend = (amount: number) => (amount < 0 ? "negative" : amount > 0 ?
 const formatCreditCardLabel = (card: CreditCardView) => `${card.issuer} ${card.name}`;
 
 export const ActiveMonthPage = () => {
-  const [activeMonth, setActiveMonth] = useState<Month | null>(null);
-  const [year, setYear] = useState(String(now.getFullYear()));
-  const [month, setMonth] = useState(String(now.getMonth() + 1));
-  const [loading, setLoading] = useState(true);
+  const dashboard = useActiveMonthDashboard();
+  const activeMonth = dashboard.viewModel.month ?? null;
+  const historyMonthId = useRef<string | null>(null);
+  const historyRequestId = useRef(0);
+  const [openMonthInput, setOpenMonthInput] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
   const [submitting, setSubmitting] = useState(false);
   const [activePockets, setActivePockets] = useState<SavingsPocket[]>([]);
   const [activeCreditCards, setActiveCreditCards] = useState<CreditCardView[]>([]);
@@ -59,8 +62,9 @@ export const ActiveMonthPage = () => {
   const [newSubcategoryAddToTemplate, setNewSubcategoryAddToTemplate] = useState(false);
 
   const refreshExpenseHistory = async (monthId: string, creditCardId = historyCreditCardId) => {
+    const currentRequest = ++historyRequestId.current;
     const expenses = creditCardId ? await api.getExpenseHistory(monthId, { creditCardId }) : await api.getExpenseHistory(monthId);
-    setExpenseHistory(expenses);
+    if (currentRequest === historyRequestId.current) setExpenseHistory(expenses);
   };
 
   const refreshExpenseHistoryBestEffort = async (monthId: string) => {
@@ -72,21 +76,15 @@ export const ActiveMonthPage = () => {
   };
 
   const refresh = async () => {
-    const monthData = await api.getActiveMonth();
-    setActiveMonth(monthData);
-    resetCorrectionForms(monthData);
-    if (monthData) {
-      await refreshExpenseHistory(monthData.id);
-    } else {
-      setExpenseHistory([]);
-    }
+    historyMonthId.current = null;
+    await dashboard.refresh();
+    resetCorrectionForms();
   };
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [monthData, pockets, creditCards] = await Promise.all([
-          api.getActiveMonth(),
+        const [pockets, creditCards] = await Promise.all([
           api.getPockets("active"),
           api
             .getCreditCards("active")
@@ -99,46 +97,40 @@ export const ActiveMonthPage = () => {
               return [];
             }),
         ]);
-        setActiveMonth(monthData);
         setActivePockets(pockets);
         setActiveCreditCards(creditCards);
-        if (monthData) {
-          setExpenseOccurredAt(formatMonthDate(monthData));
-          setWithdrawalOccurredAt(formatMonthDate(monthData));
-          await refreshExpenseHistory(monthData.id);
-        }
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "No se pudo consultar el mes activo y los bolsillos activos.");
-      } finally {
-        setLoading(false);
+        setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar los bolsillos activos.");
       }
     };
 
     void load();
   }, []);
 
-  const handleOpenMonth = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  useEffect(() => {
+    if (dashboard.viewModel.lifecycle === "unopened") {
+      ++historyRequestId.current;
+      setExpenseHistory([]);
+      historyMonthId.current = null;
+      return;
+    }
+    if (!activeMonth || historyMonthId.current === activeMonth.id) return;
+    historyMonthId.current = activeMonth.id;
+    setExpenseOccurredAt(formatMonthDate(activeMonth));
+    setWithdrawalOccurredAt(formatMonthDate(activeMonth));
+    void refreshExpenseHistoryBestEffort(activeMonth.id);
+  }, [activeMonth?.id, dashboard.viewModel.lifecycle]);
+
+  const handleOpenMonth = async (input: { year: number; month: number }) => {
     setSubmitting(true);
     setError(null);
     setMessage(null);
 
-    try {
-      const createdMonth = await api.openMonth({
-        year: Number(year),
-        month: Number(month),
-      });
-
-      setActiveMonth(createdMonth);
-      setExpenseOccurredAt(formatMonthDate(createdMonth));
-      setWithdrawalOccurredAt(formatMonthDate(createdMonth));
-      await refreshExpenseHistoryBestEffort(createdMonth.id);
+    const createdMonth = await dashboard.openMonth(input);
+    if (createdMonth) {
       setMessage(`Mes ${createdMonth.year}-${String(createdMonth.month).padStart(2, "0")} abierto con snapshot de la plantilla vigente.`);
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "No se pudo abrir el mes.");
-    } finally {
-      setSubmitting(false);
     }
+    setSubmitting(false);
   };
 
   const subcategories = activeMonth?.categories.flatMap((category) => category.subcategories) ?? [];
@@ -202,7 +194,7 @@ export const ActiveMonthPage = () => {
 
     try {
       const updatedMonth = await mutation();
-      setActiveMonth(updatedMonth);
+      dashboard.replaceMonth(updatedMonth);
       await refreshExpenseHistoryBestEffort(updatedMonth.id);
       afterSuccess?.(updatedMonth);
       setMessage(successMessage);
@@ -403,7 +395,7 @@ export const ActiveMonthPage = () => {
         occurredAt: withdrawalOccurredAt || formatMonthDate(activeMonth),
         description: withdrawalDescription || undefined,
       });
-      setActiveMonth(updatedMonth);
+      dashboard.replaceMonth(updatedMonth);
       setWithdrawalAmount("");
       setWithdrawalDescription("");
       setMessage("Retiro de efectivo registrado y saldos recalculados.");
@@ -433,7 +425,7 @@ export const ActiveMonthPage = () => {
         ? await api.updateMonthlyIncome({ ...input, incomeId: editingIncomeId })
         : await api.createMonthlyIncome(input);
 
-      setActiveMonth(updatedMonth);
+      dashboard.replaceMonth(updatedMonth);
       resetIncomeForm(updatedMonth);
       setMessage(editingIncomeId ? "Ingreso actualizado y totales recalculados." : "Ingreso registrado y totales recalculados.");
     } catch (submitError) {
@@ -451,7 +443,7 @@ export const ActiveMonthPage = () => {
 
     try {
       const updatedMonth = await api.deleteMonthlyIncome(activeMonth.id, income.id);
-      setActiveMonth(updatedMonth);
+      dashboard.replaceMonth(updatedMonth);
       if (editingIncomeId === income.id) {
         resetIncomeForm(updatedMonth);
       }
@@ -478,7 +470,8 @@ export const ActiveMonthPage = () => {
         amount: Number(depositAmount),
         externalSourceLabel: depositSourceSubcategoryId ? undefined : depositExternalSource,
       });
-      setActiveMonth(updatedMonth ?? (await api.getActiveMonth()));
+      if (updatedMonth) dashboard.replaceMonth(updatedMonth);
+      else await dashboard.refresh();
       setDepositAmount("");
       setDepositExternalSource("");
       setMessage("Depósito a bolsillo registrado.");
@@ -489,40 +482,13 @@ export const ActiveMonthPage = () => {
     }
   };
 
-  if (loading) {
-    return <p>Cargando mes activo...</p>;
-  }
-
   return (
+    <ActiveMonthDashboard input={openMonthInput} onInputChange={setOpenMonthInput} onOpenMonth={(input) => void handleOpenMonth(input)} onRetry={() => void dashboard.refresh()} onRetryOpenMonth={(input) => void handleOpenMonth(input)} pending={submitting} viewModel={dashboard.viewModel}>
     <section className="page stack-lg">
       <SectionHeader title="Mes activo" description="Abrí manualmente un mes nuevo. La API bloquea abrir un segundo mes mientras exista uno activo." />
 
-      <Card aria-label="Abrir mes manualmente" className="stack-md">
-        <h2>Abrir mes manualmente</h2>
-
-        <form className="row gap-sm wrap" onSubmit={handleOpenMonth}>
-          <label className="field small-field">
-            <span>Año</span>
-            <input min="2000" step="1" type="number" value={year} onChange={(event) => setYear(event.target.value)} />
-          </label>
-
-          <label className="field small-field">
-            <span>Mes</span>
-            <input min="1" max="12" step="1" type="number" value={month} onChange={(event) => setMonth(event.target.value)} />
-          </label>
-
-          <Button disabled={submitting} type="submit">
-            {submitting ? "Abriendo..." : "Abrir mes"}
-          </Button>
-        </form>
-
-        {message ? <p className="success">{message}</p> : null}
-        {error ? (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </Card>
+      {message ? <p className="success">{message}</p> : null}
+      {error ? <p className="error" role="alert">{error}</p> : null}
 
       {activeMonth ? (
         <Card aria-label="Ingresos y saldos del mes" className="stack-md">
@@ -935,5 +901,6 @@ export const ActiveMonthPage = () => {
         )}
       </Card>
     </section>
+    </ActiveMonthDashboard>
   );
 };
