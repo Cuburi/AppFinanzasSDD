@@ -4,9 +4,11 @@ import { dashboardApi } from "../api/dashboardApi";
 import type { DashboardApi, OpenMonthInput } from "../api/dashboardApi";
 import { buildDashboardViewModel } from "../model/buildDashboardViewModel";
 import type { DashboardModelInput } from "../model/contracts";
+import type { Month } from "../../../../types";
 
 export type ActiveMonthDashboardController = {
-  openMonth: (input: OpenMonthInput) => Promise<void>;
+  openMonth: (input: OpenMonthInput) => Promise<Month | null>;
+  replaceMonth: (month: Month | null) => void;
   refresh: () => Promise<void>;
   viewModel: ReturnType<typeof buildDashboardViewModel>;
 };
@@ -37,15 +39,21 @@ export function useActiveMonthDashboard(api: DashboardApi = dashboardApi): Activ
       if (currentRequest === openRequestId.current) {
         ++refreshRequestId.current;
         setState({ status: "ready", month });
+        return month;
       }
-    } catch {
-      if (currentRequest === openRequestId.current) setState({ status: "blocking" });
+    } catch (error) {
+      if (currentRequest === openRequestId.current) {
+        setState({ status: "blocking", error: error instanceof Error ? error.message : "No se pudo abrir el mes.", retryInput: input });
+      }
     }
+    return null;
   }, [api]);
+
+  const replaceMonth = useCallback((month: Month | null) => setState({ status: "ready", month }), []);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  return { openMonth, refresh, viewModel: buildDashboardViewModel(state) };
+  return { openMonth, replaceMonth, refresh, viewModel: buildDashboardViewModel(state) };
 }

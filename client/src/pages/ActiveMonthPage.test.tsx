@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ActiveMonthPage } from "./ActiveMonthPage";
-import type { CreditCardView, Month, SavingsPocket } from "../types";
+import type { CreditCardView, ExpenseHistoryItem, Month, SavingsPocket } from "../types";
 
 const apiMock = vi.hoisted(() => ({
   getActiveMonth: vi.fn(),
@@ -148,6 +148,21 @@ describe("ActiveMonthPage", () => {
 
     expect(await screen.findByText("Todavía no hay un mes activo.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Abrir mes" })).toBeInTheDocument();
+  });
+
+  it("preserves an open-month command failure and retries that command without refreshing authority", async () => {
+    const user = userEvent.setup();
+    apiMock.getActiveMonth.mockResolvedValue(null);
+    apiMock.openMonth.mockRejectedValue(new Error("El mes 2026-05 ya existe."));
+
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Abrir mes" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("El mes 2026-05 ya existe.");
+    await user.click(screen.getByRole("button", { name: "Reintentar" }));
+
+    expect(apiMock.openMonth).toHaveBeenCalledTimes(2);
+    expect(apiMock.getActiveMonth).toHaveBeenCalledTimes(1);
   });
 
   it("uses an active-pocket selector for deposits instead of a manual pocket ID", async () => {
@@ -630,11 +645,57 @@ describe("ActiveMonthPage", () => {
     await user.click(screen.getByRole("button", { name: "Editar subcategoría Bonus" }));
     expect(screen.getByRole("form", { name: "Editar subcategoría del mes activo" })).toBeInTheDocument();
 
+    apiMock.getExpenseHistory.mockClear();
     await user.click(screen.getByRole("button", { name: "Refrescar" }));
 
     expect(await screen.findByRole("button", { name: "Editar categoría Ingresos refrescados" })).toBeInTheDocument();
+    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("form", { name: "Editar categoría del mes activo" })).not.toBeInTheDocument();
     expect(screen.queryByRole("form", { name: "Editar subcategoría del mes activo" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the refreshed month history when a previous month history response arrives late", async () => {
+    const user = userEvent.setup();
+    const nextMonth = { ...activeMonth, id: "month-2", month: 6 };
+    const previousHistory: ExpenseHistoryItem[] = [
+      {
+        id: "expense-a",
+        occurredAt: "2026-05-12T00:00:00.000Z",
+        paymentMethod: "CASH",
+        amount: 20,
+        description: "Gasto de A",
+        creditCardId: null,
+        category: { id: "cat-income", name: "Ingresos" },
+        subcategory: { id: "sub-bonus", name: "Bonus" },
+      },
+    ];
+    const refreshedHistory: ExpenseHistoryItem[] = [{ ...previousHistory[0], id: "expense-b", description: "Gasto de B" }];
+    const resolvePreviousHistories: Array<(history: ExpenseHistoryItem[]) => void> = [];
+    let resolveRefreshedHistory!: (history: ExpenseHistoryItem[]) => void;
+
+    apiMock.getActiveMonth.mockResolvedValueOnce(activeMonth).mockResolvedValueOnce(nextMonth);
+    apiMock.getExpenseHistory.mockImplementation((monthId: string) =>
+      new Promise<ExpenseHistoryItem[]>((resolve) => {
+        if (monthId === "month-1") resolvePreviousHistories.push(resolve);
+        else resolveRefreshedHistory = resolve;
+      }),
+    );
+
+    render(<ActiveMonthPage />);
+
+    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1"));
+    await user.click(screen.getByRole("button", { name: "Refrescar" }));
+    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-2"));
+
+    resolveRefreshedHistory(refreshedHistory);
+    expect(await screen.findByText("Gasto de B")).toBeInTheDocument();
+
+    resolvePreviousHistories.forEach((resolve) => resolve(previousHistory));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await waitFor(() => {
+      expect(screen.getByText("Gasto de B")).toBeInTheDocument();
+      expect(screen.queryByText("Gasto de A")).not.toBeInTheDocument();
+    });
   });
 
   it("keeps server deletion guard failures visible without removing month snapshot items", async () => {
