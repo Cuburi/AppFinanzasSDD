@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "../lib/api";
-import { Button, Card, KpiCard, SectionHeader, StatusPill } from "../components/ui";
+import { Button, Card, StatusPill } from "../components/ui";
 import { ActiveMonthDashboard } from "../features/monthly-cycle/active-month-dashboard/components/ActiveMonthDashboard";
 import { useActiveMonthDashboard } from "../features/monthly-cycle/active-month-dashboard/controllers/useActiveMonthDashboard";
 import type { CreditCardView, ExpenseHistoryItem, Month, MonthCategory, MonthlyIncome, MonthSubcategory, PaymentMethod, SavingsPocket } from "../types";
@@ -9,16 +9,20 @@ import type { CreditCardView, ExpenseHistoryItem, Month, MonthCategory, MonthlyI
 const now = new Date();
 
 const formatMonthDate = (month: Month) => `${month.year}-${String(month.month).padStart(2, "0")}-01`;
-const formatDisplayDate = (value: string) => new Date(value).toLocaleDateString("es-AR", { timeZone: "UTC" });
+const formatDisplayDate = (value: string) => new Date(value).toLocaleDateString("es-CO", { timeZone: "UTC" });
 const formatPaymentMethod = (paymentMethod: PaymentMethod) => (paymentMethod === "CASH" ? "Efectivo" : "No efectivo");
 const balanceTrend = (amount: number) => (amount < 0 ? "negative" : amount > 0 ? "positive" : "neutral");
 const formatCreditCardLabel = (card: CreditCardView) => `${card.issuer} ${card.name}`;
+export const formatCop = (amount: number) => `$${amount < 0 ? "-" : ""}${new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 }).format(Math.abs(amount))} COP`;
+
+type MonthlyExpenseHistoryStatus = "idle" | "loading" | "ready" | "error";
 
 export const ActiveMonthPage = () => {
   const dashboard = useActiveMonthDashboard();
   const activeMonth = dashboard.viewModel.month ?? null;
   const historyMonthId = useRef<string | null>(null);
   const historyRequestId = useRef(0);
+  const monthlyHistoryRequestId = useRef(0);
   const [openMonthInput, setOpenMonthInput] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
   const [submitting, setSubmitting] = useState(false);
   const [activePockets, setActivePockets] = useState<SavingsPocket[]>([]);
@@ -34,6 +38,9 @@ export const ActiveMonthPage = () => {
   const [expenseCreditCardId, setExpenseCreditCardId] = useState("");
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [expenseHistory, setExpenseHistory] = useState<ExpenseHistoryItem[]>([]);
+  const [monthlyExpenseHistory, setMonthlyExpenseHistory] = useState<ExpenseHistoryItem[]>([]);
+  const [monthlyExpenseHistoryStatus, setMonthlyExpenseHistoryStatus] = useState<MonthlyExpenseHistoryStatus>("idle");
+  const [monthlyExpenseHistoryMonthId, setMonthlyExpenseHistoryMonthId] = useState<string | null>(null);
   const [historyCreditCardId, setHistoryCreditCardId] = useState("");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalOccurredAt, setWithdrawalOccurredAt] = useState("");
@@ -67,9 +74,29 @@ export const ActiveMonthPage = () => {
     if (currentRequest === historyRequestId.current) setExpenseHistory(expenses);
   };
 
+  const refreshMonthlyExpenseHistory = async (monthId: string, updateVisibleHistory = false) => {
+    const currentRequest = ++monthlyHistoryRequestId.current;
+    const visibleRequest = updateVisibleHistory ? ++historyRequestId.current : null;
+    setMonthlyExpenseHistoryMonthId(monthId);
+    setMonthlyExpenseHistoryStatus("loading");
+
+    try {
+      const expenses = await api.getExpenseHistory(monthId);
+      if (currentRequest === monthlyHistoryRequestId.current) {
+        setMonthlyExpenseHistory(expenses);
+        setMonthlyExpenseHistoryStatus("ready");
+      }
+      if (visibleRequest === historyRequestId.current) setExpenseHistory(expenses);
+    } catch (loadError) {
+      if (currentRequest === monthlyHistoryRequestId.current) setMonthlyExpenseHistoryStatus("error");
+      throw loadError;
+    }
+  };
+
   const refreshExpenseHistoryBestEffort = async (monthId: string) => {
     try {
-      await refreshExpenseHistory(monthId);
+      if (historyCreditCardId) await Promise.all([refreshExpenseHistory(monthId), refreshMonthlyExpenseHistory(monthId)]);
+      else await refreshMonthlyExpenseHistory(monthId, true);
     } catch {
       // A failed history refresh must not turn an already-persisted mutation into a user-facing mutation failure.
     }
@@ -93,7 +120,7 @@ export const ActiveMonthPage = () => {
               return cards;
             })
             .catch(() => {
-              setCreditCardLoadError("No se pudieron cargar las tarjetas activas. Podés registrar gastos sin tarjeta.");
+              setCreditCardLoadError("No se pudieron cargar las tarjetas activas. Puedes registrar gastos sin tarjeta.");
               return [];
             }),
         ]);
@@ -110,7 +137,11 @@ export const ActiveMonthPage = () => {
   useEffect(() => {
     if (dashboard.viewModel.lifecycle === "unopened") {
       ++historyRequestId.current;
+      ++monthlyHistoryRequestId.current;
       setExpenseHistory([]);
+      setMonthlyExpenseHistory([]);
+      setMonthlyExpenseHistoryMonthId(null);
+      setMonthlyExpenseHistoryStatus("idle");
       historyMonthId.current = null;
       return;
     }
@@ -135,6 +166,11 @@ export const ActiveMonthPage = () => {
 
   const subcategories = activeMonth?.categories.flatMap((category) => category.subcategories) ?? [];
   const canMutateActiveMonth = activeMonth?.status === "ACTIVE" && !activeMonth.closedAt;
+  const plannedBudget = subcategories.reduce((total, subcategory) => total + subcategory.plannedAmount, 0);
+  const spentBudget = subcategories.reduce((total, subcategory) => total + Math.max(0, subcategory.plannedAmount - subcategory.available), 0);
+  const actualSpent = monthlyExpenseHistory.reduce((total, expense) => total + expense.amount, 0);
+  const hasCurrentMonthlyExpenseHistory = monthlyExpenseHistoryStatus === "ready" && monthlyExpenseHistoryMonthId === activeMonth?.id;
+  const budgetPercent = plannedBudget === 0 ? 0 : Math.min(100, Math.round((spentBudget / plannedBudget) * 100));
 
   const resetIncomeForm = (monthData = activeMonth) => {
     setIncomeSourceName("");
@@ -226,7 +262,7 @@ export const ActiveMonthPage = () => {
   const getCreditCardLabel = (creditCardId: string | null) => {
     if (!creditCardId) return null;
     const card = activeCreditCards.find((item) => item.id === creditCardId);
-    return card ? formatCreditCardLabel(card) : "Card unavailable";
+    return card ? formatCreditCardLabel(card) : "Tarjeta no disponible";
   };
 
   const handleExpensePaymentMethodChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -483,25 +519,44 @@ export const ActiveMonthPage = () => {
   };
 
   return (
-    <ActiveMonthDashboard input={openMonthInput} onInputChange={setOpenMonthInput} onOpenMonth={(input) => void handleOpenMonth(input)} onRetry={() => void dashboard.refresh()} onRetryOpenMonth={(input) => void handleOpenMonth(input)} onRetrySupport={(source) => void dashboard.retrySupport(source)} pending={submitting} viewModel={dashboard.viewModel}>
+    <ActiveMonthDashboard input={openMonthInput} onInputChange={setOpenMonthInput} onOpenMonth={(input) => void handleOpenMonth(input)} onRetry={() => void dashboard.refresh()} onRetryOpenMonth={(input) => void handleOpenMonth(input)} onRetrySupport={(source) => void dashboard.retrySupport(source)} pending={submitting} primaryAction={activeMonth && canMutateActiveMonth ? <a className="button primary" href="#expense-form">Registrar gasto</a> : undefined} viewModel={dashboard.viewModel}>
     <section className="page stack-lg">
-      <SectionHeader title="Mes activo" description="Abrí manualmente un mes nuevo. La API bloquea abrir un segundo mes mientras exista uno activo." />
-
       {message ? <p className="success">{message}</p> : null}
       {error ? <p className="error" role="alert">{error}</p> : null}
 
       {activeMonth ? (
-        <Card aria-label="Ingresos y saldos del mes" className="stack-md">
-          <div>
-            <h2>Ingresos del mes</h2>
-            <p>El dinero disponible lo calcula la API con ingresos, gastos y depósitos a bolsillos.</p>
+        <Card aria-label="Resumen financiero del mes" className="financial-summary stack-md">
+          <div aria-label="Disponible del mes" className="financial-primary" role="region">
+            <p className="eyebrow">Disponible del mes</p>
+            <p className="financial-primary-value">{formatCop(activeMonth.availableMoney)}</p>
+            <p className="sr-only">{activeMonth.availableMoney < 0 ? "Tendencia negativa" : "Tendencia positiva"}</p>
           </div>
+          <div className="financial-secondary-metrics">
+            <p><span>Ingresos</span><strong>{formatCop(activeMonth.monthlyIncomeTotal)}</strong></p>
+            <p>
+              <span>Gastado</span>
+              <strong>{hasCurrentMonthlyExpenseHistory ? formatCop(actualSpent) : "No disponible"}</strong>
+              {monthlyExpenseHistoryStatus === "error" && monthlyExpenseHistoryMonthId === activeMonth?.id ? (
+                <span role="alert">
+                  No se pudo cargar el gasto del mes. <Button onClick={() => void refreshMonthlyExpenseHistory(activeMonth.id, !historyCreditCardId).catch(() => undefined)} type="button" variant="tertiary">Reintentar Gastado</Button>
+                </span>
+              ) : monthlyExpenseHistoryStatus === "loading" && monthlyExpenseHistoryMonthId === activeMonth?.id ? (
+                <span className="sr-only" role="status">Cargando gasto del mes.</span>
+              ) : null}
+            </p>
+            <p aria-label="Efectivo físico" role="region"><span>Efectivo disponible</span><strong>{formatCop(activeMonth.cashBalance)}</strong><span className="sr-only">{activeMonth.cashBalance < 0 ? "Tendencia negativa" : "Tendencia positiva"}</span></p>
+          </div>
+          <div className="financial-budget">
+            <div className="row between wrap"><span>Presupuesto utilizado</span><strong>{budgetPercent}%</strong></div>
+            <progress aria-label="Presupuesto utilizado" aria-valuemax={100} aria-valuemin={0} aria-valuenow={budgetPercent} max="100" value={budgetPercent}>{budgetPercent}%</progress>
+            <p>{formatCop(spentBudget)} de {formatCop(plannedBudget)}</p>
+          </div>
+        </Card>
+      ) : null}
 
-          <div className="dashboard-kpi-grid">
-            <KpiCard label="Ingresos del mes" value={`$${activeMonth.monthlyIncomeTotal.toFixed(2)}`} trend={balanceTrend(activeMonth.monthlyIncomeTotal)} />
-            <KpiCard label="Disponible del mes" value={`$${activeMonth.availableMoney.toFixed(2)}`} trend={balanceTrend(activeMonth.availableMoney)} />
-            <KpiCard label="Efectivo físico" value={`$${activeMonth.cashBalance.toFixed(2)}`} trend={balanceTrend(activeMonth.cashBalance)} />
-          </div>
+      {activeMonth ? (
+        <Card aria-label="Ingresos del mes" className="stack-md">
+          <h2>Ingresos del mes</h2>
 
           {canMutateActiveMonth ? (
             <form className="row gap-sm wrap" onSubmit={handleIncome}>
@@ -545,7 +600,7 @@ export const ActiveMonthPage = () => {
                   </p>
                 </div>
                 <div className="row gap-sm wrap">
-                  <StatusPill tone="success">Ingreso ${income.amount.toFixed(2)}</StatusPill>
+                  <StatusPill aria-label={`Ingreso: ${formatCop(income.amount)}`} tone="success">Ingreso {formatCop(income.amount)}</StatusPill>
                   {canMutateActiveMonth ? (
                     <>
                       <Button variant="secondary" disabled={submitting} onClick={() => startEditingIncome(income)} type="button">
@@ -567,14 +622,14 @@ export const ActiveMonthPage = () => {
         <Card aria-label="Operación diaria" className="stack-md">
           <h2>Operación diaria</h2>
 
-          <form className="row gap-sm wrap" onSubmit={handleExpense}>
+          <form className="row gap-sm wrap" id="expense-form" onSubmit={handleExpense}>
             <label className="field">
               <span>Subcategoría del gasto</span>
               <select value={expenseSubcategoryId} onChange={(event) => setExpenseSubcategoryId(event.target.value)} required>
-                <option value="">Elegí una subcategoría</option>
+                <option value="">Selecciona una subcategoría</option>
                 {subcategories.map((subcategory) => (
                   <option key={subcategory.id} value={subcategory.id}>
-                    {subcategory.name} (${subcategory.available.toFixed(2)})
+                    {subcategory.name} ({formatCop(subcategory.available)})
                   </option>
                 ))}
               </select>
@@ -644,7 +699,7 @@ export const ActiveMonthPage = () => {
                 <option value="">Ingreso externo</option>
                 {subcategories.map((subcategory) => (
                   <option key={subcategory.id} value={subcategory.id}>
-                    {subcategory.name} (${subcategory.available.toFixed(2)})
+                    {subcategory.name} ({formatCop(subcategory.available)})
                   </option>
                 ))}
               </select>
@@ -652,10 +707,10 @@ export const ActiveMonthPage = () => {
             <label className="field">
               <span>Bolsillo destino</span>
               <select value={depositPocketId} onChange={(event) => setDepositPocketId(event.target.value)} required>
-                <option value="">Elegí un bolsillo activo</option>
+                <option value="">Selecciona un bolsillo activo</option>
                 {activePockets.map((pocket) => (
                   <option key={pocket.id} value={pocket.id}>
-                    {pocket.name} (${pocket.balance.toFixed(2)})
+                    {pocket.name} ({formatCop(pocket.balance)})
                   </option>
                 ))}
               </select>
@@ -702,10 +757,10 @@ export const ActiveMonthPage = () => {
                     <p>
                       {formatDisplayDate(expense.occurredAt)} · {expense.subcategory.name} · {expense.category.name} · {formatPaymentMethod(expense.paymentMethod)}
                     </p>
-                    {creditCardLabel ? <StatusPill tone="neutral">Card: {creditCardLabel}</StatusPill> : null}
+                    {creditCardLabel ? <StatusPill aria-label={`Tarjeta: ${creditCardLabel}`} tone="neutral">Tarjeta: {creditCardLabel}</StatusPill> : null}
                   </div>
                   <div className="row gap-sm wrap">
-                    <StatusPill tone="danger">Gasto -${expense.amount.toFixed(2)}</StatusPill>
+                    <StatusPill aria-label={`Gasto: ${formatCop(-expense.amount)}`} tone="danger">Gasto {formatCop(-expense.amount)}</StatusPill>
                     {canMutateActiveMonth ? (
                       <>
                         <Button variant="secondary" disabled={submitting} onClick={() => startEditingExpense(expense)} type="button">
@@ -744,7 +799,7 @@ export const ActiveMonthPage = () => {
 
             {canMutateActiveMonth ? (
               <div className="stack-md">
-                <p>Creá categorías y subcategorías solo en este mes. Marcá la copia a plantilla únicamente si querés que aparezcan en próximos meses.</p>
+                <p>Crea categorías y subcategorías solo en este mes. Marca la copia a plantilla únicamente si quieres que aparezcan en próximos meses.</p>
 
                 <form aria-label="Crear categoría del mes activo" className="row gap-sm wrap" onSubmit={handleCreateCategory}>
                   <label className="field">
@@ -764,7 +819,7 @@ export const ActiveMonthPage = () => {
                   <label className="field">
                     <span>Categoría padre</span>
                     <select value={newSubcategoryParentId} onChange={(event) => setNewSubcategoryParentId(event.target.value)} required>
-                      <option value="">Elegí una categoría</option>
+                      <option value="">Selecciona una categoría</option>
                       {activeMonth.categories.map((category) => (
                         <option key={category.id} value={category.id}>
                           {category.name}
@@ -786,7 +841,7 @@ export const ActiveMonthPage = () => {
                       <option value="">Sin bolsillo predeterminado</option>
                       {activePockets.map((pocket) => (
                         <option key={pocket.id} value={pocket.id}>
-                          {pocket.name} — predeterminado (${pocket.balance.toFixed(2)})
+                          {pocket.name} — predeterminado ({formatCop(pocket.balance)})
                         </option>
                       ))}
                     </select>
@@ -835,7 +890,7 @@ export const ActiveMonthPage = () => {
                     <option value="">Sin bolsillo predeterminado</option>
                     {activePockets.map((pocket) => (
                       <option key={pocket.id} value={pocket.id}>
-                        {pocket.name} (${pocket.balance.toFixed(2)})
+                        {pocket.name} ({formatCop(pocket.balance)})
                       </option>
                     ))}
                   </select>
@@ -871,12 +926,12 @@ export const ActiveMonthPage = () => {
                       <div className="budget-line align-start" key={subcategory.id}>
                         <div>
                           <strong>{subcategory.name}</strong>
-                          <p>Planificado: ${subcategory.plannedAmount.toFixed(2)}</p>
+                          <p>Planificado: {formatCop(subcategory.plannedAmount)}</p>
                         </div>
 
                         <div className="row gap-sm wrap">
-                          <StatusPill tone={subcategory.available < 0 ? "danger" : "success"}>
-                            Disponible: ${subcategory.available.toFixed(2)}
+                          <StatusPill aria-label={`Disponible: ${formatCop(subcategory.available)}`} tone={subcategory.available < 0 ? "danger" : "success"}>
+                            Disponible: {formatCop(subcategory.available)}
                           </StatusPill>
                           {canMutateActiveMonth ? (
                             <>
