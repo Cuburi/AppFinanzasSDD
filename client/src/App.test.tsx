@@ -41,6 +41,21 @@ describe("App active month route", () => {
     expect(screen.getByRole("link", { name: "Mes activo" })).toHaveAttribute("href", "/active-month");
     expect(screen.getByRole("heading", { name: "Mes activo test" })).toBeInTheDocument();
   });
+
+  it("uses the compact shell landmark and marks the active navigation route", () => {
+    render(
+      <MemoryRouter future={routerFutureFlags} initialEntries={["/active-month"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("banner")).toHaveTextContent("AppFinanzas");
+    expect(screen.getByRole("navigation", { name: "Navegación principal" })).toContainElement(
+      screen.getByRole("link", { name: "Mes activo" }),
+    );
+    expect(screen.getByRole("link", { name: "Mes activo" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("main")).toContainElement(screen.getByRole("heading", { name: "Mes activo test" }));
+  });
 });
 
 describe("App debt route", () => {
@@ -68,17 +83,18 @@ describe("App reports route", () => {
     expect(screen.getByRole("heading", { name: "Basic reports test" })).toBeInTheDocument();
   });
 
-  it("keeps the premium app shell accessible while preserving reports navigation", () => {
+  it("keeps the shared shell accessible on unaffected routes", () => {
     render(
       <MemoryRouter future={routerFutureFlags} initialEntries={["/reports"]}>
         <App />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("banner")).toHaveTextContent("Finance command center");
-    expect(screen.getByRole("navigation", { name: "Primary sections" })).toContainElement(
+    expect(screen.getByRole("banner")).toHaveTextContent("AppFinanzas");
+    expect(screen.getByRole("navigation", { name: "Navegación principal" })).toContainElement(
       screen.getByRole("link", { name: "Reports" }),
     );
+    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("main")).toContainElement(screen.getByRole("heading", { name: "Basic reports test" }));
   });
 });

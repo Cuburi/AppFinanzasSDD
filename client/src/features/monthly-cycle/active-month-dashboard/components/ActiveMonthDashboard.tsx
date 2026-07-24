@@ -12,10 +12,11 @@ export type ActiveMonthDashboardProps = {
   onRetrySupport?: (source: "report" | "closure-review") => void;
   onRetry: () => void;
   pending?: boolean;
+  primaryAction?: React.ReactNode;
   viewModel: DashboardViewModel;
 };
 
-export function ActiveMonthDashboard({ children, input, onInputChange, onOpenMonth, onRetry, onRetryOpenMonth, onRetrySupport, pending = false, viewModel }: ActiveMonthDashboardProps) {
+export function ActiveMonthDashboard({ children, input, onInputChange, onOpenMonth, onRetry, onRetryOpenMonth, onRetrySupport, pending = false, primaryAction, viewModel }: ActiveMonthDashboardProps) {
   if (viewModel.lifecycle === "loading") return <p role="status">Cargando mes activo...</p>;
 
   if (viewModel.lifecycle === "blocking") {
@@ -40,7 +41,7 @@ export function ActiveMonthDashboard({ children, input, onInputChange, onOpenMon
   }
 
   return (
-    <DashboardOperationalSection>
+    <DashboardOperationalSection month={viewModel.month!} primaryAction={primaryAction}>
       {viewModel.supportFailures?.map((source) => (
         <Card key={source} className="stack-sm">
           <p role="alert">{source === "report" ? "No se pudo cargar el reporte." : "No se pudo cargar la revisión de cierre."}</p>

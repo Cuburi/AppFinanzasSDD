@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -28,7 +28,7 @@ describe("ActiveMonthDashboard", () => {
     render(<ActiveMonthDashboard onOpenMonth={vi.fn()} onRetry={vi.fn()} viewModel={{ lifecycle: "loading", action: { kind: "none" } }} />);
 
     expect(screen.getByRole("status")).toHaveTextContent("Cargando mes activo...");
-    expect(screen.queryByRole("region", { name: "Operación del mes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Panel del mes activo" })).not.toBeInTheDocument();
   });
 
   it("guides an unopened month through the only permitted activation action", async () => {
@@ -40,7 +40,7 @@ describe("ActiveMonthDashboard", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Todavía no hay un mes activo.");
     await user.click(screen.getByRole("button", { name: "Abrir mes" }));
     expect(openMonth).toHaveBeenCalledWith({ year: expect.any(Number), month: expect.any(Number) });
-    expect(screen.queryByRole("region", { name: "Operación del mes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Panel del mes activo" })).not.toBeInTheDocument();
   });
 
   it("renders operations only with active authority and retries only blocking authority failures", async () => {
@@ -52,14 +52,41 @@ describe("ActiveMonthDashboard", () => {
       </ActiveMonthDashboard>,
     );
 
-    expect(screen.getByRole("region", { name: "Operación del mes" })).toHaveTextContent("Legacy operation");
+    expect(screen.getByRole("region", { name: "Panel del mes activo" })).toHaveTextContent("Legacy operation");
 
     rerender(<ActiveMonthDashboard onOpenMonth={vi.fn()} onRetry={retry} viewModel={{ lifecycle: "blocking", action: { kind: "retry-authority" } }} />);
 
     expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cargar el mes activo.");
     await user.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(retry).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("region", { name: "Operación del mes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Panel del mes activo" })).not.toBeInTheDocument();
+  });
+
+  it("gives the active operational area one contextual month heading and current-status context", () => {
+    render(
+      <ActiveMonthDashboard onOpenMonth={vi.fn()} onRetry={vi.fn()} viewModel={{ lifecycle: "active", month: activeMonth, action: { kind: "none" } }}>
+        <button type="button">Registrar gasto</button>
+      </ActiveMonthDashboard>,
+    );
+
+    const dashboard = screen.getByRole("region", { name: "Panel del mes activo" });
+    expect(within(dashboard).getByRole("heading", { level: 1, name: "Julio 2026" })).toBeInTheDocument();
+    expect(within(dashboard).getByRole("status", { name: /Mes abierto/i })).toBeInTheDocument();
+    expect(within(dashboard).getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
+  });
+
+  it("renders a closed month with its closed status instead of the active status", () => {
+    render(
+      <ActiveMonthDashboard
+        onOpenMonth={vi.fn()}
+        onRetry={vi.fn()}
+        viewModel={{ lifecycle: "closed", month: { ...activeMonth, status: "CLOSED", closedAt: "2026-07-31T00:00:00.000Z" }, action: { kind: "none" } }}
+      />,
+    );
+
+    const dashboard = screen.getByRole("region", { name: "Panel del mes activo" });
+    expect(within(dashboard).getByRole("status", { name: /Mes cerrado/i })).toBeInTheDocument();
+    expect(within(dashboard).queryByRole("status", { name: /Mes abierto/i })).not.toBeInTheDocument();
   });
 
   it("keeps operations visible while announcing a degraded support source with a targeted retry", async () => {
@@ -77,7 +104,7 @@ describe("ActiveMonthDashboard", () => {
       </ActiveMonthDashboard>,
     );
 
-    expect(screen.getByRole("region", { name: "Operación del mes" })).toHaveTextContent("Legacy operation");
+    expect(screen.getByRole("region", { name: "Panel del mes activo" })).toHaveTextContent("Legacy operation");
     expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cargar el reporte.");
     await user.click(screen.getByRole("button", { name: "Reintentar reporte" }));
     expect(retrySupport).toHaveBeenCalledWith("report");
@@ -94,5 +121,20 @@ describe("ActiveMonthDashboard", () => {
     rerender(<DashboardActivationForm input={{ year: 2026, month: 13 }} onChange={vi.fn()} onSubmit={submit} pending={false} />);
     await user.click(screen.getByRole("button", { name: "Abrir mes" }));
     expect(submit).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the mobile activation controls reachable in their reading order", async () => {
+    const user = userEvent.setup();
+    render(<DashboardActivationForm input={{ year: 2026, month: 7 }} onChange={vi.fn()} onSubmit={vi.fn()} pending={false} />);
+
+    const year = screen.getByLabelText("Año");
+    const month = screen.getByLabelText("Mes");
+    const action = screen.getByRole("button", { name: "Abrir mes" });
+    await user.tab();
+    expect(year).toHaveFocus();
+    await user.tab();
+    expect(month).toHaveFocus();
+    await user.tab();
+    expect(action).toHaveFocus();
   });
 });

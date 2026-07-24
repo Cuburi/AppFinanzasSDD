@@ -59,6 +59,20 @@ function mediaBlock(query: string): string {
   return "";
 }
 
+function effectiveDeclaration(source: string, selector: string, property: string): string {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedProperty = property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const blocks = source.matchAll(new RegExp(`(?:^|\\n)${escapedSelector}\\s*\\{([^}]*)\\}`, "g"));
+  let value = "";
+
+  for (const block of blocks) {
+    const declarations = block[1].matchAll(new RegExp(`(?:^|;)\\s*${escapedProperty}\\s*:\\s*([^;]+)`, "g"));
+    for (const declaration of declarations) value = declaration[1].trim();
+  }
+
+  return value;
+}
+
 describe("visual system contracts", () => {
   it("keeps semantic primitive styling backed by shared CSS tokens", () => {
     expect(firstCssBlock(":root")).toContain("--color-success-border:");
@@ -78,20 +92,70 @@ describe("visual system contracts", () => {
   });
 
   it("keeps mobile and tablet layouts constrained against horizontal overflow", () => {
-    const tabletRules = mediaBlock("(max-width: 768px)");
+    const tabletRules = mediaBlock("(max-width: 1100px)");
 
     expect(cssBlock("body")).toContain("min-width: 320px;");
     expect(firstCssBlock(".app-shell")).toContain("max-width: 1180px;");
-    expect(topLevelCssBlock(".card")).toContain("min-width: 0;");
+    expect(styles).toContain("grid-template-columns: 18.75rem minmax(0, 1fr);");
+    expect(styles).toContain("min-width: 0;");
     expect(cssBlockAfter(".budget-line", ".dashboard-kpi-grid")).toContain("overflow-wrap: anywhere;");
     expect(cssBlockAfter(".grid-subcategory", ".wrap")).toContain("grid-template-columns: minmax(0, 1fr) 200px auto;");
 
     expect(tabletRules).toContain(".app-shell");
-    expect(tabletRules).toContain("padding-inline: var(--space-2);");
+    expect(tabletRules).toContain("display: block;");
+    expect(tabletRules).toContain(".app-header");
+    expect(tabletRules).toContain("flex-direction: row;");
     expect(tabletRules).toContain(".dashboard-kpi-grid");
     expect(tabletRules).toContain("grid-template-columns: 1fr;");
     expect(tabletRules).toContain(".row");
     expect(tabletRules).toContain("flex-direction: column;");
     expect(tabletRules).toContain(".grid-subcategory");
+  });
+
+  it("keeps dashboard context and controls usable at the mobile breakpoint", () => {
+    const tabletRules = mediaBlock("(max-width: 1100px)");
+
+    expect(cssBlock(".field input,\n.field select")).toContain("min-height: 44px;");
+    expect(topLevelCssBlock(".button")).toContain("min-height: 44px;");
+    expect(topLevelCssBlock(".button")).toContain("min-inline-size: 44px;");
+    expect(styles).toMatch(/\.dashboard-context\s*\{\s*align-items: center;\s*gap: var\(--space-2\);\s*grid-template-columns: minmax\(0, 1fr\) auto;/);
+    expect(tabletRules).toContain(".dashboard-context");
+    expect(tabletRules).toContain("grid-template-columns: 1fr;");
+    expect(tabletRules).toContain(".dashboard-context-actions");
+    expect(tabletRules).toContain("flex-wrap: wrap;");
+  });
+
+  it("switches to the compact shell before the desktop rail can compress the active-month context", () => {
+    const compactShellRules = mediaBlock("(max-width: 1100px)");
+
+    expect(compactShellRules).toContain(".app-shell");
+    expect(compactShellRules).toContain("display: block;");
+    expect(compactShellRules).toContain(".app-header");
+    expect(compactShellRules).toContain("flex-direction: row;");
+    expect(compactShellRules).toContain(".nav a:not([aria-current=\"page\"]) { display: inline-flex; }");
+    expect(compactShellRules).toContain(".dashboard-context");
+    expect(compactShellRules).toContain("grid-template-columns: 1fr;");
+    expect(compactShellRules).toContain(".dashboard-context-actions");
+    expect(compactShellRules).toContain("flex-wrap: wrap;");
+  });
+
+  it("makes the approved flat desktop shell declarations win the cascade", () => {
+    expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("#101813");
+    expect(effectiveDeclaration(styles, ".app-header", "border-radius")).toBe("0");
+    expect(effectiveDeclaration(styles, ".nav a", "background")).toBe("transparent");
+    expect(effectiveDeclaration(styles, ".nav a", "border")).toBe("0");
+    expect(effectiveDeclaration(styles, ".card", "background")).toBe("var(--color-surface)");
+    expect(effectiveDeclaration(styles, ".button.primary", "background")).toBe("var(--color-primary)");
+  });
+
+  it("retains the flat shell while compact and 320px contracts replace the desktop rail", () => {
+    const compactShellRules = mediaBlock("(max-width: 1100px)");
+
+    expect(compactShellRules).toContain(".app-shell { display: block; }");
+    expect(compactShellRules).toContain(".nav { flex-direction: row;");
+    expect(cssBlock("body")).toContain("min-width: 320px;");
+    expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("#101813");
+    expect(effectiveDeclaration(styles, ".nav a", "background")).toBe("transparent");
+    expect(effectiveDeclaration(styles, ".button.primary", "background")).toBe("var(--color-primary)");
   });
 });
