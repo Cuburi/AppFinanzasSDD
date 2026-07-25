@@ -58,11 +58,22 @@ describe("PocketsPage", () => {
 
   it("shows active and inactive pockets with balances and recent movement context", async () => {
     const user = userEvent.setup();
+    let resolveActivePockets!: (pockets: SavingsPocket[]) => void;
+    apiMock.getPockets.mockImplementation((filter: "active" | "inactive" | "all") => {
+      if (filter === "active") {
+        return new Promise<SavingsPocket[]>((resolve) => {
+          resolveActivePockets = resolve;
+        });
+      }
+      if (filter === "inactive") return Promise.resolve([travelPocket]);
+      return Promise.resolve([emergencyPocket, travelPocket]);
+    });
 
     render(<PocketsPage />);
 
     expect(await screen.findByRole("heading", { name: "Bolsillos" })).toBeInTheDocument();
-    expect(screen.getByText("Emergencias")).toBeInTheDocument();
+    resolveActivePockets([emergencyPocket]);
+    expect(await screen.findByText("Emergencias")).toBeInTheDocument();
     expect(screen.getByText("Balance: $250.00")).toBeInTheDocument();
     expect(screen.getByText("Meta: $1000.00")).toBeInTheDocument();
     expect(screen.getByText("Ahorro inicial · Entrada $250.00")).toBeInTheDocument();
