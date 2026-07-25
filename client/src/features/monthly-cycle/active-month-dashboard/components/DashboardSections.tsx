@@ -30,7 +30,14 @@ export function DashboardActivationForm({ input, onChange, onSubmit, pending }: 
   );
 }
 
-export function DashboardOperationalSection({ children, month, primaryAction }: { children: React.ReactNode; month: Month; primaryAction?: React.ReactNode }) {
+export function DashboardOperationalSection({ activityContent, financialContent, month, primaryAction, quickActions, warnings }: {
+  activityContent?: React.ReactNode;
+  financialContent?: React.ReactNode;
+  month: Month;
+  primaryAction?: React.ReactNode;
+  quickActions?: React.ReactNode;
+  warnings?: React.ReactNode;
+}) {
   const monthName = new Intl.DateTimeFormat("es-CO", { month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(month.year, month.month - 1, 1)));
   const title = `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${month.year}`;
   const isClosed = month.status === "CLOSED" || Boolean(month.closedAt);
@@ -45,10 +52,13 @@ export function DashboardOperationalSection({ children, month, primaryAction }: 
         <div className="dashboard-context-actions">
           <StatusPill aria-label={isClosed ? "Mes cerrado" : "Mes abierto"} tone={isClosed ? "neutral" : "success"}>{isClosed ? "Mes cerrado" : "Mes abierto"}</StatusPill>
           <p className="dashboard-context-meta">Información actual del mes</p>
-          {primaryAction}
         </div>
       </div>
-      {children}
+      {financialContent ? <section aria-label="Resumen financiero">{financialContent}</section> : null}
+      {primaryAction ? <section aria-label="Próxima acción" className="dashboard-actions">{primaryAction}</section> : null}
+      {quickActions ? <section aria-label="Acciones rápidas" className="dashboard-actions">{quickActions}</section> : null}
+      {warnings}
+      {activityContent ? <section aria-label="Actividad y contexto">{activityContent}</section> : null}
     </section>
   );
 }

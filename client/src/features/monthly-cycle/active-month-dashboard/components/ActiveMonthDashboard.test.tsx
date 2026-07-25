@@ -110,6 +110,66 @@ describe("ActiveMonthDashboard", () => {
     expect(retrySupport).toHaveBeenCalledWith("report");
   });
 
+  it("orders financial truth, the next action, quick actions, warnings, and activity while retrying only the failed support", async () => {
+    const user = userEvent.setup();
+    const retrySupport = vi.fn();
+    const refresh = vi.fn();
+
+    render(
+      <ActiveMonthDashboard
+        financialContent={<p>Disponible $375 COP</p>}
+        onOpenMonth={vi.fn()}
+        onRefresh={refresh}
+        onRetry={vi.fn()}
+        onRetrySupport={retrySupport}
+        primaryAction={<button type="button">Registrar gasto</button>}
+        viewModel={{ lifecycle: "degraded", month: activeMonth, action: { kind: "retry-support", source: "report" }, supportFailures: ["report"] }}
+      >
+        <p>Actividad reciente</p>
+      </ActiveMonthDashboard>,
+    );
+
+    const financial = screen.getByRole("region", { name: "Resumen financiero" });
+    const nextAction = screen.getByRole("region", { name: "Próxima acción" });
+    const quickActions = screen.getByRole("region", { name: "Acciones rápidas" });
+    const warning = screen.getByRole("alert");
+    const activity = screen.getByRole("region", { name: "Actividad y contexto" });
+
+    expect(financial.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nextAction.compareDocumentPosition(quickActions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(quickActions.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(warning.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("Disponible $375 COP")).toBeInTheDocument();
+    expect(screen.getByText("Actividad reciente")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Actualizar información" }));
+    await user.click(screen.getByRole("button", { name: "Reintentar reporte" }));
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(retrySupport).toHaveBeenCalledWith("report");
+  });
+
+  it("keeps quick-action controls keyboard reachable when supporting context is absent", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ActiveMonthDashboard
+        financialContent={<p>Disponible $375 COP</p>}
+        onOpenMonth={vi.fn()}
+        onRefresh={vi.fn()}
+        onRetry={vi.fn()}
+        primaryAction={<button type="button">Registrar gasto</button>}
+        viewModel={{ lifecycle: "active", month: activeMonth, action: { kind: "none" } }}
+      />,
+    );
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Registrar gasto" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Actualizar información" })).toHaveFocus();
+    expect(screen.queryByRole("region", { name: "Actividad y contexto" })).not.toBeInTheDocument();
+  });
+
   it("uses native form submission for Enter and rejects out-of-range months before activation", async () => {
     const user = userEvent.setup();
     const submit = vi.fn();
