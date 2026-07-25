@@ -321,6 +321,12 @@ select {
   margin: 0;
 }
 
+.dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .financial-summary {
   background: #121c16;
   border-color: var(--color-border-strong);

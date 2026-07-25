@@ -141,6 +141,21 @@ describe("ActiveMonthPage", () => {
     expect(formatCop(-1_234.5)).toBe("$-1.234,5 COP");
   });
 
+  it("keeps financial truth before the operational CTA and non-authoritative activity", async () => {
+    render(<ActiveMonthPage />);
+
+    const financial = await screen.findByRole("region", { name: "Resumen financiero" });
+    const nextAction = screen.getByRole("region", { name: "Próxima acción" });
+    const quickActions = screen.getByRole("region", { name: "Acciones rápidas" });
+    const activity = screen.getByRole("region", { name: "Actividad y contexto" });
+
+    expect(within(financial).getByText("$375 COP")).toBeInTheDocument();
+    expect(financial.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nextAction.compareDocumentPosition(quickActions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(quickActions.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(activity).getByRole("heading", { name: "Ingresos del mes" })).toBeInTheDocument();
+  });
+
   it("keeps the loading and unopened states distinct", async () => {
     let resolveMonth: (month: Month | null) => void;
     apiMock.getActiveMonth.mockReturnValueOnce(

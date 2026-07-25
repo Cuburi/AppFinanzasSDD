@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const projectRoot = resolve(__dirname, "../..");
-const styles = readFileSync(resolve(projectRoot, "client/src/styles.css"), "utf8");
+const styles = readFileSync(resolve(projectRoot, "client/src/styles.css"), "utf8").replace(/\r\n/g, "\n");
 const visualSystemSkill = readFileSync(resolve(projectRoot, ".opencode/skills/visual-system-ui/SKILL.md"), "utf8");
 
 function cssBlock(selector: string): string {

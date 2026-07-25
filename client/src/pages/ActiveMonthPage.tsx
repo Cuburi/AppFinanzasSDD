@@ -518,41 +518,41 @@ export const ActiveMonthPage = () => {
     }
   };
 
+  const financialSummary = activeMonth ? (
+    <Card aria-label="Resumen financiero del mes" className="financial-summary stack-md">
+      <div aria-label="Disponible del mes" className="financial-primary" role="region">
+        <p className="eyebrow">Disponible del mes</p>
+        <p className="financial-primary-value">{formatCop(activeMonth.availableMoney)}</p>
+        <p className="sr-only">{activeMonth.availableMoney < 0 ? "Tendencia negativa" : "Tendencia positiva"}</p>
+      </div>
+      <div className="financial-secondary-metrics">
+        <p><span>Ingresos</span><strong>{formatCop(activeMonth.monthlyIncomeTotal)}</strong></p>
+        <p>
+          <span>Gastado</span>
+          <strong>{hasCurrentMonthlyExpenseHistory ? formatCop(actualSpent) : "No disponible"}</strong>
+          {monthlyExpenseHistoryStatus === "error" && monthlyExpenseHistoryMonthId === activeMonth?.id ? (
+            <span role="alert">
+              No se pudo cargar el gasto del mes. <Button onClick={() => void refreshMonthlyExpenseHistory(activeMonth.id, !historyCreditCardId).catch(() => undefined)} type="button" variant="tertiary">Reintentar Gastado</Button>
+            </span>
+          ) : monthlyExpenseHistoryStatus === "loading" && monthlyExpenseHistoryMonthId === activeMonth?.id ? (
+            <span className="sr-only" role="status">Cargando gasto del mes.</span>
+          ) : null}
+        </p>
+        <p aria-label="Efectivo físico" role="region"><span>Efectivo disponible</span><strong>{formatCop(activeMonth.cashBalance)}</strong><span className="sr-only">{activeMonth.cashBalance < 0 ? "Tendencia negativa" : "Tendencia positiva"}</span></p>
+      </div>
+      <div className="financial-budget">
+        <div className="row between wrap"><span>Presupuesto utilizado</span><strong>{budgetPercent}%</strong></div>
+        <progress aria-label="Presupuesto utilizado" aria-valuemax={100} aria-valuemin={0} aria-valuenow={budgetPercent} max="100" value={budgetPercent}>{budgetPercent}%</progress>
+        <p>{formatCop(spentBudget)} de {formatCop(plannedBudget)}</p>
+      </div>
+    </Card>
+  ) : null;
+
   return (
-    <ActiveMonthDashboard input={openMonthInput} onInputChange={setOpenMonthInput} onOpenMonth={(input) => void handleOpenMonth(input)} onRetry={() => void dashboard.refresh()} onRetryOpenMonth={(input) => void handleOpenMonth(input)} onRetrySupport={(source) => void dashboard.retrySupport(source)} pending={submitting} primaryAction={activeMonth && canMutateActiveMonth ? <a className="button primary" href="#expense-form">Registrar gasto</a> : undefined} viewModel={dashboard.viewModel}>
+    <ActiveMonthDashboard financialContent={financialSummary} input={openMonthInput} onInputChange={setOpenMonthInput} onOpenMonth={(input) => void handleOpenMonth(input)} onRefresh={() => void refresh()} onRetry={() => void dashboard.refresh()} onRetryOpenMonth={(input) => void handleOpenMonth(input)} onRetrySupport={(source) => void dashboard.retrySupport(source)} pending={submitting} primaryAction={activeMonth && canMutateActiveMonth ? <a className="button primary" href="#expense-form">Registrar gasto</a> : undefined} viewModel={dashboard.viewModel}>
     <section className="page stack-lg">
       {message ? <p className="success">{message}</p> : null}
       {error ? <p className="error" role="alert">{error}</p> : null}
-
-      {activeMonth ? (
-        <Card aria-label="Resumen financiero del mes" className="financial-summary stack-md">
-          <div aria-label="Disponible del mes" className="financial-primary" role="region">
-            <p className="eyebrow">Disponible del mes</p>
-            <p className="financial-primary-value">{formatCop(activeMonth.availableMoney)}</p>
-            <p className="sr-only">{activeMonth.availableMoney < 0 ? "Tendencia negativa" : "Tendencia positiva"}</p>
-          </div>
-          <div className="financial-secondary-metrics">
-            <p><span>Ingresos</span><strong>{formatCop(activeMonth.monthlyIncomeTotal)}</strong></p>
-            <p>
-              <span>Gastado</span>
-              <strong>{hasCurrentMonthlyExpenseHistory ? formatCop(actualSpent) : "No disponible"}</strong>
-              {monthlyExpenseHistoryStatus === "error" && monthlyExpenseHistoryMonthId === activeMonth?.id ? (
-                <span role="alert">
-                  No se pudo cargar el gasto del mes. <Button onClick={() => void refreshMonthlyExpenseHistory(activeMonth.id, !historyCreditCardId).catch(() => undefined)} type="button" variant="tertiary">Reintentar Gastado</Button>
-                </span>
-              ) : monthlyExpenseHistoryStatus === "loading" && monthlyExpenseHistoryMonthId === activeMonth?.id ? (
-                <span className="sr-only" role="status">Cargando gasto del mes.</span>
-              ) : null}
-            </p>
-            <p aria-label="Efectivo físico" role="region"><span>Efectivo disponible</span><strong>{formatCop(activeMonth.cashBalance)}</strong><span className="sr-only">{activeMonth.cashBalance < 0 ? "Tendencia negativa" : "Tendencia positiva"}</span></p>
-          </div>
-          <div className="financial-budget">
-            <div className="row between wrap"><span>Presupuesto utilizado</span><strong>{budgetPercent}%</strong></div>
-            <progress aria-label="Presupuesto utilizado" aria-valuemax={100} aria-valuemin={0} aria-valuenow={budgetPercent} max="100" value={budgetPercent}>{budgetPercent}%</progress>
-            <p>{formatCop(spentBudget)} de {formatCop(plannedBudget)}</p>
-          </div>
-        </Card>
-      ) : null}
 
       {activeMonth ? (
         <Card aria-label="Ingresos del mes" className="stack-md">
