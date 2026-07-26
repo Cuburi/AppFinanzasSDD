@@ -320,4 +320,62 @@ describe("CloseMonthPage", () => {
     expect(screen.queryByRole("heading", { name: "Mayo 2026" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Abrir junio de 2026" })).not.toBeInTheDocument();
   });
+
+  it("prevents duplicate next-month requests while the first request is pending", async () => {
+    const user = userEvent.setup();
+    const closedMonth = {
+      ...activeMonth,
+      id: "closed-may",
+      status: "CLOSED" as const,
+      closedAt: "2026-05-31T00:00:00.000Z",
+    };
+    let resolveOpenMonth: ((month: Month) => void) | undefined;
+
+    apiMock.getActiveMonth.mockResolvedValue(closedMonth);
+    apiMock.getClosureReview.mockResolvedValue(cleanReview);
+    apiMock.openMonth.mockImplementation(() => new Promise<Month>((resolve) => {
+      resolveOpenMonth = resolve;
+    }));
+
+    render(<CloseMonthPage />);
+
+    const openButton = await screen.findByRole("button", { name: "Abrir junio de 2026" });
+    await user.click(openButton);
+
+    expect(apiMock.openMonth).toHaveBeenCalledTimes(1);
+    expect(openButton).toBeDisabled();
+    expect(openButton).toHaveTextContent("Abriendo mes...");
+
+    await user.click(openButton);
+    expect(apiMock.openMonth).toHaveBeenCalledTimes(1);
+
+    resolveOpenMonth?.({ ...activeMonth, id: "opened-june", month: 6 });
+    expect(await screen.findByRole("heading", { name: "Cierre de mes" })).toBeInTheDocument();
+  });
+
+  it("clears an opening error after a later successful retry", async () => {
+    const user = userEvent.setup();
+    const closedMonth = {
+      ...activeMonth,
+      id: "closed-may",
+      status: "CLOSED" as const,
+      closedAt: "2026-05-31T00:00:00.000Z",
+    };
+    const nextMonth = { ...activeMonth, id: "opened-june", month: 6 };
+
+    apiMock.getActiveMonth.mockResolvedValue(closedMonth);
+    apiMock.getClosureReview.mockResolvedValueOnce(cleanReview).mockResolvedValueOnce({ ...cleanReview, monthId: nextMonth.id });
+    apiMock.openMonth.mockRejectedValueOnce(new Error("Month already exists")).mockResolvedValueOnce(nextMonth);
+
+    render(<CloseMonthPage />);
+
+    const openButton = await screen.findByRole("button", { name: "Abrir junio de 2026" });
+    await user.click(openButton);
+    expect(await screen.findByText("Month already exists")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Abrir junio de 2026" }));
+
+    expect(await screen.findByText("Mes 2026-06 abierto.")).toBeInTheDocument();
+    expect(screen.queryByText("Month already exists")).not.toBeInTheDocument();
+  });
 });

@@ -158,11 +158,15 @@ export const CloseMonthPage = () => {
   };
 
   const openNextMonth = async () => {
-    if (!activeMonth) return;
+    if (!activeMonth || submitting) return;
 
     const input = activeMonth.month === 12
       ? { year: activeMonth.year + 1, month: 1 }
       : { year: activeMonth.year, month: activeMonth.month + 1 };
+
+    setSubmitting(true);
+    setError(null);
+    setMessage(null);
 
     try {
       const openedMonth = await api.openMonth(input);
@@ -179,6 +183,8 @@ export const CloseMonthPage = () => {
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo abrir el siguiente mes.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -209,7 +215,7 @@ export const CloseMonthPage = () => {
       <section className="page stack-lg">
         {message ? <p className="success">{message}</p> : null}
         {error ? <p className="error">{error}</p> : null}
-        <ClosedMonthDashboard month={activeMonth} onOpenNextMonth={() => void openNextMonth()} />
+        <ClosedMonthDashboard isOpeningNextMonth={submitting} month={activeMonth} onOpenNextMonth={() => void openNextMonth()} />
       </section>
     );
   }

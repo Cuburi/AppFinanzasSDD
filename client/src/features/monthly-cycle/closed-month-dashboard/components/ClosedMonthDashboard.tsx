@@ -4,6 +4,7 @@ import type { Month } from "../../../../types";
 export type ClosedMonthDashboardProps = {
   month: Month;
   onOpenNextMonth: () => void;
+  isOpeningNextMonth?: boolean;
 };
 
 const monthNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -15,7 +16,7 @@ function getNextMonthLabel(month: Month) {
   return `${monthNames[nextMonth - 1]} de ${nextYear}`;
 }
 
-export function ClosedMonthDashboard({ month, onOpenNextMonth }: ClosedMonthDashboardProps) {
+export function ClosedMonthDashboard({ month, onOpenNextMonth, isOpeningNextMonth = false }: ClosedMonthDashboardProps) {
   return (
     <section aria-label="Resumen del mes cerrado" className="stack-lg">
       <Card className="stack-md">
@@ -43,7 +44,9 @@ export function ClosedMonthDashboard({ month, onOpenNextMonth }: ClosedMonthDash
       <Card className="stack-sm">
         <h2>Continuar al siguiente mes</h2>
         <p>Abrí el siguiente mes sin modificar el período cerrado.</p>
-        <Button onClick={onOpenNextMonth} type="button">Abrir {getNextMonthLabel(month)}</Button>
+        <Button disabled={isOpeningNextMonth} onClick={onOpenNextMonth} type="button">
+          {isOpeningNextMonth ? "Abriendo mes..." : `Abrir ${getNextMonthLabel(month)}`}
+        </Button>
       </Card>
     </section>
   );
