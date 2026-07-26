@@ -149,6 +149,29 @@ describe("ActiveMonthDashboard", () => {
     expect(retrySupport).toHaveBeenCalledWith("report");
   });
 
+  it("roots the mockup hierarchy in the active-month namespace with contextual financial truth first", () => {
+    const { container } = render(
+      <ActiveMonthDashboard
+        financialContent={<p>Disponible $375 COP</p>}
+        onOpenMonth={vi.fn()}
+        onRefresh={vi.fn()}
+        onRetry={vi.fn()}
+        primaryAction={<button type="button">Registrar gasto</button>}
+        viewModel={{ lifecycle: "active", month: activeMonth, action: { kind: "none" } }}
+      >
+        <p>Actividad reciente</p>
+      </ActiveMonthDashboard>,
+    );
+
+    const dashboard = screen.getByRole("region", { name: "Panel del mes activo" });
+    const title = within(dashboard).getByRole("heading", { level: 1, name: "Julio 2026" });
+    const financial = within(dashboard).getByRole("region", { name: "Resumen financiero" });
+
+    expect(container.querySelector(".active-month-dashboard")).toBe(dashboard);
+    expect(title.compareDocumentPosition(financial) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(financial).toHaveTextContent("Disponible $375 COP");
+  });
+
   it("keeps quick-action controls keyboard reachable when supporting context is absent", async () => {
     const user = userEvent.setup();
 

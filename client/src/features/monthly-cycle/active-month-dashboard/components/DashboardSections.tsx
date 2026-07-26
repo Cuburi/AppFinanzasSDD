@@ -43,7 +43,7 @@ export function DashboardOperationalSection({ activityContent, financialContent,
   const isClosed = month.status === "CLOSED" || Boolean(month.closedAt);
 
   return (
-    <section aria-label="Panel del mes activo" className="dashboard-operational stack-lg">
+    <section aria-label="Panel del mes activo" className="active-month-dashboard dashboard-operational stack-lg">
       <div className="dashboard-context">
         <div>
           <h1 id="active-month-dashboard-title">{title}</h1>
