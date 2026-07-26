@@ -11,6 +11,7 @@ const apiMock = vi.hoisted(() => ({
   getClosureReview: vi.fn(),
   applyClosureAction: vi.fn(),
   closeMonth: vi.fn(),
+  openMonth: vi.fn(),
 }));
 
 vi.mock("../lib/api", () => ({
@@ -228,5 +229,95 @@ describe("CloseMonthPage", () => {
     expect(await screen.findByText(/El dinero disponible del mes está en negativo: \$-90\.00/i)).toBeInTheDocument();
     expect(screen.getByText(/no agrega un retiro genérico desde bolsillos/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /retirar/i })).not.toBeInTheDocument();
+  });
+
+  it("renders the exact close response as read-only and transitions to the returned next month", async () => {
+    const user = userEvent.setup();
+    const closedMonth = {
+      ...activeMonth,
+      id: "closed-month-identity",
+      year: 2026,
+      month: 12,
+      status: "CLOSED" as const,
+      closedAt: "2026-12-31T00:00:00.000Z",
+      monthlyIncomeTotal: 4321.5,
+      availableMoney: 123.45,
+      cashBalance: 67.89,
+    };
+    const nextMonth = { ...activeMonth, id: "next-month", year: 2027, month: 1 };
+    const nextMonthReview = { ...cleanReview, monthId: nextMonth.id };
+
+    apiMock.getClosureReview.mockResolvedValueOnce(cleanReview).mockResolvedValueOnce(nextMonthReview);
+    apiMock.closeMonth.mockResolvedValue(closedMonth);
+    apiMock.openMonth.mockResolvedValue(nextMonth);
+
+    render(<CloseMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Cerrar mes" }));
+    expect(await screen.findByRole("heading", { name: "Diciembre 2026" })).toBeInTheDocument();
+    expect(screen.getByText("Ingresos del mes").nextElementSibling).toHaveTextContent("$4321.50");
+    expect(screen.queryByRole("button", { name: /cerrar|transferir|cubrir/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Abrir enero de 2027" }));
+    await waitFor(() => expect(apiMock.openMonth).toHaveBeenCalledWith({ year: 2027, month: 1 }));
+    expect(apiMock.closeMonth).toHaveBeenCalledWith(activeMonth.id);
+    expect(await screen.findByRole("heading", { name: "Cierre de mes" })).toBeInTheDocument();
+    expect(await screen.findByText("2027-01")).toBeInTheDocument();
+    expect(screen.getByText("Estado: ACTIVE")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cerrar mes" })).toBeEnabled();
+    expect(screen.queryByRole("heading", { name: "Diciembre 2026" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Abrir enero de 2027" })).not.toBeInTheDocument();
+  });
+
+  it("transitions from a closed month to the returned same-year next month", async () => {
+    const user = userEvent.setup();
+    const closedMonth = {
+      ...activeMonth,
+      id: "closed-may",
+      status: "CLOSED" as const,
+      closedAt: "2026-05-31T00:00:00.000Z",
+    };
+    const nextMonth = { ...activeMonth, id: "opened-june", month: 6 };
+
+    apiMock.getActiveMonth.mockResolvedValue(closedMonth);
+    apiMock.getClosureReview.mockResolvedValueOnce(cleanReview).mockResolvedValueOnce({ ...cleanReview, monthId: nextMonth.id });
+    apiMock.openMonth.mockResolvedValue(nextMonth);
+
+    render(<CloseMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Abrir junio de 2026" }));
+
+    await waitFor(() => expect(apiMock.openMonth).toHaveBeenCalledWith({ year: 2026, month: 6 }));
+    expect(await screen.findByRole("heading", { name: "Cierre de mes" })).toBeInTheDocument();
+    expect(await screen.findByText("2026-06")).toBeInTheDocument();
+    expect(screen.getByText("Estado: ACTIVE")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cerrar mes" })).toBeEnabled();
+    expect(screen.queryByRole("heading", { name: "Mayo 2026" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Abrir junio de 2026" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the opened month visible when loading its closure review fails", async () => {
+    const user = userEvent.setup();
+    const closedMonth = {
+      ...activeMonth,
+      id: "closed-may",
+      status: "CLOSED" as const,
+      closedAt: "2026-05-31T00:00:00.000Z",
+    };
+    const nextMonth = { ...activeMonth, id: "opened-june", month: 6 };
+
+    apiMock.getActiveMonth.mockResolvedValue(closedMonth);
+    apiMock.getClosureReview.mockResolvedValueOnce(cleanReview).mockRejectedValueOnce(new Error("Review unavailable"));
+    apiMock.openMonth.mockResolvedValue(nextMonth);
+
+    render(<CloseMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Abrir junio de 2026" }));
+
+    expect(await screen.findByRole("heading", { name: "Cierre de mes" })).toBeInTheDocument();
+    expect(screen.getByText(/Mes 2026-06 abierto\./i)).toBeInTheDocument();
+    expect(screen.getByText(/El mes se abrió, pero no se pudo cargar la revisión de cierre: Review unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Mayo 2026" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Abrir junio de 2026" })).not.toBeInTheDocument();
   });
 });

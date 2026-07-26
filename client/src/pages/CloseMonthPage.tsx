@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { Button, Card, SectionHeader, StatusPill } from "../components/ui";
 import type { ClosurePendingSurplus, ClosureReview, Month, SavingsPocket } from "../types";
+import { ClosedMonthDashboard } from "../features/monthly-cycle/closed-month-dashboard/components/ClosedMonthDashboard";
 
 type TextById = Record<string, string>;
 
@@ -156,6 +157,31 @@ export const CloseMonthPage = () => {
     }
   };
 
+  const openNextMonth = async () => {
+    if (!activeMonth) return;
+
+    const input = activeMonth.month === 12
+      ? { year: activeMonth.year + 1, month: 1 }
+      : { year: activeMonth.year, month: activeMonth.month + 1 };
+
+    try {
+      const openedMonth = await api.openMonth(input);
+      setActiveMonth(openedMonth);
+      setMessage(`Mes ${input.year}-${String(input.month).padStart(2, "0")} abierto.`);
+      setReview(null);
+
+      try {
+        const closureReview = await api.getClosureReview(openedMonth.id);
+        setReview(closureReview);
+      } catch (reviewError) {
+        const reviewErrorMessage = reviewError instanceof Error ? reviewError.message : "No se pudo cargar la revisión de cierre.";
+        setError(`El mes se abrió, pero no se pudo cargar la revisión de cierre: ${reviewErrorMessage}`);
+      }
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo abrir el siguiente mes.");
+    }
+  };
+
   if (loading) {
     return <p>Cargando revisión de cierre...</p>;
   }
@@ -177,6 +203,16 @@ export const CloseMonthPage = () => {
       </>
     );
   };
+
+  if (activeMonth?.status === "CLOSED") {
+    return (
+      <section className="page stack-lg">
+        {message ? <p className="success">{message}</p> : null}
+        {error ? <p className="error">{error}</p> : null}
+        <ClosedMonthDashboard month={activeMonth} onOpenNextMonth={() => void openNextMonth()} />
+      </section>
+    );
+  }
 
   return (
     <section className="page stack-lg">
