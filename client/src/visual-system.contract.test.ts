@@ -185,4 +185,24 @@ describe("visual system contracts", () => {
     expect(styles).toContain("@media (max-width: 390px)");
     expect(styles).toContain("@media (max-width: 320px)");
   });
+
+  it("keeps active-month motion compositor-safe, interruptible, and removable for reduced motion", () => {
+    const reducedMotionRules = mediaBlock("(prefers-reduced-motion: reduce)");
+
+    expect(styles).toContain(".active-month-dashboard {");
+    expect(styles).toContain("--active-month-motion-duration: 180ms;");
+    expect(styles).toContain("--active-month-motion-easing: cubic-bezier(0.23, 1, 0.32, 1);");
+    expect(styles).toContain(".active-month-dashboard > .dashboard-context,");
+    expect(styles).toContain("section[aria-label=\"Resumen financiero\"]");
+    expect(styles).toContain("transition-property: opacity, transform;");
+    expect(styles).toContain("transform: translateY(0.375rem);");
+    expect(styles).toContain(".active-month-dashboard .button:active");
+    expect(styles).toContain("transform: scale(0.98);");
+    expect(styles).not.toContain("@keyframes");
+
+    expect(reducedMotionRules).toContain(".active-month-dashboard > .dashboard-context,");
+    expect(reducedMotionRules).toContain("transition-duration: 0ms;");
+    expect(reducedMotionRules).toContain(".active-month-dashboard .button:active");
+    expect(reducedMotionRules).toContain("transform: none;");
+  });
 });
