@@ -158,4 +158,31 @@ describe("visual system contracts", () => {
     expect(effectiveDeclaration(styles, ".nav a", "background")).toBe("transparent");
     expect(effectiveDeclaration(styles, ".button.primary", "background")).toBe("var(--color-primary)");
   });
+
+  it("keeps the active-month dashboard readable and actionable from tablet through narrow and zoomed viewports", () => {
+    const tabletRules = mediaBlock("(max-width: 768px)");
+    const phoneRules = mediaBlock("(max-width: 390px)");
+    const narrowRules = mediaBlock("(max-width: 320px)");
+
+    expect(tabletRules).toContain(".active-month-dashboard .dashboard-context-actions");
+    expect(tabletRules).toContain("width: 100%;");
+    expect(tabletRules).toContain("justify-content: space-between;");
+    expect(tabletRules).toContain(".active-month-dashboard .financial-summary");
+    expect(tabletRules).toContain("padding: var(--space-3);");
+    expect(cssBlockAfter(".active-month-dashboard .financial-primary-value", "@media (max-width: 768px)")).toContain("overflow-wrap: anywhere;");
+
+    expect(phoneRules).toContain(".active-month-dashboard .financial-secondary-metrics");
+    expect(phoneRules).toContain("grid-template-columns: 1fr;");
+    expect(phoneRules).toContain(".active-month-dashboard .dashboard-context-actions");
+    expect(phoneRules).toContain("align-items: flex-start;");
+
+    expect(narrowRules).toContain(".active-month-dashboard .dashboard-actions");
+    expect(narrowRules).toContain("display: grid;");
+    expect(narrowRules).toContain(".active-month-dashboard .button");
+    expect(narrowRules).toContain("width: 100%;");
+
+    expect(styles).toContain("@media (max-width: 768px)");
+    expect(styles).toContain("@media (max-width: 390px)");
+    expect(styles).toContain("@media (max-width: 320px)");
+  });
 });
