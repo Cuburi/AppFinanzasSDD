@@ -483,3 +483,46 @@ select {
     width: 100%;
   }
 }
+
+/* Active Month keeps financial truth and available actions readable as viewport space contracts. */
+@media (max-width: 768px) {
+  .active-month-dashboard .dashboard-context-actions {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .active-month-dashboard .financial-summary {
+    padding: var(--space-3);
+  }
+
+  .active-month-dashboard .financial-primary-value {
+    font-size: clamp(2rem, 8vw, 3.25rem);
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 390px) {
+  .active-month-dashboard .dashboard-context-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .active-month-dashboard .financial-secondary-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 320px) {
+  .active-month-dashboard h1 {
+    overflow-wrap: anywhere;
+  }
+
+  .active-month-dashboard .dashboard-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .active-month-dashboard .button {
+    width: 100%;
+  }
+}
