@@ -44,7 +44,7 @@ export function DashboardOperationalSection({ activityContent, financialContent,
 
   return (
     <section aria-label="Panel del mes activo" className="active-month-dashboard dashboard-operational stack-lg">
-      <div className="dashboard-context">
+      <section aria-label="Estado del mes" className="dashboard-context">
         <div>
           <h1 id="active-month-dashboard-title">{title}</h1>
           <p className="section-description">Resumen operativo de tus finanzas personales.</p>
@@ -53,12 +53,12 @@ export function DashboardOperationalSection({ activityContent, financialContent,
           <StatusPill aria-label={isClosed ? "Mes cerrado" : "Mes abierto"} tone={isClosed ? "neutral" : "success"}>{isClosed ? "Mes cerrado" : "Mes abierto"}</StatusPill>
           <p className="dashboard-context-meta">Información actual del mes</p>
         </div>
-      </div>
+      </section>
       {financialContent ? <section aria-label="Resumen financiero">{financialContent}</section> : null}
-      {primaryAction ? <section aria-label="Próxima acción" className="dashboard-actions">{primaryAction}</section> : null}
-      {quickActions ? <section aria-label="Acciones rápidas" className="dashboard-actions">{quickActions}</section> : null}
+      {primaryAction ? <section aria-label="Próxima acción" className="dashboard-actions dashboard-primary-action"><p className="eyebrow">Próxima acción</p>{primaryAction}</section> : null}
+      {quickActions ? <section aria-label="Acciones rápidas" className="dashboard-actions dashboard-quick-actions"><p className="eyebrow">Acciones rápidas</p>{quickActions}</section> : null}
       {warnings}
-      {activityContent ? <section aria-label="Actividad y contexto">{activityContent}</section> : null}
+      {activityContent ? <section aria-label="Actividad y contexto" className="dashboard-activity">{activityContent}</section> : null}
     </section>
   );
 }
