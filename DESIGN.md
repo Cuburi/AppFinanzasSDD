@@ -117,7 +117,7 @@ Spacing follows a `4px` base. Use more space above a section title than below it
 ### Responsive behavior
 
 - **Wide (`>= 1120px`)**: persistent navigation rail around `15rem`; main content uses a 12-column grid with a readable maximum width of `90rem`. Financial thesis and primary action may sit in a `7 / 5` split.
-- **Medium (`768px–1119px`)**: navigation becomes a top horizontal region without hiding routes. Main content uses eight columns; financial thesis and action stack before density becomes cramped.
+- **Medium (`768px–1119px`)**: navigation becomes a labeled `Menú` trigger that opens an accessible drawer with every route. Main content uses eight columns; financial thesis and action stack before density becomes cramped.
 - **Compact (`< 768px`)**: one content column; financial truth comes first, followed by the expense action, then recent activity and maintenance sections. Primary controls span the available width.
 - **Narrow (`<= 390px`)**: amount and currency unit may separate into two lines; metadata stacks; buttons remain at least `44px` high; no horizontal page scrolling.
 
@@ -188,7 +188,7 @@ These specifications map onto the existing `Button`, `Card`, `StatusPill`, field
 
 - Active routes use a Ledger Lime index rule and stronger Ink text, not a filled pill.
 - Hover and focus reveal a quiet Raised Slip field; selected state remains identifiable without color.
-- On compact layouts, routes remain directly reachable through a horizontal, scrollable nav; do not hide core destinations behind an unlabeled icon.
+- Below the desktop rail threshold, routes remain directly reachable through a labeled `Menú` trigger and accessible navigation drawer; do not hide core destinations behind an unlabeled icon.
 - Product labels remain Spanish, including “Tarjetas de crédito” and “Reportes.”
 
 ### Motion and state changes
