@@ -85,7 +85,9 @@ describe("ActiveMonthDashboard", () => {
     );
 
     const dashboard = screen.getByRole("region", { name: "Panel del mes activo" });
-    expect(within(dashboard).getByRole("status", { name: /Mes cerrado/i })).toBeInTheDocument();
+    const currentState = within(dashboard).getByRole("region", { name: "Estado del mes" });
+
+    expect(within(currentState).getByRole("status", { name: /Mes cerrado/i })).toBeInTheDocument();
     expect(within(dashboard).queryByRole("status", { name: /Mes abierto/i })).not.toBeInTheDocument();
   });
 
@@ -170,6 +172,28 @@ describe("ActiveMonthDashboard", () => {
     expect(container.querySelector(".active-month-dashboard")).toBe(dashboard);
     expect(title.compareDocumentPosition(financial) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(financial).toHaveTextContent("Disponible $375 COP");
+  });
+
+  it("groups the current month state, next action, and refresh action into distinct decision regions", () => {
+    render(
+      <ActiveMonthDashboard
+        financialContent={<p>Disponible $375 COP</p>}
+        onOpenMonth={vi.fn()}
+        onRefresh={vi.fn()}
+        onRetry={vi.fn()}
+        primaryAction={<button type="button">Registrar gasto</button>}
+        viewModel={{ lifecycle: "active", month: activeMonth, action: { kind: "none" } }}
+      />,
+    );
+
+    const currentState = screen.getByRole("region", { name: "Estado del mes" });
+    const nextAction = screen.getByRole("region", { name: "Próxima acción" });
+    const quickActions = screen.getByRole("region", { name: "Acciones rápidas" });
+
+    expect(currentState).toHaveTextContent("Julio 2026");
+    expect(currentState).toHaveTextContent("Mes abierto");
+    expect(nextAction).toHaveTextContent("Registrar gasto");
+    expect(quickActions).toHaveTextContent("Actualizar información");
   });
 
   it("keeps quick-action controls keyboard reachable when supporting context is absent", async () => {

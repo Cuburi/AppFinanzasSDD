@@ -94,7 +94,7 @@ describe("visual system contracts", () => {
   it("keeps mobile and tablet layouts constrained against horizontal overflow", () => {
     const tabletRules = mediaBlock("(max-width: 1100px)");
 
-    expect(cssBlock("body")).toContain("min-width: 320px;");
+    expect(cssBlock("body")).not.toContain("min-width: 320px;");
     expect(firstCssBlock(".app-shell")).toContain("max-width: 1180px;");
     expect(styles).toContain("grid-template-columns: 18.75rem minmax(0, 1fr);");
     expect(styles).toContain("min-width: 0;");
@@ -153,7 +153,7 @@ describe("visual system contracts", () => {
 
     expect(compactShellRules).toContain(".app-shell { display: block; }");
     expect(compactShellRules).toContain(".nav { flex-direction: row;");
-    expect(cssBlock("body")).toContain("min-width: 320px;");
+    expect(cssBlock("body")).not.toContain("min-width: 320px;");
     expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("#101813");
     expect(effectiveDeclaration(styles, ".nav a", "background")).toBe("transparent");
     expect(effectiveDeclaration(styles, ".button.primary", "background")).toBe("var(--color-primary)");
@@ -184,6 +184,15 @@ describe("visual system contracts", () => {
     expect(styles).toContain("@media (max-width: 768px)");
     expect(styles).toContain("@media (max-width: 390px)");
     expect(styles).toContain("@media (max-width: 320px)");
+  });
+
+  it("keeps degraded-support warnings before activity in the grid at desktop and mobile widths", () => {
+    const desktopRules = topLevelCssBlock(".active-month-dashboard.dashboard-operational");
+    const tabletRules = mediaBlock("(max-width: 768px)");
+
+    expect(desktopRules).not.toContain('"activity activity"');
+    expect(tabletRules).not.toContain('"activity"');
+    expect(cssBlock(".active-month-dashboard .dashboard-activity")).toContain("grid-column: 1 / -1;");
   });
 
   it("keeps active-month motion compositor-safe, interruptible, and removable for reduced motion", () => {

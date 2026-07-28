@@ -50,7 +50,6 @@
 
 body {
   margin: 0;
-  min-width: 320px;
   min-height: 100vh;
 }
 
@@ -369,6 +368,45 @@ select {
   font-variant-numeric: tabular-nums;
 }
 
+/* The active dashboard is a decision surface: state first, then money and actions. */
+.active-month-dashboard.dashboard-operational {
+  align-items: start;
+  grid-template-areas:
+    "hero hero"
+    "finance action"
+    "finance quick";
+  grid-template-columns: minmax(0, 1.45fr) minmax(14rem, 0.55fr);
+}
+
+.active-month-dashboard > .dashboard-context {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  grid-area: hero;
+  padding: var(--space-4);
+}
+
+.active-month-dashboard > section[aria-label="Resumen financiero"] {
+  grid-area: finance;
+}
+
+.active-month-dashboard .dashboard-primary-action,
+.active-month-dashboard .dashboard-quick-actions {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.active-month-dashboard .dashboard-primary-action { grid-area: action; }
+.active-month-dashboard .dashboard-quick-actions { grid-area: quick; }
+.active-month-dashboard .dashboard-primary-action .button,
+.active-month-dashboard .dashboard-quick-actions .button { width: 100%; }
+.active-month-dashboard > .card { grid-column: 1 / -1; }
+.active-month-dashboard .dashboard-activity { grid-column: 1 / -1; }
+
 .financial-budget {
   border-top: 1px solid var(--color-border);
   display: grid;
@@ -486,6 +524,15 @@ select {
 
 /* Active Month keeps financial truth and available actions readable as viewport space contracts. */
 @media (max-width: 768px) {
+  .active-month-dashboard.dashboard-operational {
+    grid-template-areas:
+      "hero"
+      "finance"
+      "action"
+      "quick";
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .active-month-dashboard .dashboard-context-actions {
     justify-content: space-between;
     width: 100%;
