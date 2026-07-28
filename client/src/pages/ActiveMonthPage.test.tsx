@@ -141,19 +141,58 @@ describe("ActiveMonthPage", () => {
     expect(formatCop(-1_234.5)).toBe("$-1.234,5 COP");
   });
 
-  it("keeps financial truth before the operational CTA and non-authoritative activity", async () => {
+  it("keeps financial truth and expense capture before warnings and maintenance", async () => {
     render(<ActiveMonthPage />);
 
     const financial = await screen.findByRole("region", { name: "Resumen financiero" });
-    const nextAction = screen.getByRole("region", { name: "Próxima acción" });
+    const expenseCapture = screen.getByRole("region", { name: "Registrar gasto" });
     const quickActions = screen.getByRole("region", { name: "Acciones rápidas" });
     const activity = screen.getByRole("region", { name: "Actividad y contexto" });
 
     expect(within(financial).getByText("$375 COP")).toBeInTheDocument();
-    expect(financial.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(nextAction.compareDocumentPosition(quickActions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(financial.compareDocumentPosition(expenseCapture) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(quickActions.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(activity).getByRole("heading", { name: "Ingresos del mes" })).toBeInTheDocument();
+  });
+
+  it("uses shared registration-slip anatomy with local feedback and focused edit handoff", async () => {
+    const user = userEvent.setup();
+    apiMock.recordExpense.mockRejectedValueOnce(new Error("El monto supera el disponible."));
+
+    render(<ActiveMonthPage />);
+
+    const expenseSlip = await screen.findByRole("region", { name: "Registrar gasto" });
+    expect(expenseSlip).toHaveClass("registration-slip-primary", "registration-slip-create");
+    const amount = within(expenseSlip).getByLabelText("Monto", { selector: "input" });
+    const subcategory = within(expenseSlip).getByLabelText("Subcategoría del gasto");
+    const primaryFields = expenseSlip.querySelector(".registration-slip-primary-fields");
+    const supportingFields = expenseSlip.querySelector(".registration-slip-supporting-fields");
+    expect(amount.compareDocumentPosition(subcategory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(primaryFields).not.toBeNull();
+    expect(supportingFields).not.toBeNull();
+    expect(primaryFields!.compareDocumentPosition(supportingFields!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.selectOptions(subcategory, "sub-bonus");
+    await user.type(amount, "700");
+    await user.click(within(expenseSlip).getByRole("button", { name: "Registrar gasto" }));
+    expect(await within(expenseSlip).findByRole("alert")).toHaveTextContent("El monto supera el disponible.");
+
+    await user.click(screen.getByRole("button", { name: "Editar gasto Café" }));
+    expect(within(screen.getByRole("region", { name: "Editar gasto" })).getByLabelText("Monto", { selector: "input" })).toHaveFocus();
+  });
+
+  it("separates the income slip from income history and focuses its first field on edit", async () => {
+    const user = userEvent.setup();
+    render(<ActiveMonthPage />);
+
+    const incomeSlip = await screen.findByRole("region", { name: "Registrar ingreso" });
+    const history = screen.getByRole("region", { name: "Historial de ingresos" });
+    expect(incomeSlip).toHaveClass("registration-slip-secondary", "registration-slip-create");
+    expect(incomeSlip.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Editar ingreso" }));
+    expect(screen.getByRole("region", { name: "Editar ingreso" })).toHaveClass("registration-slip-edit");
+    expect(screen.getByLabelText("Fuente del ingreso")).toHaveFocus();
   });
 
   it("keeps the loading and unopened states distinct", async () => {
@@ -239,7 +278,7 @@ describe("ActiveMonthPage", () => {
     expect(financialSurface).toHaveTextContent("Efectivo disponible");
     expect(financialSurface).toHaveTextContent("Presupuesto utilizado");
     expect(within(financialSurface).getByRole("progressbar", { name: "Presupuesto utilizado" })).toHaveAttribute("aria-valuenow", "0");
-    expect(screen.getByRole("link", { name: "Registrar gasto" })).toHaveAttribute("href", "#expense-form");
+    expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
     expect(screen.getByText("Sueldo")).toBeInTheDocument();
     expect(screen.getByText(/neto/)).toBeInTheDocument();
   });
@@ -304,7 +343,7 @@ describe("ActiveMonthPage", () => {
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "35");
     fireEvent.change(within(expenseForm).getByLabelText("Fecha del gasto"), { target: { value: "2026-05-15" } });
     await user.selectOptions(within(expenseForm).getByLabelText("Tarjeta de crédito (opcional)"), "card-1");
-    await user.type(within(expenseForm).getByLabelText("Descripción"), "Groceries");
+    await user.type(within(expenseForm).getByLabelText(/Descripción/), "Groceries");
     await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
 
     await waitFor(() =>
@@ -561,7 +600,7 @@ describe("ActiveMonthPage", () => {
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
     fireEvent.change(within(expenseForm).getByLabelText("Fecha del gasto"), { target: { value: "2026-05-12" } });
     await user.selectOptions(within(expenseForm).getByLabelText("Método de pago"), "CASH");
-    await user.type(within(expenseForm).getByLabelText("Descripción"), "Café");
+    await user.type(within(expenseForm).getByLabelText(/Descripción/), "Café");
     await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
 
     await waitFor(() =>
@@ -595,6 +634,58 @@ describe("ActiveMonthPage", () => {
     expect(screen.queryByText("No se pudo consultar el historial.")).not.toBeInTheDocument();
   });
 
+  it("keeps the expense action correctly labeled while an income is saving", async () => {
+    const user = userEvent.setup();
+    let resolveIncome!: (month: Month) => void;
+    apiMock.createMonthlyIncome.mockImplementationOnce(
+      () =>
+        new Promise<Month>((resolve) => {
+          resolveIncome = resolve;
+        }),
+    );
+
+    render(<ActiveMonthPage />);
+
+    const incomeForm = (await screen.findByRole("button", { name: "Registrar ingreso" })).closest("form");
+    if (!incomeForm) throw new Error("Missing income form.");
+    await user.type(within(incomeForm).getByLabelText("Fuente del ingreso"), "Freelance");
+    await user.type(within(incomeForm).getByLabelText("Monto", { selector: "input" }), "250");
+    await user.click(within(incomeForm).getByRole("button", { name: "Registrar ingreso" }));
+
+    const expenseButton = await screen.findByRole("button", { name: "Registrar gasto" });
+    expect(expenseButton).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Guardando gasto..." })).not.toBeInTheDocument();
+
+    resolveIncome(activeMonth);
+    expect(await screen.findByText("Ingreso registrado y totales recalculados.")).toBeInTheDocument();
+  });
+
+  it("keeps the expense action correctly labeled while a pocket deposit is saving", async () => {
+    const user = userEvent.setup();
+    let resolveDeposit!: (month: Month) => void;
+    apiMock.depositToPocket.mockImplementationOnce(
+      () =>
+        new Promise<Month>((resolve) => {
+          resolveDeposit = resolve;
+        }),
+    );
+
+    render(<ActiveMonthPage />);
+
+    const depositForm = (await screen.findByRole("button", { name: "Depositar en bolsillo" })).closest("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+    await user.selectOptions(within(depositForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
+    await user.type(within(depositForm).getByLabelText("Monto", { selector: "input" }), "125");
+    await user.click(within(depositForm).getByRole("button", { name: "Depositar en bolsillo" }));
+
+    const expenseButton = await screen.findByRole("button", { name: "Registrar gasto" });
+    expect(expenseButton).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Guardando gasto..." })).not.toBeInTheDocument();
+
+    resolveDeposit(activeMonth);
+    expect(await screen.findByText("Depósito a bolsillo registrado.")).toBeInTheDocument();
+  });
+
   it("edits and deletes registered expenses from the active month only", async () => {
     const user = userEvent.setup();
     apiMock.updateExpense.mockResolvedValueOnce({ ...activeMonth, availableMoney: 390 });
@@ -608,8 +699,8 @@ describe("ActiveMonthPage", () => {
 
     await user.clear(within(expenseForm).getByLabelText("Monto", { selector: "input" }));
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "30");
-    await user.clear(within(expenseForm).getByLabelText("Descripción"));
-    await user.type(within(expenseForm).getByLabelText("Descripción"), "Café corregido");
+    await user.clear(within(expenseForm).getByLabelText(/Descripción/));
+    await user.type(within(expenseForm).getByLabelText(/Descripción/), "Café corregido");
     await user.click(within(expenseForm).getByRole("button", { name: "Actualizar gasto" }));
 
     await waitFor(() =>

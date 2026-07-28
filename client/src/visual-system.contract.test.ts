@@ -139,13 +139,27 @@ describe("visual system contracts", () => {
     expect(compactShellRules).toContain("flex-wrap: wrap;");
   });
 
-  it("makes the approved flat desktop shell declarations win the cascade", () => {
-    expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("#101813");
+  it("makes the Living Ledger shell declarations win the cascade", () => {
+    expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("var(--color-bg)");
     expect(effectiveDeclaration(styles, ".app-header", "border-radius")).toBe("0");
     expect(effectiveDeclaration(styles, ".nav a", "background")).toBe("transparent");
     expect(effectiveDeclaration(styles, ".nav a", "border")).toBe("0");
     expect(effectiveDeclaration(styles, ".card", "background")).toBe("var(--color-surface)");
     expect(effectiveDeclaration(styles, ".button.primary", "background")).toBe("var(--color-primary)");
+  });
+
+  it("keeps the Living Ledger accents restrained while preserving semantic distinction", () => {
+    const livingLedgerTokens = cssBlock(":root");
+
+    expect(livingLedgerTokens).toContain("--color-primary: #aebe72;");
+    expect(livingLedgerTokens).toContain("--color-guidance: #988eb7;");
+    expect(livingLedgerTokens).toContain("--color-success: #8fb39e;");
+    expect(livingLedgerTokens).toContain("--color-warning: #c3aa7a;");
+    expect(livingLedgerTokens).toContain("--color-danger: #bb8d8d;");
+    expect(livingLedgerTokens).toContain("--color-success-bg: #1b2720;");
+    expect(livingLedgerTokens).toContain("--color-warning-bg: #2a261d;");
+    expect(livingLedgerTokens).toContain("--color-danger-bg: #2b2020;");
+    expect(cssBlock(".registration-slip-edit")).toContain("border-color: var(--color-guidance);");
   });
 
   it("retains the flat shell while compact and 320px contracts replace the desktop rail", () => {
@@ -154,9 +168,20 @@ describe("visual system contracts", () => {
     expect(compactShellRules).toContain(".app-shell { display: block; }");
     expect(compactShellRules).toContain(".nav { flex-direction: row;");
     expect(cssBlock("body")).not.toContain("min-width: 320px;");
-    expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("#101813");
+    expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("var(--color-bg)");
     expect(effectiveDeclaration(styles, ".nav a", "background")).toBe("transparent");
     expect(effectiveDeclaration(styles, ".button.primary", "background")).toBe("var(--color-primary)");
+  });
+
+  it("keeps registration slips grid-based, container-safe, and stacked on narrow screens", () => {
+    const compactRules = mediaBlock("(max-width: 767px)");
+
+    expect(topLevelCssBlock(".registration-slip")).toContain("min-width: 0;");
+    expect(topLevelCssBlock(".registration-slip-supporting-fields")).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
+    expect(cssBlock("body")).not.toContain("overflow-x: hidden;");
+    expect(compactRules).toContain(".expense-capture-form .registration-slip-primary-fields,");
+    expect(compactRules).toContain(".registration-slip-supporting-fields { grid-template-columns: 1fr; }");
+    expect(compactRules).toContain(".registration-slip-actions .button { width: 100%; }");
   });
 
   it("keeps the active-month dashboard readable and actionable from tablet through narrow and zoomed viewports", () => {
@@ -192,7 +217,7 @@ describe("visual system contracts", () => {
 
     expect(desktopRules).not.toContain('"activity activity"');
     expect(tabletRules).not.toContain('"activity"');
-    expect(cssBlock(".active-month-dashboard .dashboard-activity")).toContain("grid-column: 1 / -1;");
+    expect(cssBlock(".active-month-dashboard .dashboard-activity")).toContain("grid-column: auto;");
   });
 
   it("keeps active-month motion compositor-safe, interruptible, and removable for reduced motion", () => {

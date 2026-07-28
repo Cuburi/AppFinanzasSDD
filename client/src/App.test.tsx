@@ -72,14 +72,14 @@ describe("App debt route", () => {
 });
 
 describe("App reports route", () => {
-  it("exposes Reports navigation and renders the reports route", () => {
+  it("exposes Reportes navigation and renders the reports route", () => {
     render(
       <MemoryRouter future={routerFutureFlags} initialEntries={["/reports"]}>
         <App />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("href", "/reports");
+    expect(screen.getByRole("link", { name: "Reportes" })).toHaveAttribute("href", "/reports");
     expect(screen.getByRole("heading", { name: "Basic reports test" })).toBeInTheDocument();
   });
 
@@ -92,22 +92,22 @@ describe("App reports route", () => {
 
     expect(screen.getByRole("banner")).toHaveTextContent("AppFinanzas");
     expect(screen.getByRole("navigation", { name: "Navegación principal" })).toContainElement(
-      screen.getByRole("link", { name: "Reports" }),
+      screen.getByRole("link", { name: "Reportes" }),
     );
-    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Reportes" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("main")).toContainElement(screen.getByRole("heading", { name: "Basic reports test" }));
   });
 });
 
 describe("App credit cards route", () => {
-  it("exposes Credit Cards navigation and renders the direct route", () => {
+  it("exposes Tarjetas de crédito navigation and renders the direct route", () => {
     render(
       <MemoryRouter future={routerFutureFlags} initialEntries={["/credit-cards"]}>
         <App />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "Credit Cards" })).toHaveAttribute("href", "/credit-cards");
+    expect(screen.getByRole("link", { name: "Tarjetas de crédito" })).toHaveAttribute("href", "/credit-cards");
     expect(screen.getByRole("heading", { name: "Credit Cards dashboard test" })).toBeInTheDocument();
   });
 });

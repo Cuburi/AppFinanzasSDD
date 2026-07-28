@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
@@ -620,4 +620,139 @@ select {
   .active-month-dashboard .button:active {
     transform: none;
   }
+}
+
+/* Living Ledger: matte treasury desk for the active month. */
+:root {
+  --color-bg: #0d100e;
+  --color-surface: #131713;
+  --color-surface-raised: #1c211d;
+  --color-surface-muted: #191e19;
+  --color-border: #333b34;
+  --color-border-strong: #5c685d;
+  --color-text: #f2f1e8;
+  --color-text-muted: #b5bcb2;
+  --color-text-subtle: #8c958b;
+  --color-primary: #aebe72;
+  --color-primary-strong: #aebe72;
+  --color-primary-contrast: #151a0e;
+  --color-success: #8fb39e;
+  --color-success-bg: #1b2720;
+  --color-success-border: #4f6f5c;
+  --color-warning: #c3aa7a;
+  --color-warning-bg: #2a261d;
+  --color-warning-border: #756448;
+  --color-danger: #bb8d8d;
+  --color-danger-bg: #2b2020;
+  --color-danger-border: #6e5050;
+  --color-neutral-bg: #1a1e1b;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --color-guidance: #988eb7;
+  --focus-ring: 0 0 0 3px var(--color-guidance), 0 0 0 5px #0d100e;
+  background: var(--color-bg);
+}
+
+body { background: var(--color-bg); }
+.app-header { background: var(--color-bg); }
+.app-brand-name { color: var(--color-text); letter-spacing: -0.03em; }
+.nav a { border-left: 2px solid transparent; border-radius: 0.375rem; }
+.nav a[aria-current="page"] { background: var(--color-surface-raised); border-left-color: var(--color-primary); color: var(--color-text); }
+.button { transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, transform 100ms cubic-bezier(0.23, 1, 0.32, 1); }
+.button.tertiary { border-style: solid; border-color: transparent; }
+.button:active { transform: scale(0.98); }
+.card { border-radius: var(--radius-md); box-shadow: none; }
+
+.active-month-dashboard.dashboard-operational { display: grid; gap: 3rem; grid-template-areas: none; grid-template-columns: minmax(0, 1fr); max-width: 90rem; }
+.active-month-dashboard > .dashboard-context { background: transparent; border: 0; border-bottom: 1px solid var(--color-border-strong); border-radius: 0; display: flex; flex-wrap: wrap; gap: 1rem 2rem; grid-area: auto; justify-content: space-between; padding: 0 0 1rem; }
+.dashboard-context h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.05; margin: 0; }
+.dashboard-context-actions { flex-wrap: wrap; justify-content: flex-end; }
+.dashboard-context-actions .button { white-space: nowrap; }
+.dashboard-runway { align-items: start; display: grid; gap: 2rem; grid-template-columns: minmax(0, 7fr) minmax(20rem, 5fr); }
+.active-month-dashboard > .dashboard-runway > section[aria-label="Resumen financiero"] { grid-area: auto; }
+.financial-summary { background: transparent; border: 0; border-left: 1px solid var(--color-border-strong); border-radius: 0; padding: 0 0 0 1.5rem; }
+.financial-primary-value { color: var(--color-text); font-family: inherit; font-size: clamp(2.75rem, 7vw, 5.75rem); letter-spacing: -0.045em; line-height: 0.96; overflow-wrap: anywhere; }
+.financial-secondary-metrics { border-top: 1px solid var(--color-border); gap: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.financial-secondary-metrics p { border-right: 1px solid var(--color-border); padding: 1rem 1rem 0 0; }
+.financial-secondary-metrics p + p { padding-left: 1rem; }
+.financial-secondary-metrics p:last-child { border-right: 0; }
+.financial-secondary-metrics strong, .financial-budget strong { font-family: inherit; font-variant-numeric: tabular-nums lining-nums; }
+.financial-budget { border-top-color: var(--color-border-strong); }
+.financial-budget progress { accent-color: var(--color-primary); }
+.dashboard-expense-slip { min-width: 0; }
+.registration-slip { background: var(--color-surface-raised); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); display: grid; gap: var(--space-4); min-width: 0; padding: var(--space-4); }
+.registration-slip-edit { border-color: var(--color-guidance); box-shadow: inset 3px 0 0 var(--color-guidance); }
+.registration-slip-header { display: grid; gap: var(--space-1); }
+.registration-slip-header h2 { letter-spacing: -0.012em; margin: 0; }
+.registration-slip form { display: grid; gap: var(--space-3); min-width: 0; }
+.registration-slip-primary-fields, .registration-slip-supporting-fields { display: grid; gap: var(--space-3); min-width: 0; }
+.registration-slip-primary-fields { border-bottom: 1px solid var(--color-border-strong); padding-bottom: var(--space-3); }
+.registration-slip-primary-fields .field { min-width: 0; }
+.registration-slip-primary-fields .field > span { color: var(--color-text); font-weight: 650; }
+.registration-slip-supporting-fields { border-bottom: 1px solid var(--color-border); grid-template-columns: repeat(2, minmax(0, 1fr)); padding-bottom: var(--space-3); }
+.registration-slip-supporting-fields .field { min-width: 0; }
+.registration-slip-actions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.registration-slip-primary .registration-slip-actions .button:first-child { flex: 1 1 13rem; }
+.registration-slip-secondary { background: var(--color-surface); }
+.registration-slip-secondary .registration-slip-actions .button:first-child { flex: 0 1 auto; }
+.registration-slip-feedback { border-top: 1px solid var(--color-border); padding-top: var(--space-2); }
+.registration-slip-feedback p { margin: 0; }
+.expense-capture-form .registration-slip-primary-fields { grid-template-columns: minmax(8rem, 0.65fr) minmax(0, 1.35fr); }
+.expense-capture-form .expense-amount-field input { font-size: 1.2rem; font-variant-numeric: tabular-nums lining-nums; font-weight: 700; }
+.expense-capture-form .expense-description-field { grid-column: 1 / -1; }
+.income-workflow { gap: var(--space-5); }
+.income-capture-form .registration-slip-primary-fields { grid-template-columns: minmax(0, 1.3fr) minmax(8rem, 0.7fr); }
+.income-capture-form .income-amount-field input { font-variant-numeric: tabular-nums lining-nums; font-weight: 650; }
+.income-capture-form .income-notes-field { grid-column: 1 / -1; }
+.income-history { background: var(--color-surface); border-color: var(--color-border); }
+.active-month-dashboard > .card { grid-column: auto; }
+.active-month-dashboard .dashboard-activity { grid-column: auto; }
+.dashboard-activity > .page { gap: 3rem; }
+.dashboard-activity .card { background: var(--color-surface); border-color: var(--color-border); }
+.budget-line { background: transparent; border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; padding: 0.75rem 0; }
+.budget-line:last-child { border-bottom: 0; }
+
+@media (hover: hover) and (pointer: fine) {
+  .button:hover { border-color: var(--color-border-strong); }
+  .nav a:hover { background: var(--color-surface-raised); }
+}
+
+@media (max-width: 1119px) {
+  .active-month-dashboard.dashboard-operational { gap: 2rem; }
+  .dashboard-runway { grid-template-columns: 1fr; }
+  .financial-summary { padding: 0; }
+}
+
+@media (max-width: 767px) {
+  .app-main { padding: 1.5rem 1rem 3rem; }
+  .active-month-dashboard > .dashboard-context { align-items: flex-start; flex-direction: column; }
+  .dashboard-context-actions { justify-content: flex-start; }
+  .financial-secondary-metrics { grid-template-columns: 1fr; }
+  .financial-secondary-metrics p, .financial-secondary-metrics p + p { border-bottom: 1px solid var(--color-border); border-right: 0; padding: 0.75rem 0; }
+  .registration-slip { padding: var(--space-3); }
+  .expense-capture-form .registration-slip-primary-fields,
+  .income-capture-form .registration-slip-primary-fields,
+  .registration-slip-supporting-fields { grid-template-columns: 1fr; }
+  .expense-capture-form .expense-description-field,
+  .income-capture-form .income-notes-field { grid-column: auto; }
+  .registration-slip-actions { display: grid; }
+  .registration-slip-actions .button { width: 100%; }
+}
+
+@media (max-width: 390px) {
+  .app-main { padding-inline: 0.75rem; }
+  .financial-primary-value { font-size: clamp(2.5rem, 17vw, 3.5rem); }
+  .dashboard-context-actions { width: 100%; }
+  .dashboard-context-actions .button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .active-month-dashboard > .dashboard-context,
+  .active-month-dashboard > section[aria-label="Resumen financiero"],
+  .button { transition-duration: 0ms; transform: none !important; }
+}
+
+@media (prefers-contrast: more) {
+  .card, .field input, .field select { border-color: var(--color-text); }
 }

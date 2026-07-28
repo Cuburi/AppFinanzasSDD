@@ -112,7 +112,7 @@ describe("ActiveMonthDashboard", () => {
     expect(retrySupport).toHaveBeenCalledWith("report");
   });
 
-  it("orders financial truth, the next action, quick actions, warnings, and activity while retrying only the failed support", async () => {
+  it("orders financial truth, the next action, warnings, and activity while keeping refresh in month context", async () => {
     const user = userEvent.setup();
     const retrySupport = vi.fn();
     const refresh = vi.fn();
@@ -138,8 +138,8 @@ describe("ActiveMonthDashboard", () => {
     const activity = screen.getByRole("region", { name: "Actividad y contexto" });
 
     expect(financial.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(nextAction.compareDocumentPosition(quickActions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(quickActions.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(quickActions.compareDocumentPosition(financial) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nextAction.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(warning.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("Disponible $375 COP")).toBeInTheDocument();
     expect(screen.getByText("Actividad reciente")).toBeInTheDocument();
@@ -211,9 +211,9 @@ describe("ActiveMonthDashboard", () => {
     );
 
     await user.tab();
-    expect(screen.getByRole("button", { name: "Registrar gasto" })).toHaveFocus();
-    await user.tab();
     expect(screen.getByRole("button", { name: "Actualizar información" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Registrar gasto" })).toHaveFocus();
     expect(screen.queryByRole("region", { name: "Actividad y contexto" })).not.toBeInTheDocument();
   });
 
