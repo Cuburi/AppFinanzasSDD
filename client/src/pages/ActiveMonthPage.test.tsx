@@ -86,6 +86,14 @@ const activeCreditCards: CreditCardView[] = [
   { id: "card-2", ownerId: "owner-1", issuer: "Mastercard", name: "Travel", limit: null, closingDay: 10, dueDay: 18, active: true },
 ];
 
+async function openMonthStructure() {
+  const disclosure = (await screen.findByRole("region", { name: "Estructura del mes" })).querySelector("details");
+  if (!disclosure) throw new Error("Missing month structure disclosure.");
+  disclosure.open = true;
+  fireEvent(disclosure, new Event("toggle", { bubbles: true }));
+  return disclosure;
+}
+
 describe("ActiveMonthPage", () => {
   afterEach(() => {
     cleanup();
@@ -153,6 +161,40 @@ describe("ActiveMonthPage", () => {
     expect(financial.compareDocumentPosition(expenseCapture) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(quickActions.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(activity).getByRole("heading", { name: "Ingresos del mes" })).toBeInTheDocument();
+  });
+
+  it("keeps Estructura del mes closed by default and exposes the month-only versus template-promotion guidance when expanded", async () => {
+    render(<ActiveMonthPage />);
+
+    await screen.findByRole("region", { name: "Resumen financiero" });
+    const disclosure = screen.getByRole("region", { name: "Estructura del mes" }).querySelector("details");
+    expect(disclosure).not.toBeNull();
+    expect(disclosure).not.toHaveAttribute("open");
+    expect(screen.getByText("Corrige categorías y subcategorías de este mes sin perder de vista la plantilla global.")).toBeInTheDocument();
+
+    await openMonthStructure();
+    expect(disclosure).toHaveAttribute("open");
+    expect(screen.getByText("Estos cambios corrigen solo la estructura de este mes; no modifican la plantilla global.")).toBeInTheDocument();
+    expect(screen.getByText(/Antes de promoverlas, marca la copia a plantilla/i)).toBeInTheDocument();
+  });
+
+  it("opens the structure disclosure when an edit is initiated or a structural mutation fails", async () => {
+    const user = userEvent.setup();
+    apiMock.deleteMonthCategory.mockRejectedValueOnce(new Error("La categoría tiene movimientos asociados."));
+    render(<ActiveMonthPage />);
+
+    await screen.findByRole("region", { name: "Resumen financiero" });
+    const disclosure = screen.getByRole("region", { name: "Estructura del mes" }).querySelector("details");
+    if (!disclosure) throw new Error("Missing month structure disclosure.");
+
+    await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos", hidden: true }));
+    expect(disclosure).toHaveAttribute("open");
+
+    disclosure.open = false;
+    fireEvent(disclosure, new Event("toggle", { bubbles: true }));
+    await user.click(screen.getByRole("button", { name: "Eliminar categoría Ingresos", hidden: true }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("La categoría tiene movimientos asociados.");
+    expect(disclosure).toHaveAttribute("open");
   });
 
   it("uses shared registration-slip anatomy with local feedback and focused edit handoff", async () => {
@@ -746,6 +788,7 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
+    await openMonthStructure();
     await user.click(await screen.findByRole("button", { name: "Editar categoría Ingresos" }));
     await user.click(screen.getByRole("button", { name: "Editar subcategoría Bonus" }));
     expect(screen.getByRole("form", { name: "Editar categoría del mes activo" })).toBeInTheDocument();
@@ -792,7 +835,8 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    expect(await screen.findByText("Estos cambios corrigen solo el snapshot del mes activo; no modifican la plantilla global.")).toBeInTheDocument();
+    await openMonthStructure();
+    expect(await screen.findByText("Estos cambios corrigen solo la estructura de este mes; no modifican la plantilla global.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
     await user.clear(screen.getByLabelText("Nombre categoría"));
@@ -842,6 +886,7 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
+    await openMonthStructure();
     expect(await screen.findByText(/Crea categorías y subcategorías solo en este mes/i)).toBeInTheDocument();
     expect(screen.getByText(/Copiar a plantilla también/i)).toBeInTheDocument();
 
@@ -856,7 +901,7 @@ describe("ActiveMonthPage", () => {
         addToTemplate: false,
       }),
     );
-    expect(await screen.findByText("Categoría creada solo en el snapshot del mes activo; la plantilla global no cambió.")).toBeInTheDocument();
+    expect(await screen.findByText("Categoría creada solo en la estructura de este mes; la plantilla global no cambió.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Editar categoría Regalos" })).toBeInTheDocument();
     expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(2);
   });
@@ -889,6 +934,7 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
+    await openMonthStructure();
     const subcategoryForm = await screen.findByRole("form", { name: "Crear subcategoría del mes activo" });
     await user.selectOptions(within(subcategoryForm).getByLabelText("Categoría padre"), "cat-income");
     await user.type(within(subcategoryForm).getByLabelText("Nueva subcategoría"), "Reintegros");
@@ -917,6 +963,7 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
+    await openMonthStructure();
     expect(await screen.findByText("El mes está cerrado: la estructura es de solo lectura y no se pueden crear categorías ni subcategorías.")).toBeInTheDocument();
     expect(screen.queryByRole("form", { name: "Crear categoría del mes activo" })).not.toBeInTheDocument();
     expect(screen.queryByRole("form", { name: "Crear subcategoría del mes activo" })).not.toBeInTheDocument();
@@ -936,6 +983,7 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
+    await openMonthStructure();
     await user.click(await screen.findByRole("button", { name: "Editar gasto Café" }));
     expect(screen.getByRole("button", { name: "Actualizar gasto" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Cancelar edición de gasto" }));
@@ -1005,6 +1053,7 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
+    await openMonthStructure();
     await user.click(await screen.findByRole("button", { name: "Eliminar subcategoría Bonus" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("No se puede eliminar la subcategoría porque tiene movimientos asociados.");
@@ -1017,6 +1066,7 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
+    await openMonthStructure();
     await user.click(await screen.findByRole("button", { name: "Eliminar categoría Ingresos" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("No se puede eliminar la categoría porque todavía tiene subcategorías o movimientos asociados.");

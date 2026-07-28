@@ -76,6 +76,7 @@ export const ActiveMonthPage = () => {
   const [newSubcategoryPlannedAmount, setNewSubcategoryPlannedAmount] = useState("");
   const [newSubcategoryDefaultPocketId, setNewSubcategoryDefaultPocketId] = useState("");
   const [newSubcategoryAddToTemplate, setNewSubcategoryAddToTemplate] = useState(false);
+  const [structureOpen, setStructureOpen] = useState(false);
 
   const refreshExpenseHistory = async (monthId: string, creditCardId = historyCreditCardId) => {
     const currentRequest = ++historyRequestId.current;
@@ -180,7 +181,7 @@ export const ActiveMonthPage = () => {
 
     const createdMonth = await dashboard.openMonth(input);
     if (createdMonth) {
-      setMessage(`Mes ${createdMonth.year}-${String(createdMonth.month).padStart(2, "0")} abierto con snapshot de la plantilla vigente.`);
+      setMessage(`Mes ${createdMonth.year}-${String(createdMonth.month).padStart(2, "0")} abierto con la estructura de la plantilla vigente.`);
     }
     setSubmitting(false);
   };
@@ -244,7 +245,7 @@ export const ActiveMonthPage = () => {
     resetCreateSubcategoryForm();
   };
 
-  const applyActiveMonthCorrection = async (mutation: () => Promise<Month>, successMessage: string, fallbackError: string, afterSuccess?: (monthData: Month) => void, setLocalFeedback?: (feedback: { kind: "error" | "success"; text: string } | null) => void) => {
+  const applyActiveMonthCorrection = async (mutation: () => Promise<Month>, successMessage: string, fallbackError: string, afterSuccess?: (monthData: Month) => void, setLocalFeedback?: (feedback: { kind: "error" | "success"; text: string } | null) => void, revealStructureOnError = false) => {
     setSubmitting(true);
     setLocalFeedback?.(null);
     if (!setLocalFeedback) {
@@ -261,6 +262,7 @@ export const ActiveMonthPage = () => {
       else setMessage(successMessage);
     } catch (submitError) {
       const text = submitError instanceof Error ? submitError.message : fallbackError;
+      if (revealStructureOnError) setStructureOpen(true);
       if (setLocalFeedback) setLocalFeedback({ kind: "error", text });
       else setError(text);
     } finally {
@@ -313,11 +315,13 @@ export const ActiveMonthPage = () => {
   };
 
   const startEditingCategory = (category: MonthCategory) => {
+    setStructureOpen(true);
     setEditingCategoryId(category.id);
     setCategoryName(category.name);
   };
 
   const startEditingSubcategory = (subcategory: MonthSubcategory) => {
+    setStructureOpen(true);
     setEditingSubcategoryId(subcategory.id);
     setSubcategoryName(subcategory.name);
     setSubcategoryPlannedAmount(String(subcategory.plannedAmount));
@@ -377,6 +381,8 @@ export const ActiveMonthPage = () => {
       "Categoría del mes activo actualizada sin modificar la plantilla global.",
       "No se pudo actualizar la categoría del mes activo.",
       () => resetCategoryForm(),
+      undefined,
+      true,
     );
   };
 
@@ -388,9 +394,11 @@ export const ActiveMonthPage = () => {
       () => api.createMonthCategory({ monthId: activeMonth.id, name: newCategoryName, addToTemplate: shouldPromote }),
       shouldPromote
         ? "Categoría creada en este mes y copiada a la plantilla global para próximos meses."
-        : "Categoría creada solo en el snapshot del mes activo; la plantilla global no cambió.",
+        : "Categoría creada solo en la estructura de este mes; la plantilla global no cambió.",
       "No se pudo crear la categoría del mes activo.",
       () => resetCreateCategoryForm(),
+      undefined,
+      true,
     );
   };
 
@@ -409,6 +417,8 @@ export const ActiveMonthPage = () => {
       "Subcategoría del mes activo actualizada sin modificar la plantilla global.",
       "No se pudo actualizar la subcategoría del mes activo.",
       () => resetSubcategoryForm(),
+      undefined,
+      true,
     );
   };
 
@@ -428,9 +438,11 @@ export const ActiveMonthPage = () => {
         }),
       shouldPromote
         ? "Subcategoría creada en este mes y copiada a la plantilla global para próximos meses."
-        : "Subcategoría creada solo en el snapshot del mes activo; la plantilla global no cambió.",
+        : "Subcategoría creada solo en la estructura de este mes; la plantilla global no cambió.",
       "No se pudo crear la subcategoría del mes activo.",
       () => resetCreateSubcategoryForm(),
+      undefined,
+      true,
     );
   };
 
@@ -443,6 +455,8 @@ export const ActiveMonthPage = () => {
       () => {
         if (editingCategoryId === category.id) resetCategoryForm();
       },
+      undefined,
+      true,
     );
   };
 
@@ -455,6 +469,8 @@ export const ActiveMonthPage = () => {
       () => {
         if (editingSubcategoryId === subcategory.id) resetSubcategoryForm();
       },
+      undefined,
+      true,
     );
   };
 
@@ -770,13 +786,21 @@ export const ActiveMonthPage = () => {
         </Card>
       ) : null}
 
-      <Card aria-label="Snapshot del mes activo" className="stack-md">
-        <div className="row between wrap">
-          <h2>Snapshot del mes activo</h2>
-          <Button variant="secondary" onClick={() => void refresh()} type="button">
-            Refrescar
-          </Button>
-        </div>
+      <Card aria-label="Estructura del mes" className="month-structure-card">
+        <details className="month-structure-disclosure" onToggle={(event) => setStructureOpen(event.currentTarget.open)} open={structureOpen}>
+          <summary>
+            <span>
+              <strong>Estructura del mes</strong>
+              <span>Corrige categorías y subcategorías de este mes sin perder de vista la plantilla global.</span>
+            </span>
+          </summary>
+          <div className="month-structure-content stack-md">
+            <div className="row between wrap">
+              <h2>Estructura del mes</h2>
+              <Button variant="secondary" onClick={() => void refresh()} type="button">
+                Refrescar
+              </Button>
+            </div>
 
         {activeMonth ? (
           <>
@@ -786,11 +810,11 @@ export const ActiveMonthPage = () => {
               </strong>{" "}
               · estado {activeMonth.status}
             </p>
-            <p>Estos cambios corrigen solo el snapshot del mes activo; no modifican la plantilla global.</p>
+            <p>Estos cambios corrigen solo la estructura de este mes; no modifican la plantilla global.</p>
 
             {canMutateActiveMonth ? (
               <div className="stack-md">
-                <p>Crea categorías y subcategorías solo en este mes. Marca la copia a plantilla únicamente si quieres que aparezcan en próximos meses.</p>
+                <p>Crea categorías y subcategorías solo en este mes. Antes de promoverlas, marca la copia a plantilla únicamente si quieres que aparezcan en próximos meses.</p>
 
                 <form aria-label="Crear categoría del mes activo" className="row gap-sm wrap" onSubmit={handleCreateCategory}>
                   <label className="field">
@@ -943,8 +967,10 @@ export const ActiveMonthPage = () => {
             </div>
           </>
         ) : (
-          <p>Todavía no hay un mes activo.</p>
-        )}
+            <p>Todavía no hay un mes activo.</p>
+          )}
+          </div>
+        </details>
       </Card>
     </section>
     </ActiveMonthDashboard>

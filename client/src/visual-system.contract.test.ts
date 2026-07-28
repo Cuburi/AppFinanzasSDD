@@ -92,7 +92,7 @@ describe("visual system contracts", () => {
   });
 
   it("keeps mobile and tablet layouts constrained against horizontal overflow", () => {
-    const tabletRules = mediaBlock("(max-width: 1100px)");
+    const tabletRules = mediaBlock("(max-width: 1119px)");
 
     expect(cssBlock("body")).not.toContain("min-width: 320px;");
     expect(firstCssBlock(".app-shell")).toContain("max-width: 1180px;");
@@ -101,42 +101,36 @@ describe("visual system contracts", () => {
     expect(cssBlockAfter(".budget-line", ".dashboard-kpi-grid")).toContain("overflow-wrap: anywhere;");
     expect(cssBlockAfter(".grid-subcategory", ".wrap")).toContain("grid-template-columns: minmax(0, 1fr) 200px auto;");
 
-    expect(tabletRules).toContain(".app-shell");
-    expect(tabletRules).toContain("display: block;");
+    expect(tabletRules).toContain(".app-shell { display: block; padding-inline: 0; }");
     expect(tabletRules).toContain(".app-header");
-    expect(tabletRules).toContain("flex-direction: row;");
-    expect(tabletRules).toContain(".dashboard-kpi-grid");
+    expect(tabletRules).toContain("height: auto;");
+    expect(tabletRules).toContain(".menu-trigger { display: inline-flex;");
     expect(tabletRules).toContain("grid-template-columns: 1fr;");
-    expect(tabletRules).toContain(".row");
-    expect(tabletRules).toContain("flex-direction: column;");
-    expect(tabletRules).toContain(".grid-subcategory");
+    expect(tabletRules).toContain(".dashboard-runway");
   });
 
   it("keeps dashboard context and controls usable at the mobile breakpoint", () => {
-    const tabletRules = mediaBlock("(max-width: 1100px)");
+    const tabletRules = mediaBlock("(max-width: 1119px)");
 
     expect(cssBlock(".field input,\n.field select")).toContain("min-height: 44px;");
     expect(topLevelCssBlock(".button")).toContain("min-height: 44px;");
     expect(topLevelCssBlock(".button")).toContain("min-inline-size: 44px;");
     expect(styles).toMatch(/\.dashboard-context\s*\{\s*align-items: center;\s*gap: var\(--space-2\);\s*grid-template-columns: minmax\(0, 1fr\) auto;/);
-    expect(tabletRules).toContain(".dashboard-context");
-    expect(tabletRules).toContain("grid-template-columns: 1fr;");
-    expect(tabletRules).toContain(".dashboard-context-actions");
-    expect(tabletRules).toContain("flex-wrap: wrap;");
+    expect(tabletRules).toContain(".navigation-drawer");
+    expect(tabletRules).toContain("min-height: 100vh;");
+    expect(tabletRules).toContain(".navigation-drawer nav");
   });
 
-  it("switches to the compact shell before the desktop rail can compress the active-month context", () => {
-    const compactShellRules = mediaBlock("(max-width: 1100px)");
+  it("switches to the labeled navigation drawer before the desktop rail can compress the active-month context", () => {
+    const compactShellRules = mediaBlock("(max-width: 1119px)");
 
-    expect(compactShellRules).toContain(".app-shell");
-    expect(compactShellRules).toContain("display: block;");
+    expect(compactShellRules).toContain(".app-shell { display: block; padding-inline: 0; }");
     expect(compactShellRules).toContain(".app-header");
     expect(compactShellRules).toContain("flex-direction: row;");
-    expect(compactShellRules).toContain(".nav a:not([aria-current=\"page\"]) { display: inline-flex; }");
-    expect(compactShellRules).toContain(".dashboard-context");
-    expect(compactShellRules).toContain("grid-template-columns: 1fr;");
-    expect(compactShellRules).toContain(".dashboard-context-actions");
-    expect(compactShellRules).toContain("flex-wrap: wrap;");
+    expect(compactShellRules).toContain(".app-header .eyebrow,");
+    expect(compactShellRules).toContain(".menu-trigger { display: inline-flex;");
+    expect(compactShellRules).toContain(".navigation-drawer[open]");
+    expect(compactShellRules).toContain(".dashboard-runway { grid-template-columns: 1fr; }");
   });
 
   it("makes the Living Ledger shell declarations win the cascade", () => {
@@ -162,15 +156,20 @@ describe("visual system contracts", () => {
     expect(cssBlock(".registration-slip-edit")).toContain("border-color: var(--color-guidance);");
   });
 
-  it("retains the flat shell while compact and 320px contracts replace the desktop rail", () => {
-    const compactShellRules = mediaBlock("(max-width: 1100px)");
+  it("retains the flat shell while a labeled drawer and 320px contracts replace the desktop rail", () => {
+    const compactShellRules = mediaBlock("(max-width: 1119px)");
 
-    expect(compactShellRules).toContain(".app-shell { display: block; }");
-    expect(compactShellRules).toContain(".nav { flex-direction: row;");
+    expect(compactShellRules).toContain(".app-shell { display: block; padding-inline: 0; }");
+    expect(compactShellRules).toContain(".app-header .nav { display: none; }");
+    expect(compactShellRules).toContain(".navigation-drawer");
     expect(cssBlock("body")).not.toContain("min-width: 320px;");
     expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("var(--color-bg)");
     expect(effectiveDeclaration(styles, ".nav a", "background")).toBe("transparent");
     expect(effectiveDeclaration(styles, ".button.primary", "background")).toBe("var(--color-primary)");
+  });
+
+  it("keeps the desktop rail top-aligned and sticky while the routes remain immediately available", () => {
+    expect(styles).toMatch(/\.app-header\s*\{\s*align-self: start;\s*height: 100vh;\s*justify-content: flex-start;\s*overflow-y: auto;\s*position: sticky;\s*top: 0;/);
   });
 
   it("keeps registration slips grid-based, container-safe, and stacked on narrow screens", () => {

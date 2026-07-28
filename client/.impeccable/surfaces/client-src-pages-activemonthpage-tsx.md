@@ -71,7 +71,7 @@ Do not wrap the context strip, treasury ledger, and action slip in three visuall
 ### Medium (`768px–1119px`)
 
 - Place the context strip first, treasury ledger second, and expense slip third.
-- Keep all routes available in the horizontal navigation.
+- Keep all routes available through the labeled `Menú` navigation drawer.
 - Let secondary metrics use two columns, then one when labels or values would compress.
 - Warnings remain before recent activity.
 
@@ -100,7 +100,7 @@ Keep every existing workflow, but place it after the primary runway:
 - `Ingresos del mes`
 - `Retirar efectivo`
 - `Depositar en bolsillo`
-- `Snapshot del mes activo`
+- `Estructura del mes`, closed by default and expanded automatically when a structural edit or structural mutation error needs attention.
 - create, edit, and delete category/subcategory operations
 - optional promotion to the global template
 
