@@ -5,6 +5,7 @@ import { DashboardActivationForm, DashboardOperationalSection } from "./Dashboar
 
 export type ActiveMonthDashboardProps = {
   children?: React.ReactNode;
+  expenseContent?: React.ReactNode;
   financialContent?: React.ReactNode;
   input?: OpenMonthInput;
   onInputChange?: (input: OpenMonthInput) => void;
@@ -18,7 +19,7 @@ export type ActiveMonthDashboardProps = {
   viewModel: DashboardViewModel;
 };
 
-export function ActiveMonthDashboard({ children, financialContent, input, onInputChange, onOpenMonth, onRefresh, onRetry, onRetryOpenMonth, onRetrySupport, pending = false, primaryAction, viewModel }: ActiveMonthDashboardProps) {
+export function ActiveMonthDashboard({ children, expenseContent, financialContent, input, onInputChange, onOpenMonth, onRefresh, onRetry, onRetryOpenMonth, onRetrySupport, pending = false, primaryAction, viewModel }: ActiveMonthDashboardProps) {
   if (viewModel.lifecycle === "loading") return <p role="status">Cargando mes activo...</p>;
 
   if (viewModel.lifecycle === "blocking") {
@@ -43,8 +44,9 @@ export function ActiveMonthDashboard({ children, financialContent, input, onInpu
   }
 
   return (
-    <DashboardOperationalSection
-      activityContent={children}
+        <DashboardOperationalSection
+          activityContent={children}
+          expenseContent={expenseContent}
       financialContent={financialContent}
       month={viewModel.month!}
       primaryAction={primaryAction}

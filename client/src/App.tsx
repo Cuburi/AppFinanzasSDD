@@ -22,9 +22,9 @@ export default function App() {
           <NavLink to="/active-month">Mes activo</NavLink>
           <NavLink to="/pockets">Bolsillos</NavLink>
           <NavLink to="/debts">Deudas</NavLink>
-          <NavLink to="/credit-cards">Credit Cards</NavLink>
+          <NavLink to="/credit-cards">Tarjetas de crédito</NavLink>
           <NavLink to="/close-month">Cierre</NavLink>
-          <NavLink to="/reports">Reports</NavLink>
+          <NavLink to="/reports">Reportes</NavLink>
         </nav>
       </header>
 

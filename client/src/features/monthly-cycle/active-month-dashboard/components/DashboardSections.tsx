@@ -30,8 +30,9 @@ export function DashboardActivationForm({ input, onChange, onSubmit, pending }: 
   );
 }
 
-export function DashboardOperationalSection({ activityContent, financialContent, month, primaryAction, quickActions, warnings }: {
+export function DashboardOperationalSection({ activityContent, expenseContent, financialContent, month, primaryAction, quickActions, warnings }: {
   activityContent?: React.ReactNode;
+  expenseContent?: React.ReactNode;
   financialContent?: React.ReactNode;
   month: Month;
   primaryAction?: React.ReactNode;
@@ -52,11 +53,14 @@ export function DashboardOperationalSection({ activityContent, financialContent,
         <div className="dashboard-context-actions">
           <StatusPill aria-label={isClosed ? "Mes cerrado" : "Mes abierto"} tone={isClosed ? "neutral" : "success"}>{isClosed ? "Mes cerrado" : "Mes abierto"}</StatusPill>
           <p className="dashboard-context-meta">Información actual del mes</p>
+          {quickActions ? <section aria-label="Acciones rápidas" className="dashboard-quick-actions">{quickActions}</section> : null}
         </div>
       </section>
-      {financialContent ? <section aria-label="Resumen financiero">{financialContent}</section> : null}
-      {primaryAction ? <section aria-label="Próxima acción" className="dashboard-actions dashboard-primary-action"><p className="eyebrow">Próxima acción</p>{primaryAction}</section> : null}
-      {quickActions ? <section aria-label="Acciones rápidas" className="dashboard-actions dashboard-quick-actions"><p className="eyebrow">Acciones rápidas</p>{quickActions}</section> : null}
+      <section aria-label="Tesorería del mes" className="dashboard-runway">
+        {financialContent ? <section aria-label="Resumen financiero">{financialContent}</section> : null}
+        {expenseContent ? <div className="dashboard-expense-slip">{expenseContent}</div> : null}
+        {primaryAction ? <section aria-label="Próxima acción" className="dashboard-actions dashboard-primary-action"><p className="eyebrow">Próxima acción</p>{primaryAction}</section> : null}
+      </section>
       {warnings}
       {activityContent ? <section aria-label="Actividad y contexto" className="dashboard-activity">{activityContent}</section> : null}
     </section>

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { Button, Card, StatusPill } from "../components/ui";
 import { ActiveMonthDashboard } from "../features/monthly-cycle/active-month-dashboard/components/ActiveMonthDashboard";
+import { RegistrationSlip } from "../features/monthly-cycle/active-month-dashboard/components/RegistrationSlip";
 import { useActiveMonthDashboard } from "../features/monthly-cycle/active-month-dashboard/controllers/useActiveMonthDashboard";
 import type { CreditCardView, ExpenseHistoryItem, Month, MonthCategory, MonthlyIncome, MonthSubcategory, PaymentMethod, SavingsPocket } from "../types";
 
@@ -23,13 +24,21 @@ export const ActiveMonthPage = () => {
   const historyMonthId = useRef<string | null>(null);
   const historyRequestId = useRef(0);
   const monthlyHistoryRequestId = useRef(0);
+  const expenseAmountInputRef = useRef<HTMLInputElement>(null);
+  const expenseSlipRef = useRef<HTMLElement>(null);
+  const incomeSourceInputRef = useRef<HTMLInputElement>(null);
+  const incomeSlipRef = useRef<HTMLElement>(null);
   const [openMonthInput, setOpenMonthInput] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
   const [submitting, setSubmitting] = useState(false);
+  const [expenseSubmitting, setExpenseSubmitting] = useState(false);
+  const [incomeSubmitting, setIncomeSubmitting] = useState(false);
   const [activePockets, setActivePockets] = useState<SavingsPocket[]>([]);
   const [activeCreditCards, setActiveCreditCards] = useState<CreditCardView[]>([]);
   const [creditCardLoadError, setCreditCardLoadError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expenseFeedback, setExpenseFeedback] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const [incomeFeedback, setIncomeFeedback] = useState<{ kind: "error" | "success"; text: string } | null>(null);
   const [expenseSubcategoryId, setExpenseSubcategoryId] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseDescription, setExpenseDescription] = useState("");
@@ -152,6 +161,18 @@ export const ActiveMonthPage = () => {
     void refreshExpenseHistoryBestEffort(activeMonth.id);
   }, [activeMonth?.id, dashboard.viewModel.lifecycle]);
 
+  useEffect(() => {
+    if (!editingExpenseId) return;
+    if (typeof expenseSlipRef.current?.scrollIntoView === "function") expenseSlipRef.current.scrollIntoView({ behavior: "auto", block: "nearest" });
+    expenseAmountInputRef.current?.focus();
+  }, [editingExpenseId]);
+
+  useEffect(() => {
+    if (!editingIncomeId) return;
+    if (typeof incomeSlipRef.current?.scrollIntoView === "function") incomeSlipRef.current.scrollIntoView({ behavior: "auto", block: "nearest" });
+    incomeSourceInputRef.current?.focus();
+  }, [editingIncomeId]);
+
   const handleOpenMonth = async (input: { year: number; month: number }) => {
     setSubmitting(true);
     setError(null);
@@ -223,25 +244,32 @@ export const ActiveMonthPage = () => {
     resetCreateSubcategoryForm();
   };
 
-  const applyActiveMonthCorrection = async (mutation: () => Promise<Month>, successMessage: string, fallbackError: string, afterSuccess?: (monthData: Month) => void) => {
+  const applyActiveMonthCorrection = async (mutation: () => Promise<Month>, successMessage: string, fallbackError: string, afterSuccess?: (monthData: Month) => void, setLocalFeedback?: (feedback: { kind: "error" | "success"; text: string } | null) => void) => {
     setSubmitting(true);
-    setError(null);
-    setMessage(null);
+    setLocalFeedback?.(null);
+    if (!setLocalFeedback) {
+      setError(null);
+      setMessage(null);
+    }
 
     try {
       const updatedMonth = await mutation();
       dashboard.replaceMonth(updatedMonth);
       await refreshExpenseHistoryBestEffort(updatedMonth.id);
       afterSuccess?.(updatedMonth);
-      setMessage(successMessage);
+      if (setLocalFeedback) setLocalFeedback({ kind: "success", text: successMessage });
+      else setMessage(successMessage);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : fallbackError);
+      const text = submitError instanceof Error ? submitError.message : fallbackError;
+      if (setLocalFeedback) setLocalFeedback({ kind: "error", text });
+      else setError(text);
     } finally {
       setSubmitting(false);
     }
   };
 
   const startEditingIncome = (income: MonthlyIncome) => {
+    setIncomeFeedback(null);
     setIncomeSourceName(income.sourceName);
     setIncomeAmount(String(income.amount));
     setIncomeReceivedAt(income.receivedAt.slice(0, 10));
@@ -250,6 +278,7 @@ export const ActiveMonthPage = () => {
   };
 
   const startEditingExpense = (expense: ExpenseHistoryItem) => {
+    setExpenseFeedback(null);
     setExpenseSubcategoryId(expense.subcategory.id);
     setExpenseAmount(String(expense.amount));
     setExpenseDescription(expense.description ?? "");
@@ -308,24 +337,36 @@ export const ActiveMonthPage = () => {
       creditCardId: expensePaymentMethod === "CASH" ? null : expenseCreditCardId || null,
     };
 
-    await applyActiveMonthCorrection(
-      () => (editingExpenseId ? api.updateExpense({ ...input, expenseId: editingExpenseId }) : api.recordExpense(input)),
-      editingExpenseId ? "Gasto actualizado en el mes activo y saldos recalculados." : "Gasto registrado y saldos recalculados.",
-      editingExpenseId ? "No se pudo actualizar el gasto." : "No se pudo registrar el gasto.",
-      resetExpenseForm,
-    );
+    setExpenseSubmitting(true);
+    try {
+      await applyActiveMonthCorrection(
+        () => (editingExpenseId ? api.updateExpense({ ...input, expenseId: editingExpenseId }) : api.recordExpense(input)),
+        editingExpenseId ? "Gasto actualizado en el mes activo y saldos recalculados." : "Gasto registrado y saldos recalculados.",
+        editingExpenseId ? "No se pudo actualizar el gasto." : "No se pudo registrar el gasto.",
+        resetExpenseForm,
+        setExpenseFeedback,
+      );
+    } finally {
+      setExpenseSubmitting(false);
+    }
   };
 
   const handleDeleteExpense = async (expense: ExpenseHistoryItem) => {
     if (!activeMonth || !canMutateActiveMonth) return;
-    await applyActiveMonthCorrection(
-      () => api.deleteExpense(activeMonth.id, expense.id),
-      "Gasto eliminado del mes activo y saldos recalculados.",
-      "No se pudo eliminar el gasto.",
-      (updatedMonth) => {
-        if (editingExpenseId === expense.id) resetExpenseForm(updatedMonth);
-      },
-    );
+    setExpenseSubmitting(true);
+    try {
+      await applyActiveMonthCorrection(
+        () => api.deleteExpense(activeMonth.id, expense.id),
+        "Gasto eliminado del mes activo y saldos recalculados.",
+        "No se pudo eliminar el gasto.",
+        (updatedMonth) => {
+          if (editingExpenseId === expense.id) resetExpenseForm(updatedMonth);
+        },
+        setExpenseFeedback,
+      );
+    } finally {
+      setExpenseSubmitting(false);
+    }
   };
 
   const handleCategory = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -446,8 +487,8 @@ export const ActiveMonthPage = () => {
     event.preventDefault();
     if (!activeMonth || !canMutateActiveMonth) return;
     setSubmitting(true);
-    setError(null);
-    setMessage(null);
+    setIncomeSubmitting(true);
+    setIncomeFeedback(null);
 
     try {
       const input = {
@@ -463,19 +504,20 @@ export const ActiveMonthPage = () => {
 
       dashboard.replaceMonth(updatedMonth);
       resetIncomeForm(updatedMonth);
-      setMessage(editingIncomeId ? "Ingreso actualizado y totales recalculados." : "Ingreso registrado y totales recalculados.");
+      setIncomeFeedback({ kind: "success", text: editingIncomeId ? "Ingreso actualizado y totales recalculados." : "Ingreso registrado y totales recalculados." });
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "No se pudo guardar el ingreso.");
+      setIncomeFeedback({ kind: "error", text: submitError instanceof Error ? submitError.message : "No se pudo guardar el ingreso." });
     } finally {
       setSubmitting(false);
+      setIncomeSubmitting(false);
     }
   };
 
   const handleDeleteIncome = async (income: MonthlyIncome) => {
     if (!activeMonth || !canMutateActiveMonth) return;
     setSubmitting(true);
-    setError(null);
-    setMessage(null);
+    setIncomeSubmitting(true);
+    setIncomeFeedback(null);
 
     try {
       const updatedMonth = await api.deleteMonthlyIncome(activeMonth.id, income.id);
@@ -483,11 +525,12 @@ export const ActiveMonthPage = () => {
       if (editingIncomeId === income.id) {
         resetIncomeForm(updatedMonth);
       }
-      setMessage(`Ingreso de ${income.sourceName} eliminado y totales recalculados.`);
+      setIncomeFeedback({ kind: "success", text: `Ingreso de ${income.sourceName} eliminado y totales recalculados.` });
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "No se pudo eliminar el ingreso.");
+      setIncomeFeedback({ kind: "error", text: submitError instanceof Error ? submitError.message : "No se pudo eliminar el ingreso." });
     } finally {
       setSubmitting(false);
+      setIncomeSubmitting(false);
     }
   };
 
@@ -548,48 +591,48 @@ export const ActiveMonthPage = () => {
     </Card>
   ) : null;
 
+  const expenseCapture = activeMonth ? (
+    <RegistrationSlip
+      actions={<><Button disabled={submitting || !canMutateActiveMonth} type="submit">{expenseSubmitting ? editingExpenseId ? "Actualizando gasto..." : "Guardando gasto..." : editingExpenseId ? "Actualizar gasto" : "Registrar gasto"}</Button>{editingExpenseId ? <Button variant="secondary" disabled={submitting} onClick={() => resetExpenseForm()} type="button">Cancelar edición de gasto</Button> : null}</>}
+      feedback={<>{expenseFeedback ? <p className={expenseFeedback.kind} role={expenseFeedback.kind === "error" ? "alert" : "status"}>{expenseFeedback.text}</p> : null}{!canMutateActiveMonth ? <p className="error">El mes está cerrado: los gastos son de solo lectura.</p> : null}</>}
+      formClassName="expense-capture-form"
+      formId="expense-form"
+      mode={editingExpenseId ? "edit" : "create"}
+      onSubmit={handleExpense}
+      primaryFields={<><label className="field expense-amount-field"><span>Monto</span><input min="0.01" ref={expenseAmountInputRef} step="0.01" type="number" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} required /></label><label className="field expense-subcategory-field"><span>Subcategoría del gasto</span><select value={expenseSubcategoryId} onChange={(event) => setExpenseSubcategoryId(event.target.value)} required><option value="">Selecciona una subcategoría</option>{subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label></>}
+      purpose="Movimiento del mes"
+      slipRef={expenseSlipRef}
+      supportingFields={<><label className="field"><span>Fecha del gasto</span><input type="date" value={expenseOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setExpenseOccurredAt(event.target.value)} required /></label><label className="field"><span>Método de pago</span><select value={expensePaymentMethod} onChange={handleExpensePaymentMethodChange} required><option value="NON_CASH">No efectivo</option><option value="CASH">Efectivo</option></select></label><label className="field"><span>Tarjeta de crédito (opcional)</span><select value={expenseCreditCardId} onChange={handleExpenseCreditCardChange}><option value="">Sin tarjeta / efectivo</option>{activeCreditCards.map((card) => <option key={card.id} value={card.id}>{formatCreditCardLabel(card)}</option>)}</select></label><label className="field expense-description-field"><span>Descripción (opcional)</span><input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} /></label></>}
+      title={editingExpenseId ? "Editar gasto" : "Registrar gasto"}
+      variant="primary"
+    />
+  ) : null;
+
   return (
-    <ActiveMonthDashboard financialContent={financialSummary} input={openMonthInput} onInputChange={setOpenMonthInput} onOpenMonth={(input) => void handleOpenMonth(input)} onRefresh={() => void refresh()} onRetry={() => void dashboard.refresh()} onRetryOpenMonth={(input) => void handleOpenMonth(input)} onRetrySupport={(source) => void dashboard.retrySupport(source)} pending={submitting} primaryAction={activeMonth && canMutateActiveMonth ? <a className="button primary" href="#expense-form">Registrar gasto</a> : undefined} viewModel={dashboard.viewModel}>
+    <ActiveMonthDashboard expenseContent={expenseCapture} financialContent={financialSummary} input={openMonthInput} onInputChange={setOpenMonthInput} onOpenMonth={(input) => void handleOpenMonth(input)} onRefresh={() => void refresh()} onRetry={() => void dashboard.refresh()} onRetryOpenMonth={(input) => void handleOpenMonth(input)} onRetrySupport={(source) => void dashboard.retrySupport(source)} pending={submitting} viewModel={dashboard.viewModel}>
     <section className="page stack-lg">
       {message ? <p className="success">{message}</p> : null}
       {error ? <p className="error" role="alert">{error}</p> : null}
 
       {activeMonth ? (
-        <Card aria-label="Ingresos del mes" className="stack-md">
-          <h2>Ingresos del mes</h2>
+        <section aria-label="Ingresos del mes" className="income-workflow stack-lg">
+          <h2 className="sr-only">Ingresos del mes</h2>
+          {canMutateActiveMonth ? <RegistrationSlip
+            actions={<><Button disabled={submitting} type="submit">{incomeSubmitting ? editingIncomeId ? "Actualizando ingreso..." : "Guardando ingreso..." : editingIncomeId ? "Actualizar ingreso" : "Registrar ingreso"}</Button>{editingIncomeId ? <Button variant="secondary" disabled={submitting} onClick={() => resetIncomeForm()} type="button">Cancelar edición de ingreso</Button> : null}</>}
+            feedback={incomeFeedback ? <p className={incomeFeedback.kind} role={incomeFeedback.kind === "error" ? "alert" : "status"}>{incomeFeedback.text}</p> : null}
+            formClassName="income-capture-form"
+            mode={editingIncomeId ? "edit" : "create"}
+            onSubmit={handleIncome}
+            primaryFields={<><label className="field income-source-field"><span>Fuente del ingreso</span><input ref={incomeSourceInputRef} value={incomeSourceName} onChange={(event) => setIncomeSourceName(event.target.value)} required /></label><label className="field income-amount-field"><span>Monto</span><input min="0.01" step="0.01" type="number" value={incomeAmount} onChange={(event) => setIncomeAmount(event.target.value)} required /></label></>}
+            purpose="Entrada del mes"
+            slipRef={incomeSlipRef}
+            supportingFields={<><label className="field"><span>Fecha</span><input type="date" value={incomeReceivedAt || formatMonthDate(activeMonth)} onChange={(event) => setIncomeReceivedAt(event.target.value)} required /></label><label className="field income-notes-field"><span>Notas</span><input value={incomeNotes} onChange={(event) => setIncomeNotes(event.target.value)} /></label></>}
+            title={editingIncomeId ? "Editar ingreso" : "Registrar ingreso"}
+            variant="secondary"
+          /> : <p className="error">El mes está cerrado: los ingresos son de solo lectura.</p>}
 
-          {canMutateActiveMonth ? (
-            <form className="row gap-sm wrap" onSubmit={handleIncome}>
-              <label className="field">
-                <span>Fuente del ingreso</span>
-                <input value={incomeSourceName} onChange={(event) => setIncomeSourceName(event.target.value)} required />
-              </label>
-              <label className="field small-field">
-                <span>Monto</span>
-                <input min="0.01" step="0.01" type="number" value={incomeAmount} onChange={(event) => setIncomeAmount(event.target.value)} required />
-              </label>
-              <label className="field small-field">
-                <span>Fecha</span>
-                <input type="date" value={incomeReceivedAt || formatMonthDate(activeMonth)} onChange={(event) => setIncomeReceivedAt(event.target.value)} required />
-              </label>
-              <label className="field">
-                <span>Notas</span>
-                <input value={incomeNotes} onChange={(event) => setIncomeNotes(event.target.value)} />
-              </label>
-              <Button disabled={submitting} type="submit">
-                {editingIncomeId ? "Actualizar ingreso" : "Registrar ingreso"}
-              </Button>
-              {editingIncomeId ? (
-                <Button variant="secondary" disabled={submitting} onClick={() => resetIncomeForm()} type="button">
-                  Cancelar edición
-                </Button>
-              ) : null}
-            </form>
-          ) : (
-            <p className="error">El mes está cerrado: los ingresos son de solo lectura.</p>
-          )}
-
-          <div className="stack-sm">
+          <Card aria-label="Historial de ingresos" className="income-history stack-sm">
+            <h2>Historial de ingresos</h2>
             {activeMonth.incomes.length === 0 ? <p>No hay ingresos cargados para este mes.</p> : null}
             {activeMonth.incomes.map((income) => (
               <div className="budget-line align-start" key={income.id}>
@@ -614,65 +657,13 @@ export const ActiveMonthPage = () => {
                 </div>
               </div>
             ))}
-          </div>
-        </Card>
+          </Card>
+        </section>
       ) : null}
 
       {activeMonth ? (
-        <Card aria-label="Operación diaria" className="stack-md">
-          <h2>Operación diaria</h2>
-
-          <form className="row gap-sm wrap" id="expense-form" onSubmit={handleExpense}>
-            <label className="field">
-              <span>Subcategoría del gasto</span>
-              <select value={expenseSubcategoryId} onChange={(event) => setExpenseSubcategoryId(event.target.value)} required>
-                <option value="">Selecciona una subcategoría</option>
-                {subcategories.map((subcategory) => (
-                  <option key={subcategory.id} value={subcategory.id}>
-                    {subcategory.name} ({formatCop(subcategory.available)})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field small-field">
-              <span>Monto</span>
-              <input min="0.01" step="0.01" type="number" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} required />
-            </label>
-            <label className="field small-field">
-              <span>Fecha del gasto</span>
-              <input type="date" value={expenseOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setExpenseOccurredAt(event.target.value)} required />
-            </label>
-            <label className="field small-field">
-              <span>Método de pago</span>
-              <select value={expensePaymentMethod} onChange={handleExpensePaymentMethodChange} required>
-                <option value="NON_CASH">No efectivo</option>
-                <option value="CASH">Efectivo</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>Tarjeta de crédito (opcional)</span>
-              <select value={expenseCreditCardId} onChange={handleExpenseCreditCardChange}>
-                <option value="">Sin tarjeta / efectivo</option>
-                {activeCreditCards.map((card) => (
-                  <option key={card.id} value={card.id}>
-                    {formatCreditCardLabel(card)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Descripción</span>
-              <input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} />
-            </label>
-            <Button disabled={submitting || !canMutateActiveMonth} type="submit">
-              {editingExpenseId ? "Actualizar gasto" : "Registrar gasto"}
-            </Button>
-            {editingExpenseId ? (
-              <Button variant="secondary" disabled={submitting} onClick={() => resetExpenseForm()} type="button">
-                Cancelar edición de gasto
-              </Button>
-            ) : null}
-          </form>
+        <Card aria-label="Movimientos y revisión" className="stack-md">
+          <h2>Movimientos y revisión</h2>
 
           <form className="row gap-sm wrap" onSubmit={handleCashWithdrawal}>
             <label className="field small-field">
