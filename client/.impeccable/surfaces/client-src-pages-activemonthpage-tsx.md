@@ -89,17 +89,19 @@ Do not wrap the context strip, treasury ledger, and action slip in three visuall
 1. Treasury ledger.
 2. Expense capture.
 3. Degraded-state warnings and retry actions.
-4. `Historial de gastos del mes`, with card filter and edit/delete actions.
+4. `Gastos e ingresos`, an explicitly limited activity section that combines only available expense history and active-month incomes. It is not a complete monthly ledger and must state that withdrawals and pocket deposits are excluded. The card filter applies only to the supported expense-history rows; unfiltered `Gastado` remains independent.
 
-Recent expenses should read as ledger rows: description and context left, amount aligned right, actions available on focus/hover and still reachable on touch. Do not hide destructive actions behind hover-only UI.
+Activity should read as ledger rows: date, type, concept/context left, amount aligned right, and labelled edit/delete actions where the underlying record supports them. Do not hide destructive actions behind hover-only UI.
 
 ### Maintenance deck
 
-Keep every existing workflow, but place it after the primary runway:
+Keep every existing workflow, but place it after activity in one compact secondary-action strip:
 
-- `Ingresos del mes`
+- `Registrar ingreso`
 - `Retirar efectivo`
 - `Depositar en bolsillo`
+
+Only one secondary form may be open at a time. Income is disclosed inline and automatically opens for editing; cancellation resets and closes its slip.
 - `Estructura del mes`, closed by default and expanded automatically when a structural edit or structural mutation error needs attention.
 - create, edit, and delete category/subcategory operations
 - optional promotion to the global template

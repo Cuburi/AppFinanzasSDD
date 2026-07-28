@@ -160,7 +160,7 @@ describe("ActiveMonthPage", () => {
     expect(within(financial).getByText("$375 COP")).toBeInTheDocument();
     expect(financial.compareDocumentPosition(expenseCapture) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(quickActions.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(activity).getByRole("heading", { name: "Ingresos del mes" })).toBeInTheDocument();
+    expect(within(activity).getByRole("heading", { name: "Gastos e ingresos" })).toBeInTheDocument();
   });
 
   it("keeps Estructura del mes closed by default and exposes the month-only versus template-promotion guidance when expanded", async () => {
@@ -223,18 +223,74 @@ describe("ActiveMonthPage", () => {
     expect(within(screen.getByRole("region", { name: "Editar gasto" })).getByLabelText("Monto", { selector: "input" })).toHaveFocus();
   });
 
-  it("separates the income slip from income history and focuses its first field on edit", async () => {
+  it("opens the income slip from its secondary action and focuses its first field on edit", async () => {
     const user = userEvent.setup();
     render(<ActiveMonthPage />);
 
-    const incomeSlip = await screen.findByRole("region", { name: "Registrar ingreso" });
-    const history = screen.getByRole("region", { name: "Historial de ingresos" });
-    expect(incomeSlip).toHaveClass("registration-slip-secondary", "registration-slip-create");
-    expect(incomeSlip.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    await user.click(screen.getByRole("button", { name: "Editar ingreso" }));
+    const activity = await screen.findByRole("region", { name: "Gastos e ingresos" });
+    await within(activity).findByText("Café");
+    await user.click(within(activity).getByRole("button", { name: "Editar ingreso Sueldo" }));
     expect(screen.getByRole("region", { name: "Editar ingreso" })).toHaveClass("registration-slip-edit");
     expect(screen.getByLabelText("Fuente del ingreso")).toHaveFocus();
+  });
+
+  it("keeps income capture disclosed on demand and closes and resets it on cancellation", async () => {
+    const user = userEvent.setup();
+    render(<ActiveMonthPage />);
+
+    expect(await screen.findByRole("button", { name: "Registrar ingreso" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Registrar ingreso" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Registrar ingreso" }));
+    const incomeSlip = screen.getByRole("region", { name: "Registrar ingreso" });
+    await user.type(within(incomeSlip).getByLabelText("Fuente del ingreso"), "Freelance");
+    await user.click(within(incomeSlip).getByRole("button", { name: "Cancelar ingreso" }));
+
+    expect(screen.queryByRole("region", { name: "Registrar ingreso" })).not.toBeInTheDocument();
+  });
+
+  it("resets an income edit when another secondary panel is opened, so Registrar ingreso creates a new record", async () => {
+    const user = userEvent.setup();
+    render(<ActiveMonthPage />);
+
+    const activity = await screen.findByRole("region", { name: "Gastos e ingresos" });
+    await user.click(within(activity).getByRole("button", { name: "Editar ingreso Sueldo" }));
+    expect(screen.getByRole("region", { name: "Editar ingreso" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Retirar efectivo" }));
+    expect(screen.queryByRole("region", { name: "Editar ingreso" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Registrar ingreso" }));
+    const incomeForm = screen.getByRole("region", { name: "Registrar ingreso" }).querySelector("form");
+    if (!incomeForm) throw new Error("Missing income form.");
+    await user.type(within(incomeForm).getByLabelText("Fuente del ingreso"), "Freelance");
+    await user.type(within(incomeForm).getByLabelText("Monto", { selector: "input" }), "250");
+    await user.click(within(incomeForm).getByRole("button", { name: "Registrar ingreso" }));
+
+    await waitFor(() => expect(apiMock.createMonthlyIncome).toHaveBeenCalledWith(expect.objectContaining({ monthId: "month-1", sourceName: "Freelance", amount: 250 })));
+    expect(apiMock.updateMonthlyIncome).not.toHaveBeenCalled();
+  });
+
+  it("combines only existing expense and income data in chronological activity and opens income editing inline", async () => {
+    const user = userEvent.setup();
+    render(<ActiveMonthPage />);
+
+    const activity = await screen.findByRole("region", { name: "Gastos e ingresos" });
+    expect(within(activity).getByText("Incluye gastos e ingresos registrados; no incluye retiros ni depósitos a bolsillos.")).toBeInTheDocument();
+    await within(activity).findByText("Café");
+    expect(within(activity).getByText("Café").compareDocumentPosition(within(activity).getByText("Sueldo")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(within(activity).getByRole("button", { name: "Editar ingreso Sueldo" }));
+    expect(screen.getByRole("region", { name: "Editar ingreso" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Fuente del ingreso")).toHaveFocus();
+  });
+
+  it("does not leave pocket deposit mutations enabled for a closed month", async () => {
+    apiMock.getActiveMonth.mockResolvedValue({ ...activeMonth, status: "CLOSED", closedAt: "2026-05-31T00:00:00.000Z" });
+    render(<ActiveMonthPage />);
+
+    const depositAction = await screen.findByRole("button", { name: "Depositar en bolsillo" });
+    expect(depositAction).toBeDisabled();
   });
 
   it("keeps the loading and unopened states distinct", async () => {
@@ -275,11 +331,12 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    expect(await screen.findAllByRole("option", { name: "Bonus ($500 COP)" })).toHaveLength(2);
+    expect(await screen.findAllByRole("option", { name: "Bonus ($500 COP)" })).toHaveLength(1);
     expect(screen.queryByLabelText("ID bolsillo destino")).not.toBeInTheDocument();
     expect(apiMock.getPockets).toHaveBeenCalledWith("active");
 
-    const depositForm = screen.getByRole("button", { name: "Depositar en bolsillo" }).closest("form");
+    await user.click(screen.getByRole("button", { name: "Depositar en bolsillo" }));
+    const depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
     if (!depositForm) throw new Error("Missing deposit form.");
 
     await user.selectOptions(within(depositForm).getByLabelText("Origen subcategoría (opcional)"), "sub-bonus");
@@ -299,8 +356,10 @@ describe("ActiveMonthPage", () => {
   });
 
   it("offers only the loaded active pockets as deposit destinations", async () => {
+    const user = userEvent.setup();
     render(<ActiveMonthPage />);
 
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
     const pocketSelect = await screen.findByLabelText("Bolsillo destino");
     expect(pocketSelect).toHaveValue("");
     expect(screen.getByRole("option", { name: "Selecciona un bolsillo activo" })).toBeInTheDocument();
@@ -357,8 +416,8 @@ describe("ActiveMonthPage", () => {
     expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1");
     expect(await screen.findByText("Café")).toBeInTheDocument();
     expect(screen.getByText("Tarjeta: Visa Daily")).toBeInTheDocument();
-    expect(screen.getByText("12/5/2026 · Bonus · Ingresos · Efectivo")).toBeInTheDocument();
-    expect(screen.getByText("15/5/2026 · Bonus · Ingresos · No efectivo")).toBeInTheDocument();
+    expect(screen.getByText("Bonus · Ingresos · Efectivo")).toBeInTheDocument();
+    expect(screen.getByText("Bonus · Ingresos · No efectivo")).toBeInTheDocument();
   });
 
   it("offers active credit cards while keeping the default cash/no-card expense path", async () => {
@@ -601,6 +660,49 @@ describe("ActiveMonthPage", () => {
     resolveNextHistory([]);
   });
 
+  it("never renders prior-month expenses with the next month income while replacement history is pending or fails", async () => {
+    const user = userEvent.setup();
+    const nextMonth: Month = {
+      ...activeMonth,
+      id: "month-2",
+      month: 6,
+      incomes: [{ ...activeMonth.incomes[0], id: "income-2", monthId: "month-2", sourceName: "Sueldo de B" }],
+    };
+    const previousExpense: ExpenseHistoryItem = {
+      id: "expense-a",
+      occurredAt: "2026-05-12T00:00:00.000Z",
+      paymentMethod: "CASH",
+      amount: 55,
+      description: "Gasto de A",
+      creditCardId: null,
+      category: { id: "cat-income", name: "Ingresos" },
+      subcategory: { id: "sub-bonus", name: "Bonus" },
+    };
+    let rejectNextHistory!: (error: Error) => void;
+    apiMock.getActiveMonth.mockResolvedValueOnce(activeMonth).mockResolvedValueOnce(nextMonth);
+    apiMock.getExpenseHistory.mockImplementation((monthId: string) =>
+      monthId === "month-1"
+        ? Promise.resolve([previousExpense])
+        : new Promise<ExpenseHistoryItem[]>((_, reject) => {
+            rejectNextHistory = reject;
+          }),
+    );
+
+    render(<ActiveMonthPage />);
+
+    expect(await screen.findByText("Gasto de A")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refrescar" }));
+    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-2"));
+
+    expect(screen.getByText("Sueldo de B")).toBeInTheDocument();
+    expect(screen.queryByText("Gasto de A")).not.toBeInTheDocument();
+
+    rejectNextHistory(new Error("No se pudo consultar el historial."));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Reintentar Gastado" })).toBeInTheDocument());
+    expect(screen.queryByText("Gasto de A")).not.toBeInTheDocument();
+    expect(screen.getByText("Sueldo de B")).toBeInTheDocument();
+  });
+
   it("keeps the active month usable when credit cards cannot be loaded", async () => {
     apiMock.getCreditCards.mockRejectedValueOnce(new Error("Credit cards unavailable."));
 
@@ -688,7 +790,8 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    const incomeForm = (await screen.findByRole("button", { name: "Registrar ingreso" })).closest("form");
+    await user.click(await screen.findByRole("button", { name: "Registrar ingreso" }));
+    const incomeForm = screen.getByRole("region", { name: "Registrar ingreso" }).querySelector("form");
     if (!incomeForm) throw new Error("Missing income form.");
     await user.type(within(incomeForm).getByLabelText("Fuente del ingreso"), "Freelance");
     await user.type(within(incomeForm).getByLabelText("Monto", { selector: "input" }), "250");
@@ -714,7 +817,8 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    const depositForm = (await screen.findByRole("button", { name: "Depositar en bolsillo" })).closest("form");
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    const depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
     if (!depositForm) throw new Error("Missing deposit form.");
     await user.selectOptions(within(depositForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
     await user.type(within(depositForm).getByLabelText("Monto", { selector: "input" }), "125");
@@ -794,11 +898,12 @@ describe("ActiveMonthPage", () => {
     expect(screen.getByRole("form", { name: "Editar categoría del mes activo" })).toBeInTheDocument();
     expect(screen.getByRole("form", { name: "Editar subcategoría del mes activo" })).toBeInTheDocument();
 
-    const incomeForm = screen.getByRole("button", { name: "Registrar ingreso" }).closest("form");
+    await user.click(screen.getByRole("button", { name: "Registrar ingreso" }));
+    const incomeForm = screen.getByRole("region", { name: "Registrar ingreso" }).querySelector("form");
     if (!incomeForm) throw new Error("Missing income form.");
     fireEvent.submit(incomeForm);
 
-    expect(await screen.findByText("El mes está cerrado: los ingresos son de solo lectura.")).toBeInTheDocument();
+    expect(await screen.findByText("El mes está cerrado: los movimientos son de solo lectura.")).toBeInTheDocument();
 
     fireEvent.submit(screen.getByRole("form", { name: "Editar categoría del mes activo" }));
     fireEvent.submit(screen.getByRole("form", { name: "Editar subcategoría del mes activo" }));
@@ -1078,12 +1183,13 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    const withdrawalForm = (await screen.findByRole("button", { name: "Retirar efectivo" })).closest("form");
+    await user.click(await screen.findByRole("button", { name: "Retirar efectivo" }));
+    const withdrawalForm = screen.getByRole("region", { name: "Retirar efectivo" }).querySelector("form");
     if (!withdrawalForm) throw new Error("Missing withdrawal form.");
 
     await user.type(within(withdrawalForm).getByLabelText("Monto a retirar", { selector: "input" }), "50");
     fireEvent.change(within(withdrawalForm).getByLabelText("Fecha del retiro"), { target: { value: "2026-05-10" } });
-    await user.type(within(withdrawalForm).getByLabelText("Descripción del retiro"), "ATM");
+    await user.type(within(withdrawalForm).getByLabelText("Descripción del retiro (opcional)"), "ATM");
     await user.click(within(withdrawalForm).getByRole("button", { name: "Retirar efectivo" }));
 
     await waitFor(() =>
@@ -1134,7 +1240,8 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    const incomeForm = (await screen.findByRole("button", { name: "Registrar ingreso" })).closest("form");
+    await user.click(await screen.findByRole("button", { name: "Registrar ingreso" }));
+    const incomeForm = screen.getByRole("region", { name: "Registrar ingreso" }).querySelector("form");
     if (!incomeForm) throw new Error("Missing income form.");
 
     await user.type(within(incomeForm).getByLabelText("Fuente del ingreso"), "Freelance");
@@ -1152,7 +1259,9 @@ describe("ActiveMonthPage", () => {
       }),
     );
 
-    await user.click(screen.getAllByRole("button", { name: "Editar ingreso" })[0]);
+    await screen.findByText("Ingreso registrado y totales recalculados.");
+
+    await user.click(screen.getByRole("button", { name: "Editar ingreso Sueldo" }));
     const editForm = screen.getByRole("button", { name: "Actualizar ingreso" }).closest("form");
     if (!editForm) throw new Error("Missing edit income form.");
     await user.clear(within(editForm).getByLabelText("Fuente del ingreso"));
@@ -1174,7 +1283,7 @@ describe("ActiveMonthPage", () => {
       }),
     );
 
-    await user.click(screen.getAllByRole("button", { name: "Eliminar ingreso" })[0]);
+    await user.click(screen.getByRole("button", { name: "Eliminar ingreso Sueldo neto" }));
     await waitFor(() => expect(apiMock.deleteMonthlyIncome).toHaveBeenCalledWith("month-1", "income-1"));
   });
 
@@ -1183,8 +1292,8 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    expect(await screen.findByText(/ingresos son de solo lectura/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Registrar ingreso" })).not.toBeInTheDocument();
+    expect(await screen.findByText(/movimientos son de solo lectura/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Registrar ingreso" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Editar ingreso" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Eliminar ingreso" })).not.toBeInTheDocument();
   });
