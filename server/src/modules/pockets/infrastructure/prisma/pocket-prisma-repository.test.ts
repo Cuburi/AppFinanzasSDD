@@ -55,6 +55,43 @@ test("pocket Prisma repository preserves include/orderBy and maps balance inputs
   ]);
 });
 
+test("pocket Prisma repository reads the additive available-deposit enum as legacy external history", async () => {
+  const db = {
+    savingsPocket: {
+      async findMany() {
+        return [
+          {
+            id: "pocket-1",
+            name: "Emergency",
+            goalAmount: null,
+            active: true,
+            incomingMovements: [{ id: "in-1", type: MovementType.POCKET_DEPOSIT_FROM_AVAILABLE, amount: money(125), occurredAt: new Date("2026-05-10T00:00:00.000Z"), description: null, sourcePocketId: null, targetPocketId: "pocket-1" }],
+            outgoingMovements: [],
+          },
+        ];
+      },
+      async findUnique() {
+        throw new Error("Not used.");
+      },
+      async findFirst() {
+        throw new Error("Not used.");
+      },
+      async create() {
+        throw new Error("Not used.");
+      },
+      async update() {
+        throw new Error("Not used.");
+      },
+    },
+  };
+
+  const repository = createPocketPrismaRepository(db as Parameters<typeof createPocketPrismaRepository>[0]);
+  const [pocket] = await repository.findAll({ active: true });
+
+  assert.equal(pocket?.incomingMovements[0]?.type, MovementType.POCKET_DEPOSIT_EXTERNAL);
+  assert.equal(pocket?.incomingMovements[0]?.amount, 125);
+});
+
 test("pocket Prisma repository normalizes writes and performs case-insensitive name lookup", async () => {
   const calls: unknown[] = [];
   const pocketRecord = { id: "pocket-1", name: "Travel", goalAmount: money(500), active: true, incomingMovements: [], outgoingMovements: [] };

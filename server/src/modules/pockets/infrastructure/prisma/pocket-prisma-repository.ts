@@ -41,10 +41,13 @@ type PrismaPocketClient = {
 
 const decimal = (value: number | null | undefined) => (value === null || value === undefined ? null : new Prisma.Decimal(value.toFixed(2)));
 const decimalLikeToNumber = (value: { toString(): string }) => Number(value.toString());
+const AVAILABLE_DEPOSIT_TYPE = "POCKET_DEPOSIT_FROM_AVAILABLE";
+const LEGACY_EXTERNAL_DEPOSIT_TYPE = "POCKET_DEPOSIT_EXTERNAL";
+const mapCompatibilityMovementType = (type: string) => (type === AVAILABLE_DEPOSIT_TYPE ? LEGACY_EXTERNAL_DEPOSIT_TYPE : type);
 
 const mapMovementRecord = (movement: PocketMovementRecord) => ({
   id: movement.id,
-  type: movement.type,
+  type: mapCompatibilityMovementType(movement.type),
   amount: decimalLikeToNumber(movement.amount),
   occurredAt: movement.occurredAt,
   description: movement.description,

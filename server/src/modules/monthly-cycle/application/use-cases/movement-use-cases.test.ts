@@ -4,6 +4,7 @@ import test from "node:test";
 import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../../lib/prisma-client.js";
 import { createMovementUseCases, MOVEMENT_USE_CASE_NAMES } from "./movement-use-cases.js";
 import type { MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
+import { parseDepositToPocketInput } from "../../dto/pockets.dto.js";
 
 const amount = (value: number) => new Prisma.Decimal(value.toFixed(2));
 
@@ -210,5 +211,28 @@ test("depositToPocket validates the target pocket and preserves the external dep
     ["transactionRunner.run"],
     ["tx.pockets.ensurePocketIsActive", "pocket-safe", "Target pocket"],
     ["tx.movements.create", "POCKET_DEPOSIT_EXTERNAL", "25", "pocket-safe", null],
+  ]);
+});
+
+test("depositToPocket stores compatible month-available input with the legacy external movement type", async () => {
+  const { calls, ports } = createMovementPorts();
+  const useCases = createMovementUseCases(ports);
+
+  const updated = await useCases.depositToPocket(
+    parseDepositToPocketInput({
+      sourceKind: "MONTH_AVAILABLE",
+      monthId: "month-1",
+      targetPocketId: "pocket-safe",
+      amount: 25,
+    }),
+  );
+
+  assert.equal(updated?.id, "month-1");
+  assert.deepEqual(calls, [
+    ["transactionRunner.run"],
+    ["tx.pockets.ensurePocketIsActive", "pocket-safe", "Target pocket"],
+    ["tx.months.findById", "month-1"],
+    ["tx.movements.create", "POCKET_DEPOSIT_EXTERNAL", "25", "pocket-safe", null],
+    ["tx.months.findById", "month-1"],
   ]);
 });

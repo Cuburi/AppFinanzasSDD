@@ -161,3 +161,51 @@ test("calculateMonthBalances ignores cash carryover for available money", () => 
 
   assert.equal(balances.availableMoney, 300);
 });
+
+test("calculateMonthBalances applies post-backfill available deposits to monthly and pocket balances", () => {
+  const balances = calculateMonthBalances({
+    incomes: [{ amount: amount(100) }],
+    categories: [{ subcategories: [] }],
+    movements: [
+      {
+        type: MovementType.POCKET_DEPOSIT_FROM_AVAILABLE,
+        amount: amount(25),
+        sourceSubcategoryId: null,
+        targetSubcategoryId: null,
+        sourcePocketId: null,
+        targetPocketId: "emergency",
+      },
+    ],
+  });
+
+  assert.equal(balances.availableMoney, 75);
+  assert.equal(balances.pocketBalances.get("emergency"), 25);
+});
+
+test("calculateMonthBalances accumulates multiple post-backfill available deposits", () => {
+  const balances = calculateMonthBalances({
+    incomes: [{ amount: amount(80) }],
+    categories: [{ subcategories: [] }],
+    movements: [
+      {
+        type: MovementType.POCKET_DEPOSIT_FROM_AVAILABLE,
+        amount: amount(15),
+        sourceSubcategoryId: null,
+        targetSubcategoryId: null,
+        sourcePocketId: null,
+        targetPocketId: "emergency",
+      },
+      {
+        type: MovementType.POCKET_DEPOSIT_FROM_AVAILABLE,
+        amount: amount(5),
+        sourceSubcategoryId: null,
+        targetSubcategoryId: null,
+        sourcePocketId: null,
+        targetPocketId: "emergency",
+      },
+    ],
+  });
+
+  assert.equal(balances.availableMoney, 60);
+  assert.equal(balances.pocketBalances.get("emergency"), 20);
+});
