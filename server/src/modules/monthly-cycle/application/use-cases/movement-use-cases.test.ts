@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../../lib/prisma-client.js";
-import { createMovementUseCases, MOVEMENT_USE_CASE_NAMES } from "./movement-use-cases.js";
+import { createMovementUseCases, createStrictDepositToPocketUseCase, MOVEMENT_USE_CASE_NAMES } from "./movement-use-cases.js";
 import type { MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 import { parseDepositToPocketInput } from "../../dto/pockets.dto.js";
 
@@ -15,7 +15,16 @@ const month = {
   status: MonthStatus.ACTIVE,
   openedAt: new Date("2026-05-01T00:00:00.000Z"),
   closedAt: null,
-  incomes: [],
+  incomes: [{
+    id: "income-1",
+    monthId: "month-1",
+    sourceName: "Salary",
+    amount: amount(1000),
+    receivedAt: new Date("2026-05-01T00:00:00.000Z"),
+    notes: null,
+    createdAt: new Date("2026-05-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-05-01T00:00:00.000Z"),
+  }],
   categories: [
     {
       id: "cat-food",
@@ -81,6 +90,10 @@ const createMovementPorts = () => {
     transactionRunner: {
       async run<T>(work: (ports: Omit<MonthlyCyclePorts, "transactionRunner">) => Promise<T>) {
         calls.push(["transactionRunner.run"]);
+        return work(txPorts as unknown as Omit<MonthlyCyclePorts, "transactionRunner">);
+      },
+      async runSerializable<T>(work: (ports: Omit<MonthlyCyclePorts, "transactionRunner">) => Promise<T>) {
+        calls.push(["transactionRunner.runSerializable"]);
         return work(txPorts as unknown as Omit<MonthlyCyclePorts, "transactionRunner">);
       },
     },
@@ -267,4 +280,85 @@ test("depositToPocket fails closed when the durable legacy-writer gate is disabl
     ["transactionRunner.run"],
     ["tx.depositWriterGate.isEnabled"],
   ]);
+});
+
+test("strict pocket deposits persist each declared funding source only after validating current month funds", async () => {
+  const cases = [
+    [{ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-market" }, "POCKET_DEPOSIT_FROM_SUBCATEGORY"],
+    [{ sourceKind: "MONTH_AVAILABLE", monthId: "month-1" }, "POCKET_DEPOSIT_FROM_AVAILABLE"],
+    [{ sourceKind: "EXTERNAL", externalSourceLabel: "Bonus" }, "POCKET_DEPOSIT_EXTERNAL"],
+  ] as const;
+
+  for (const [source, movementType] of cases) {
+    const { calls, ports } = createMovementPorts();
+    const result = await createStrictDepositToPocketUseCase(ports)({
+      ...source,
+      targetPocketId: "pocket-safe",
+      amount: 25,
+      occurredAt: "2026-05-10T00:00:00.000Z",
+    });
+
+    assert.equal(result?.id ?? null, source.sourceKind === "EXTERNAL" ? null : "month-1");
+    assert.deepEqual(calls.filter((call) => Array.isArray(call) && call[0] === "tx.movements.create"), [
+      ["tx.movements.create", movementType, "25", "pocket-safe", null],
+    ]);
+  }
+});
+
+test("strict pocket deposits reject invalid source shapes and insufficient funding before persisting a movement", async () => {
+  const { calls, ports } = createMovementPorts();
+  const deposit = createStrictDepositToPocketUseCase(ports);
+
+  await assert.rejects(
+    () => deposit({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    { code: "INVALID_DEPOSIT_SOURCE" },
+  );
+  await assert.rejects(
+    () => deposit({ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-safe", amount: 300, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    { code: "INSUFFICIENT_FUNDS" },
+  );
+  await assert.rejects(
+    () => deposit({ sourceKind: "EXTERNAL", targetPocketId: "pocket-safe", amount: 0, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    { code: "INVALID_AMOUNT" },
+  );
+  await assert.rejects(
+    () => deposit({ sourceKind: "EXTERNAL", targetPocketId: "pocket-safe", amount: 25, occurredAt: "not-a-date" }),
+    { code: "INVALID_DATE" },
+  );
+  month.status = MonthStatus.CLOSED as never;
+  await assert.rejects(
+    () => deposit({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    { code: "MONTH_NOT_ACTIVE" },
+  );
+  month.status = MonthStatus.ACTIVE;
+  assert.deepEqual(calls.filter((call) => Array.isArray(call) && call[0] === "tx.movements.create"), []);
+});
+
+test("strict pocket deposits validate and compare the normalized currency amount", async () => {
+  const { calls, ports } = createMovementPorts();
+  const deposit = createStrictDepositToPocketUseCase(ports);
+  month.categories[0]!.subcategories[0]!.plannedAmount = amount(0.3);
+  month.movements.push({
+    type: MovementType.EXPENSE,
+    amount: amount(0.1),
+    sourceSubcategoryId: "sub-market",
+    targetSubcategoryId: null,
+    sourcePocketId: null,
+    targetPocketId: null,
+    paymentMethod: PaymentMethod.NON_CASH,
+  } as never);
+
+  try {
+    await assert.rejects(
+      () => deposit({ sourceKind: "EXTERNAL", targetPocketId: "pocket-safe", amount: 0.004, occurredAt: "2026-05-10T00:00:00.000Z" }),
+      { code: "INVALID_AMOUNT", statusCode: 400 },
+    );
+    await deposit({ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-safe", amount: 0.2, occurredAt: "2026-05-10T00:00:00.000Z" });
+    assert.deepEqual(calls.filter((call) => Array.isArray(call) && call[0] === "tx.movements.create"), [
+      ["tx.movements.create", "POCKET_DEPOSIT_FROM_SUBCATEGORY", "0.2", "pocket-safe", null],
+    ]);
+  } finally {
+    month.categories[0]!.subcategories[0]!.plannedAmount = amount(250);
+    month.movements.splice(0, month.movements.length);
+  }
 });

@@ -102,6 +102,7 @@ export interface MonthStructureRepositoryPort {
 
 export interface PocketValidationPort {
   ensurePocketIsActive(pocketId: string, label: string): Promise<void>;
+  ensureStrictDepositTargetPocketIsActive?(pocketId: string): Promise<void>;
   ensureTemplateDefaultPocketsAreActive(input: TemplateInput): Promise<void>;
 }
 
@@ -127,4 +128,5 @@ export type MonthlyCyclePorts = {
 
 export interface MonthlyCycleTransactionRunner {
   run<T>(work: (ports: Omit<MonthlyCyclePorts, "transactionRunner">) => Promise<T>): Promise<T>;
+  runSerializable<T>(work: (ports: Omit<MonthlyCyclePorts, "transactionRunner">) => Promise<T>): Promise<T>;
 }
