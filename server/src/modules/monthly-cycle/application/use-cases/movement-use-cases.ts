@@ -18,16 +18,12 @@ export type MovementUseCases = {
   depositToPocket(input: DepositToPocketInput): Promise<MonthView | null>;
 };
 
-export type StrictDepositToPocketInput = {
-  sourceKind: "SUBCATEGORY" | "MONTH_AVAILABLE" | "EXTERNAL";
-  monthId?: string | null;
-  sourceSubcategoryId?: string | null;
-  externalSourceLabel?: string | null;
-  targetPocketId: string;
-  amount: number;
-  occurredAt: string;
-  description?: string | null;
-};
+type StrictDepositBase = { targetPocketId: string; amount: number; occurredAt: string; description?: string | null };
+export type StrictDepositToPocketInput = StrictDepositBase & (
+  | { sourceKind: "SUBCATEGORY"; monthId: string; sourceSubcategoryId: string; externalSourceLabel?: never }
+  | { sourceKind: "MONTH_AVAILABLE"; monthId: string; sourceSubcategoryId?: never; externalSourceLabel?: never }
+  | { sourceKind: "EXTERNAL"; monthId?: never; sourceSubcategoryId?: never; externalSourceLabel: string }
+);
 
 const invalidDepositSource = () => new SemanticError("INVALID_DEPOSIT_SOURCE", 400, "Pocket deposit source is invalid.");
 
@@ -39,7 +35,7 @@ const assertStrictDepositShape = (input: StrictDepositToPocketInput) => {
     if (!input.monthId || !input.sourceSubcategoryId || input.externalSourceLabel != null) throw invalidDepositSource();
   } else if (input.sourceKind === "MONTH_AVAILABLE") {
     if (!input.monthId || input.sourceSubcategoryId != null || input.externalSourceLabel != null) throw invalidDepositSource();
-  } else if (input.sourceKind !== "EXTERNAL" || input.monthId != null || input.sourceSubcategoryId != null) {
+  } else if (input.sourceKind !== "EXTERNAL" || input.monthId != null || input.sourceSubcategoryId != null || !input.externalSourceLabel?.trim()) {
     throw invalidDepositSource();
   }
   return amount;
@@ -72,7 +68,7 @@ export const createStrictDepositToPocketUseCase = (ports: MonthlyCyclePorts) => 
       type: input.sourceKind === "SUBCATEGORY" ? MovementType.POCKET_DEPOSIT_FROM_SUBCATEGORY : input.sourceKind === "MONTH_AVAILABLE" ? MovementType.POCKET_DEPOSIT_FROM_AVAILABLE : MovementType.POCKET_DEPOSIT_EXTERNAL,
       amount: decimal(amount), description: input.description, occurredAt, monthId: input.monthId,
       sourceSubcategoryId: input.sourceSubcategoryId, targetPocketId: input.targetPocketId,
-      externalSourceLabel: input.sourceKind === "EXTERNAL" ? input.externalSourceLabel ?? null : null,
+      externalSourceLabel: input.sourceKind === "EXTERNAL" ? input.externalSourceLabel?.trim() ?? null : null,
     });
     return existingMonth ? txPorts.months.findById(existingMonth.id) : null;
   });
