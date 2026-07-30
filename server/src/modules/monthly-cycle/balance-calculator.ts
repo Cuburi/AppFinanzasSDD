@@ -45,6 +45,7 @@ export const calculateMonthBalances = (month: MonthShape) => {
         break;
       case MovementType.CASH_WITHDRAWAL:
       case MovementType.POCKET_DEPOSIT_FROM_SUBCATEGORY:
+      case MovementType.POCKET_DEPOSIT_FROM_AVAILABLE:
       case MovementType.POCKET_DEPOSIT_EXTERNAL:
       case MovementType.SURPLUS_TO_POCKET_ON_CLOSE:
         monthOutflows += amount;
@@ -85,6 +86,7 @@ export const calculateMonthBalances = (month: MonthShape) => {
 
     switch (movement.type) {
       case MovementType.POCKET_DEPOSIT_FROM_SUBCATEGORY:
+      case MovementType.POCKET_DEPOSIT_FROM_AVAILABLE:
       case MovementType.POCKET_DEPOSIT_EXTERNAL:
       case MovementType.SURPLUS_TO_POCKET_ON_CLOSE:
         if (movement.targetPocketId) {
