@@ -27,6 +27,12 @@ BEGIN
   WHERE "type" = 'POCKET_DEPOSIT_EXTERNAL'
     AND "monthId" IS NOT NULL;
 
+  IF eligible_rows = 0 THEN
+    INSERT INTO "MonthlyLedgerBackfillControl" ("id", "writersQuiesced", "activeDepositWriters", "writersEnabled")
+    VALUES ('pocket-deposit-from-available', FALSE, 0, TRUE)
+    ON CONFLICT ("id") DO NOTHING;
+  END IF;
+
   IF eligible_rows > 0 AND NOT EXISTS (
     SELECT 1
     FROM "MonthlyLedgerBackfillControl"

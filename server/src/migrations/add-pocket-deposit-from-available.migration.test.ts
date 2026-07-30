@@ -153,8 +153,13 @@ test("backfill replays on an empty schema without an operational attestation", a
 
     await applyMigration(schema, backfillMigrationPath);
 
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL search_path TO "${schema}"`);
+      await tx.$executeRawUnsafe(`INSERT INTO "Movement" ("id", "type", "monthId") VALUES ('compatibility-deposit-after-empty-replay', 'POCKET_DEPOSIT_EXTERNAL', 'month-1')`);
+    });
+
     const remainingEligibleRows = await countLegacyExternalRows(schema, "IS NOT NULL");
-    assert.equal(remainingEligibleRows[0]?.count, 0n);
+    assert.equal(remainingEligibleRows[0]?.count, 1n);
   });
 });
 

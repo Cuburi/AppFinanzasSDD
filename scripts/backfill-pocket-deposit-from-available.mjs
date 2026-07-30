@@ -64,7 +64,11 @@ export const reenableDepositWriters = async (prisma, schema = "public") => {
   assertSchema(schema);
   await prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(`SET LOCAL search_path TO "${schema}"`);
-    await tx.$executeRawUnsafe(`UPDATE "MonthlyLedgerBackfillControl" SET "writersQuiesced" = FALSE, "activeDepositWriters" = 0, "writersEnabled" = TRUE WHERE "id" = '${controlId}'`);
+    await tx.$executeRawUnsafe(`
+      INSERT INTO "MonthlyLedgerBackfillControl" ("id", "writersQuiesced", "activeDepositWriters", "writersEnabled")
+      VALUES ('${controlId}', FALSE, 0, TRUE)
+      ON CONFLICT ("id") DO UPDATE SET "writersQuiesced" = FALSE, "activeDepositWriters" = 0, "writersEnabled" = TRUE
+    `);
   });
 };
 
@@ -90,7 +94,9 @@ export const rollbackBackfill = async (prisma, schema = "public") => {
         WHERE "type" = 'POCKET_DEPOSIT_FROM_AVAILABLE'
           AND "id" IN (SELECT "movementId" FROM "MonthlyLedgerBackfillRow");
         DELETE FROM "MonthlyLedgerBackfillRow";
-        UPDATE "MonthlyLedgerBackfillControl" SET "writersQuiesced" = FALSE, "activeDepositWriters" = 0, "writersEnabled" = TRUE WHERE "id" = '${controlId}';
+        INSERT INTO "MonthlyLedgerBackfillControl" ("id", "writersQuiesced", "activeDepositWriters", "writersEnabled")
+        VALUES ('${controlId}', FALSE, 0, TRUE)
+        ON CONFLICT ("id") DO UPDATE SET "writersQuiesced" = FALSE, "activeDepositWriters" = 0, "writersEnabled" = TRUE;
       END $$;
     `);
   });
