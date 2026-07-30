@@ -90,6 +90,7 @@ test("monthly-cycle port scaffold names the initial explicit boundaries", () => 
     "structure",
     "pockets",
     "creditCards",
+    "depositWriterGate",
     "transactionRunner",
   ]);
 });

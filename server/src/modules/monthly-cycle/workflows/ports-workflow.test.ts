@@ -54,6 +54,9 @@ test("template workflow updates through transaction-scoped ports instead of a Pr
     creditCards: {
       async ensureCreditCardIsActive() {},
     },
+    depositWriterGate: {
+      async isEnabled() { return true; },
+    },
   };
   const service = createTemplateService({
     ...txPorts,
@@ -105,6 +108,12 @@ test("movement workflow validates pocket deposits through ports inside the trans
     creditCards: {
       async ensureCreditCardIsActive() {},
     },
+    depositWriterGate: {
+      async isEnabled() {
+        calls.push(["depositWriterGate.isEnabled"]);
+        return true;
+      },
+    },
     movements: {
       async findById() {
         return null;
@@ -141,6 +150,7 @@ test("movement workflow validates pocket deposits through ports inside the trans
   assert.equal(result, null);
   assert.deepEqual(calls, [
     ["transactionRunner.run"],
+    ["depositWriterGate.isEnabled"],
     ["pockets.ensurePocketIsActive", "pocket-home", "Target pocket"],
     ["movements.create", "POCKET_DEPOSIT_EXTERNAL", "25", "pocket-home"],
   ]);

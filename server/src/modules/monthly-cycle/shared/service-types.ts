@@ -89,6 +89,7 @@ export type MonthlyIncomeRecord = NonNullable<MonthRecord["incomes"]>[number];
 
 export type MonthlyCycleDb = {
   $transaction<T>(callback: (tx: MonthlyCycleDb) => Promise<T>): Promise<T>;
+  $queryRawUnsafe<T>(query: string): Promise<T>;
   templateCategory: {
     findMany(args: { orderBy: { sortOrder: "asc" }; include: typeof templateInclude }): Promise<TemplateCategoryRecord[]>;
     deleteMany(): Promise<unknown>;
