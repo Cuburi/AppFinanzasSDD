@@ -201,6 +201,29 @@ test("monthlyCycleRouter delegates template, month lifecycle, and pocket deposit
   }
 });
 
+test("monthlyCycleRouter returns the service quiescence conflict for pocket deposits", async () => {
+  const server = createTestServer({
+    async depositToPocket() {
+      throw new DomainError(409, "Pocket deposits are temporarily disabled.");
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ targetPocketId: "pocket-1", amount: 75, description: "Deposit", externalSourceLabel: "Bonus" }),
+    });
+
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { message: "Pocket deposits are temporarily disabled." });
+  } finally {
+    server.close();
+  }
+});
+
 test("monthlyCycleRouter preserves PUT /api/template payload and response contract", async () => {
   const calls: unknown[] = [];
   const server = createTestServer({

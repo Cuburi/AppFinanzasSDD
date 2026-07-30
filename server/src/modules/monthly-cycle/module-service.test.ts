@@ -157,6 +157,9 @@ const createDbStub = ({
     async $transaction<T>(callback: (tx: typeof db) => Promise<T>) {
       return callback(db);
     },
+    async $queryRawUnsafe() {
+      return [{ exists: false }];
+    },
     templateCategory: {
       async findMany() {
         return cloneTemplateFixture(readTemplate);

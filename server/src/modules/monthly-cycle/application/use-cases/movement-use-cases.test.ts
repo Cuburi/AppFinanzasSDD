@@ -64,6 +64,12 @@ const createMovementPorts = () => {
         calls.push(["tx.creditCards.ensureCreditCardIsActive", ownerId, creditCardId]);
       },
     },
+    depositWriterGate: {
+      async isEnabled() {
+        calls.push(["tx.depositWriterGate.isEnabled"]);
+        return true;
+      },
+    },
   };
   const ports = {
     months: {},
@@ -209,6 +215,7 @@ test("depositToPocket validates the target pocket and preserves the external dep
   assert.equal(updated, null);
   assert.deepEqual(calls, [
     ["transactionRunner.run"],
+    ["tx.depositWriterGate.isEnabled"],
     ["tx.pockets.ensurePocketIsActive", "pocket-safe", "Target pocket"],
     ["tx.movements.create", "POCKET_DEPOSIT_EXTERNAL", "25", "pocket-safe", null],
   ]);
@@ -230,9 +237,34 @@ test("depositToPocket stores compatible month-available input with the legacy ex
   assert.equal(updated?.id, "month-1");
   assert.deepEqual(calls, [
     ["transactionRunner.run"],
+    ["tx.depositWriterGate.isEnabled"],
     ["tx.pockets.ensurePocketIsActive", "pocket-safe", "Target pocket"],
     ["tx.months.findById", "month-1"],
     ["tx.movements.create", "POCKET_DEPOSIT_EXTERNAL", "25", "pocket-safe", null],
     ["tx.months.findById", "month-1"],
+  ]);
+});
+
+test("depositToPocket fails closed when the durable legacy-writer gate is disabled", async () => {
+  const { calls, ports } = createMovementPorts();
+  const txPorts = await new Promise<Omit<MonthlyCyclePorts, "transactionRunner">>((resolve) => {
+    void ports.transactionRunner.run(async (resolvedPorts) => {
+      resolve(resolvedPorts);
+      return undefined;
+    });
+  });
+  txPorts.depositWriterGate.isEnabled = async () => {
+    calls.push(["tx.depositWriterGate.isEnabled"]);
+    return false;
+  };
+  calls.splice(0, calls.length);
+
+  await assert.rejects(
+    () => createMovementUseCases(ports).depositToPocket({ amount: 25, targetPocketId: "pocket-safe", externalSourceLabel: "Bonus" }),
+    { message: "Pocket deposits are temporarily disabled." },
+  );
+  assert.deepEqual(calls, [
+    ["transactionRunner.run"],
+    ["tx.depositWriterGate.isEnabled"],
   ]);
 });

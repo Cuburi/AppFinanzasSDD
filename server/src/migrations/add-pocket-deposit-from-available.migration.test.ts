@@ -74,12 +74,13 @@ const allowBackfill = async (schema: string, activeDepositWriters = 0) => {
     CREATE TABLE "${schema}"."MonthlyLedgerBackfillControl" (
       "id" TEXT PRIMARY KEY,
       "writersQuiesced" BOOLEAN NOT NULL,
-      "activeDepositWriters" INTEGER NOT NULL
+      "activeDepositWriters" INTEGER NOT NULL,
+      "writersEnabled" BOOLEAN NOT NULL
     )
   `);
   await prisma.$executeRawUnsafe(`
-    INSERT INTO "${schema}"."MonthlyLedgerBackfillControl" ("id", "writersQuiesced", "activeDepositWriters")
-    VALUES ('pocket-deposit-from-available', TRUE, ${activeDepositWriters})
+    INSERT INTO "${schema}"."MonthlyLedgerBackfillControl" ("id", "writersQuiesced", "activeDepositWriters", "writersEnabled")
+    VALUES ('pocket-deposit-from-available', TRUE, ${activeDepositWriters}, FALSE)
   `);
 };
 
@@ -199,11 +200,11 @@ test("backfill installs a writer abort for late legacy month-linked external dep
     await applyMigration(schema, backfillMigrationPath);
 
     await assert.rejects(
-      prisma.$executeRawUnsafe(`
-        INSERT INTO "${schema}"."Movement" ("id", "type", "monthId")
-        VALUES ('late-legacy-writer', 'POCKET_DEPOSIT_EXTERNAL', 'month-3')
-      `),
-      /legacy month-linked external deposits are disabled during backfill/,
+      prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL search_path TO "${schema}"`);
+        await tx.$executeRawUnsafe(`INSERT INTO "Movement" ("id", "type", "monthId") VALUES ('late-legacy-writer', 'POCKET_DEPOSIT_EXTERNAL', 'month-3')`);
+      }),
+      /legacy pocket deposits are disabled during backfill/,
     );
 
     const remainingEligibleRows = await countLegacyExternalRows(schema, "IS NOT NULL");

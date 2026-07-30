@@ -16,10 +16,60 @@ export const validateQuiescenceInput = (environment) => {
   return { ok: true };
 };
 
+const assertSchema = (schema) => {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) throw new Error("Rollback schema is invalid.");
+};
+
+const installWriterGate = async (tx) => {
+  await tx.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "MonthlyLedgerBackfillControl" (
+      "id" TEXT PRIMARY KEY,
+      "writersQuiesced" BOOLEAN NOT NULL,
+      "activeDepositWriters" INTEGER NOT NULL CHECK ("activeDepositWriters" >= 0),
+      "writersEnabled" BOOLEAN NOT NULL DEFAULT FALSE
+    )
+  `);
+  await tx.$executeRawUnsafe(`ALTER TABLE "MonthlyLedgerBackfillControl" ADD COLUMN IF NOT EXISTS "writersEnabled" BOOLEAN NOT NULL DEFAULT FALSE`);
+  await tx.$executeRawUnsafe(`
+    CREATE OR REPLACE FUNCTION "abortLegacyMonthLinkedExternalDeposit"() RETURNS TRIGGER LANGUAGE plpgsql AS $function$
+    BEGIN
+      IF NEW."type"::text IN ('POCKET_DEPOSIT_EXTERNAL', 'POCKET_DEPOSIT_FROM_SUBCATEGORY') AND NOT EXISTS (
+        SELECT 1 FROM "MonthlyLedgerBackfillControl" WHERE "id" = '${controlId}' AND "writersEnabled" = TRUE
+      ) THEN RAISE EXCEPTION 'legacy pocket deposits are disabled during backfill'; END IF;
+      RETURN NEW;
+    END;
+    $function$
+  `);
+  await tx.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "abortLegacyMonthLinkedExternalDeposit" ON "Movement"`);
+  await tx.$executeRawUnsafe(`
+    CREATE TRIGGER "abortLegacyMonthLinkedExternalDeposit" BEFORE INSERT OR UPDATE ON "Movement"
+    FOR EACH ROW EXECUTE FUNCTION "abortLegacyMonthLinkedExternalDeposit"()
+  `);
+};
+
+export const quiesceDepositWriters = async (prisma, schema = "public") => {
+  assertSchema(schema);
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(`SET LOCAL search_path TO "${schema}"`);
+    await installWriterGate(tx);
+    await tx.$executeRawUnsafe(`
+      INSERT INTO "MonthlyLedgerBackfillControl" ("id", "writersQuiesced", "activeDepositWriters", "writersEnabled")
+      VALUES ('${controlId}', TRUE, 0, FALSE)
+      ON CONFLICT ("id") DO UPDATE SET "writersQuiesced" = TRUE, "activeDepositWriters" = 0, "writersEnabled" = FALSE
+    `);
+  });
+};
+
+export const reenableDepositWriters = async (prisma, schema = "public") => {
+  assertSchema(schema);
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(`SET LOCAL search_path TO "${schema}"`);
+    await tx.$executeRawUnsafe(`UPDATE "MonthlyLedgerBackfillControl" SET "writersQuiesced" = FALSE, "activeDepositWriters" = 0, "writersEnabled" = TRUE WHERE "id" = '${controlId}'`);
+  });
+};
+
 export const rollbackBackfill = async (prisma, schema = "public") => {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) {
-    throw new Error("Rollback schema is invalid.");
-  }
+  assertSchema(schema);
 
   await prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(`SET LOCAL search_path TO "${schema}"`);
@@ -30,7 +80,7 @@ export const rollbackBackfill = async (prisma, schema = "public") => {
         SELECT COUNT(*) INTO backfilled_rows FROM "MonthlyLedgerBackfillRow";
         IF backfilled_rows > 0 AND NOT EXISTS (
           SELECT 1 FROM "MonthlyLedgerBackfillControl"
-          WHERE "id" = '${controlId}' AND "writersQuiesced" = TRUE AND "activeDepositWriters" = 0
+          WHERE "id" = '${controlId}' AND "writersQuiesced" = TRUE AND "activeDepositWriters" = 0 AND "writersEnabled" = FALSE
         ) THEN
           RAISE EXCEPTION 'rollback requires explicitly quiesced deposit writers';
         END IF;
@@ -40,6 +90,7 @@ export const rollbackBackfill = async (prisma, schema = "public") => {
         WHERE "type" = 'POCKET_DEPOSIT_FROM_AVAILABLE'
           AND "id" IN (SELECT "movementId" FROM "MonthlyLedgerBackfillRow");
         DELETE FROM "MonthlyLedgerBackfillRow";
+        UPDATE "MonthlyLedgerBackfillControl" SET "writersQuiesced" = FALSE, "activeDepositWriters" = 0, "writersEnabled" = TRUE WHERE "id" = '${controlId}';
       END $$;
     `);
   });
@@ -53,22 +104,7 @@ const recordQuiescence = async () => {
 
   const prisma = new PrismaClient();
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "MonthlyLedgerBackfillControl" (
-          "id" TEXT PRIMARY KEY,
-          "writersQuiesced" BOOLEAN NOT NULL,
-          "activeDepositWriters" INTEGER NOT NULL CHECK ("activeDepositWriters" >= 0)
-        )
-      `);
-      await tx.$executeRawUnsafe(`
-        INSERT INTO "MonthlyLedgerBackfillControl" ("id", "writersQuiesced", "activeDepositWriters")
-        VALUES ('${controlId}', TRUE, 0)
-        ON CONFLICT ("id") DO UPDATE
-        SET "writersQuiesced" = EXCLUDED."writersQuiesced",
-            "activeDepositWriters" = EXCLUDED."activeDepositWriters"
-      `);
-    });
+    await quiesceDepositWriters(prisma);
   } finally {
     await prisma.$disconnect();
   }
@@ -80,10 +116,15 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       const prisma = new PrismaClient();
       try { await rollbackBackfill(prisma); } finally { await prisma.$disconnect(); }
     }
-    : recordQuiescence;
+    : process.argv.includes("--enable-writes")
+      ? async () => {
+        const prisma = new PrismaClient();
+        try { await reenableDepositWriters(prisma); } finally { await prisma.$disconnect(); }
+      }
+      : recordQuiescence;
   run()
     .then(() => {
-      console.log(process.argv.includes("--rollback") ? "Backfill rollback completed." : "Deposit writers are quiesced. Run the guarded dev migration next.");
+      console.log(process.argv.includes("--rollback") ? "Backfill rollback completed." : process.argv.includes("--enable-writes") ? "Deposit writers are enabled." : "Deposit writers are quiesced. Run the guarded dev migration next.");
     })
     .catch((error) => {
       console.error(error instanceof Error ? error.message : error);

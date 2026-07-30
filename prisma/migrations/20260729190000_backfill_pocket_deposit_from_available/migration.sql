@@ -11,8 +11,10 @@ BEGIN
   CREATE TABLE IF NOT EXISTS "MonthlyLedgerBackfillControl" (
     "id" TEXT PRIMARY KEY,
     "writersQuiesced" BOOLEAN NOT NULL,
-    "activeDepositWriters" INTEGER NOT NULL CHECK ("activeDepositWriters" >= 0)
+    "activeDepositWriters" INTEGER NOT NULL CHECK ("activeDepositWriters" >= 0),
+    "writersEnabled" BOOLEAN NOT NULL DEFAULT FALSE
   );
+  ALTER TABLE "MonthlyLedgerBackfillControl" ADD COLUMN IF NOT EXISTS "writersEnabled" BOOLEAN NOT NULL DEFAULT FALSE;
 
   CREATE TABLE IF NOT EXISTS "MonthlyLedgerBackfillRow" (
     "movementId" TEXT PRIMARY KEY
@@ -31,6 +33,7 @@ BEGIN
     WHERE "id" = 'pocket-deposit-from-available'
       AND "writersQuiesced" = TRUE
       AND "activeDepositWriters" = 0
+      AND "writersEnabled" = FALSE
   ) THEN
     RAISE EXCEPTION 'backfill requires explicitly quiesced deposit writers';
   END IF;
@@ -49,8 +52,11 @@ BEGIN
   LANGUAGE plpgsql
   AS $function$
   BEGIN
-    IF NEW."type" = 'POCKET_DEPOSIT_EXTERNAL' AND NEW."monthId" IS NOT NULL THEN
-      RAISE EXCEPTION 'legacy month-linked external deposits are disabled during backfill';
+    IF NEW."type"::text IN ('POCKET_DEPOSIT_EXTERNAL', 'POCKET_DEPOSIT_FROM_SUBCATEGORY') AND NOT EXISTS (
+      SELECT 1 FROM "MonthlyLedgerBackfillControl"
+      WHERE "id" = 'pocket-deposit-from-available' AND "writersEnabled" = TRUE
+    ) THEN
+      RAISE EXCEPTION 'legacy pocket deposits are disabled during backfill';
     END IF;
 
     RETURN NEW;

@@ -150,6 +150,9 @@ const createIntegrationDb = (
         throw error;
       }
     },
+    async $queryRawUnsafe() {
+      return [{ exists: false }];
+    },
     templateCategory: {
       async findMany() {
         return cloneTemplate(templateCategories);

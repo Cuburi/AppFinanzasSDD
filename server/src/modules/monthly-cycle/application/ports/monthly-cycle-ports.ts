@@ -13,6 +13,7 @@ export const MONTHLY_CYCLE_PORT_NAMES = [
   "structure",
   "pockets",
   "creditCards",
+  "depositWriterGate",
   "transactionRunner",
 ] as const;
 
@@ -108,6 +109,10 @@ export interface CreditCardValidationPort {
   ensureCreditCardIsActive(ownerId: string, creditCardId: string): Promise<void>;
 }
 
+export interface DepositWriterGatePort {
+  isEnabled(): Promise<boolean>;
+}
+
 export type MonthlyCyclePorts = {
   months: MonthRepositoryPort;
   templates: TemplateRepositoryPort;
@@ -116,6 +121,7 @@ export type MonthlyCyclePorts = {
   structure: MonthStructureRepositoryPort;
   pockets: PocketValidationPort;
   creditCards: CreditCardValidationPort;
+  depositWriterGate: DepositWriterGatePort;
   transactionRunner: MonthlyCycleTransactionRunner;
 };
 

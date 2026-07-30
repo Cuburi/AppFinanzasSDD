@@ -300,6 +300,19 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       return ensureCreditCardIsActive(db, ownerId, creditCardId);
     },
   },
+  depositWriterGate: {
+    async isEnabled() {
+      const relation = await db.$queryRawUnsafe<Array<{ exists: boolean }>>(
+        `SELECT to_regclass(current_schema() || '."MonthlyLedgerBackfillControl"') IS NOT NULL AS "exists"`,
+      );
+      if (!relation[0]?.exists) return true;
+
+      const control = await db.$queryRawUnsafe<Array<{ writersEnabled: boolean }>>(
+        `SELECT "writersEnabled" FROM "MonthlyLedgerBackfillControl" WHERE "id" = 'pocket-deposit-from-available'`,
+      );
+      return control[0]?.writersEnabled === true;
+    },
+  },
 });
 
 type PrismaClientLike = {
