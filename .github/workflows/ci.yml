@@ -117,7 +117,7 @@ jobs:
         run: pnpm prisma:dev:generate
 
       - name: Apply Prisma migrations
-        run: pnpm prisma:dev:migrate
+        run: node scripts/run-prisma-with-profile.mjs dev -- migrate deploy --schema prisma/schema.prisma
 
       - name: Typecheck
         run: pnpm --dir server exec tsc -p tsconfig.json --noEmit
