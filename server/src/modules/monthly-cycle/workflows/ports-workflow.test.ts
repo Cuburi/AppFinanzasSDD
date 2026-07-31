@@ -65,6 +65,9 @@ test("template workflow updates through transaction-scoped ports instead of a Pr
         calls.push("transactionRunner.run");
         return work(txPorts);
       },
+      async runSerializable(work) {
+        return work(txPorts);
+      },
     },
   });
 
@@ -138,6 +141,9 @@ test("movement workflow validates pocket deposits through ports inside the trans
         calls.push(["transactionRunner.run"]);
         return work(txPorts);
       },
+      async runSerializable(work) {
+        return work(txPorts);
+      },
     },
   });
 
@@ -158,7 +164,7 @@ test("movement workflow validates pocket deposits through ports inside the trans
 
 test("month lifecycle workflow reads active month through the month repository port", async () => {
   const service = createMonthLifecycleService({
-    transactionRunner: { async run() {} },
+    transactionRunner: { async run() {}, async runSerializable() {} },
     months: {
       async findActive() {
         return null;

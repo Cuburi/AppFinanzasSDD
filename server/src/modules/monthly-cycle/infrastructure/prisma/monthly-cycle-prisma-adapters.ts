@@ -2,7 +2,7 @@ import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../../li
 import type { MonthlyCyclePorts } from "../../application/ports/monthly-cycle-ports.js";
 import { decimal } from "../../shared/money.js";
 import type { MonthlyCycleMoney } from "../../shared/money.js";
-import { DomainError } from "../../shared/service-errors.js";
+import { DomainError, SemanticError } from "../../shared/service-errors.js";
 import { monthInclude, templateInclude, type MonthRecord, type MonthlyCycleDb } from "../../shared/service-types.js";
 import type { TemplateInput } from "../../dto/index.js";
 
@@ -12,19 +12,20 @@ const readMonthById = async (db: MonthlyCycleDb, monthId: string): Promise<Month
   const month = await db.month.findUnique({ where: { id: monthId }, include: monthInclude });
 
   if (!month) {
-    throw new DomainError(404, "Month was not found.");
+    throw new SemanticError("NOT_FOUND", 404, "Month was not found.");
   }
 
   return month as MonthRecord;
 };
 
-const ensurePocketIsActive = async (db: MonthlyCycleDb, pocketId: string, label: string) => {
+const ensurePocketIsActive = async (db: MonthlyCycleDb, pocketId: string, label: string, strict = false) => {
   const pocket = await db.savingsPocket.findUnique({
     where: { id: pocketId },
     select: { id: true, active: true },
   });
 
   if (!pocket || !pocket.active) {
+    if (strict) throw new SemanticError("NOT_FOUND", 404, `${label} was not found.`);
     throw new DomainError(400, `${label} must exist and be active.`);
   }
 };
@@ -282,6 +283,9 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
     ensurePocketIsActive(pocketId, label) {
       return ensurePocketIsActive(db, pocketId, label);
     },
+    ensureStrictDepositTargetPocketIsActive(pocketId) {
+      return ensurePocketIsActive(db, pocketId, "Target pocket", true);
+    },
     async ensureTemplateDefaultPocketsAreActive(input) {
       const defaultPocketIds = new Set(
         input.categories
@@ -319,8 +323,27 @@ type PrismaClientLike = {
   $transaction<T>(work: (tx: MonthlyCycleDb) => Promise<T>, options?: unknown): Promise<T>;
 };
 
+const SERIALIZABLE_TRANSACTION_OPTIONS = { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } as const;
+const MAX_SERIALIZABLE_ATTEMPTS = 3;
+const isPrismaWriteConflict = (error: unknown) =>
+  typeof error === "object" && error !== null && "code" in error && error.code === "P2034";
+
 export const createMonthlyCyclePrismaTransactionRunner = (db: PrismaClientLike): MonthlyCyclePorts["transactionRunner"] => ({
   run(work) {
     return db.$transaction((tx) => work(createMonthlyCyclePrismaAdapters(tx)));
+  },
+  async runSerializable(work) {
+    for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
+      try {
+        return await db.$transaction((tx) => work(createMonthlyCyclePrismaAdapters(tx)), SERIALIZABLE_TRANSACTION_OPTIONS);
+      } catch (error) {
+        if (!isPrismaWriteConflict(error)) throw error;
+        if (attempt === MAX_SERIALIZABLE_ATTEMPTS) {
+          throw new SemanticError("CONCURRENT_MODIFICATION", 409, "Concurrent modification prevented this pocket deposit.");
+        }
+      }
+    }
+
+    throw new Error("Unreachable serializable transaction retry exhaustion.");
   },
 });
