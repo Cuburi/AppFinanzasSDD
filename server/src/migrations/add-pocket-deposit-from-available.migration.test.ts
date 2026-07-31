@@ -217,7 +217,7 @@ test("backfill installs a writer abort for late legacy month-linked external dep
   });
 });
 
-test("backfill waits for an in-flight legacy writer before proving no eligible rows remain", async () => {
+test("backfill waits for an in-flight legacy writer before proving no eligible rows remain", { timeout: 5_000 }, async () => {
   await withFixture(async (schema) => {
     await applyMigration(schema);
     await allowBackfill(schema);
@@ -230,9 +230,9 @@ test("backfill waits for an in-flight legacy writer before proving no eligible r
       await tx.$executeRawUnsafe(`INSERT INTO "Movement" ("id", "type", "monthId") VALUES ('in-flight-legacy', 'POCKET_DEPOSIT_EXTERNAL', 'month-3')`);
       await release;
     });
-    await new Promise((resolve) => setTimeout(resolve, 25));
-    const backfill = applyMigration(schema, backfillMigrationPath);
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    const waitForMovementLock = async (mode: string, granted: boolean) => { while (!(await prisma.$queryRawUnsafe<Array<{ count: number }>>(`SELECT COUNT(*)::int AS "count" FROM pg_locks WHERE relation = '"${schema}"."Movement"'::regclass AND mode = '${mode}' AND granted = ${granted}`))[0]?.count) await new Promise<void>((resolve) => setImmediate(resolve)); };
+    await waitForMovementLock("RowExclusiveLock", true); const backfill = applyMigration(schema, backfillMigrationPath);
+    await waitForMovementLock("ShareRowExclusiveLock", false);
     releaseWriter();
     await writerTransaction;
     await backfill;
