@@ -116,6 +116,9 @@ jobs:
       - name: Generate Prisma client
         run: pnpm prisma:dev:generate
 
+      - name: Apply Prisma migrations
+        run: pnpm prisma:dev:migrate
+
       - name: Typecheck
         run: pnpm --dir server exec tsc -p tsconfig.json --noEmit
 
