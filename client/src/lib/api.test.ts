@@ -11,6 +11,7 @@ const pocketPayload = {
   recentMovements: [
     {
       id: "move-1",
+      type: "POCKET_DEPOSIT_FROM_SUBCATEGORY",
       amount: 250,
       description: "Ahorro inicial",
       occurredAt: "2026-05-10T12:00:00.000Z",
@@ -93,6 +94,32 @@ describe("pockets api", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-emergency", amount: 75, occurredAt: "2026-05-13" }),
+    });
+  });
+
+  it("serializes a Pockets-only external deposit without month or subcategory fields", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ month: null }), { status: 201 }));
+
+    await expect(
+      api.depositExternalToPocket({
+        sourceKind: "EXTERNAL",
+        targetPocketId: "pocket-emergency",
+        amount: 125,
+        occurredAt: "2026-05-14",
+        externalSourceLabel: "Employer",
+      }),
+    ).resolves.toBeNull();
+
+    expect(fetch).toHaveBeenCalledWith("/api/pockets/deposits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceKind: "EXTERNAL",
+        targetPocketId: "pocket-emergency",
+        amount: 125,
+        occurredAt: "2026-05-14",
+        externalSourceLabel: "Employer",
+      }),
     });
   });
 });

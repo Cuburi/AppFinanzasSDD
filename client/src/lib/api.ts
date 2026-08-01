@@ -58,6 +58,14 @@ type ActiveMonthPocketDepositInput = {
   | { sourceKind: "MONTH_AVAILABLE" }
 );
 
+type ExternalPocketDepositInput = {
+  sourceKind: "EXTERNAL";
+  targetPocketId: string;
+  amount: number;
+  occurredAt: string;
+  externalSourceLabel?: string;
+};
+
 const serializeActiveMonthPocketDeposit = (input: ActiveMonthPocketDepositInput) =>
   input.sourceKind === "SUBCATEGORY"
     ? { sourceKind: input.sourceKind, monthId: input.monthId, sourceSubcategoryId: input.sourceSubcategoryId, targetPocketId: input.targetPocketId, amount: input.amount, occurredAt: input.occurredAt }
@@ -373,6 +381,18 @@ export const api = {
       body: JSON.stringify(serializeActiveMonthPocketDeposit(input)),
     });
     const payload = await readJson<{ month: Month }>(response);
+
+    return payload.month;
+  },
+  async depositExternalToPocket(input: ExternalPocketDepositInput): Promise<null> {
+    const response = await fetch("/api/pockets/deposits", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+    const payload = await readJson<{ month: null }>(response);
 
     return payload.month;
   },
