@@ -44,7 +44,7 @@ import type { ClosureUseCases } from "./application/use-cases/closure-use-cases.
 import type { ReportsUseCases } from "./application/use-cases/reports-use-cases.js";
 import type { ExpenseHistoryUseCases } from "./application/use-cases/expense-history-use-cases.js";
 import type { MonthStructureUseCases } from "./application/use-cases/month-structure-use-cases.js";
-import { DomainError } from "./shared/service-errors.js";
+import { DomainError, SemanticError } from "./shared/service-errors.js";
 
 const isDomainError = (error: unknown): error is DomainError => error instanceof DomainError;
 
@@ -351,6 +351,10 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
       const month = await service.depositToPocket(payload);
       response.status(201).json({ month });
     } catch (error) {
+      if (error instanceof SemanticError) {
+        response.status(error.statusCode).json({ code: error.code, message: error.message });
+        return;
+      }
       if (isDomainError(error)) {
         response.status(error.statusCode).json({ message: error.message });
         return;

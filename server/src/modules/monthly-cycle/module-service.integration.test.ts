@@ -794,11 +794,13 @@ test("service integration: valid subcategory deposits persist and decrease the s
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
   const updatedMonth = await service.depositToPocket({
+    sourceKind: "SUBCATEGORY",
     monthId: month.id,
     sourceSubcategoryId: subcategoryId,
     targetPocketId: "pocket-buffer",
     amount: 40,
     description: "Reserva mensual",
+    occurredAt: "2026-05-10T00:00:00.000Z",
   });
   const movement = getCapturedMovements()[0];
 
@@ -815,10 +817,12 @@ test("service integration: valid external deposits persist without a month ledge
   const service = createMonthlyCycleTestService(db);
 
   const updatedMonth = await service.depositToPocket({
+    sourceKind: "EXTERNAL",
     targetPocketId: "pocket-buffer",
     amount: 75,
     externalSourceLabel: "Ingreso aislado",
     description: "Regalo",
+    occurredAt: "2026-05-10T00:00:00.000Z",
   });
   const movement = getCapturedMovements()[0];
 

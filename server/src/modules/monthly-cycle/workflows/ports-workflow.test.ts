@@ -148,9 +148,11 @@ test("movement workflow validates pocket deposits through ports inside the trans
   });
 
   const result = await service.depositToPocket({
+    sourceKind: "EXTERNAL",
     amount: 25,
     targetPocketId: "pocket-home",
     externalSourceLabel: "Bonus",
+    occurredAt: "2026-05-10T00:00:00.000Z",
   });
 
   assert.equal(result, null);
