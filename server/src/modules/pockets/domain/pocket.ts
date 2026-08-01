@@ -32,8 +32,8 @@ export const rehydratePocket = (pocket: Pocket): Pocket => ({
   ...pocket,
   name: normalizePocketName(pocket.name),
   goalAmount: pocket.goalAmount ?? null,
-  incomingMovements: pocket.incomingMovements.map((movement) => ({ ...movement, description: movement.description ?? null })),
-  outgoingMovements: pocket.outgoingMovements.map((movement) => ({ ...movement, description: movement.description ?? null })),
+  incomingMovements: pocket.incomingMovements.map((movement) => ({ ...movement, description: movement.description ?? null, externalSourceLabel: movement.externalSourceLabel ?? null })),
+  outgoingMovements: pocket.outgoingMovements.map((movement) => ({ ...movement, description: movement.description ?? null, externalSourceLabel: movement.externalSourceLabel ?? null })),
 });
 
 export const calculatePocketBalance = (pocket: Pocket) => {
@@ -52,6 +52,7 @@ export const projectRecentMovements = (pocket: Pocket) => {
     .map((movement) => ({
       id: movement.id,
       type: movement.type,
+      ...(movement.type === "POCKET_DEPOSIT_EXTERNAL" ? { sourceKind: "EXTERNAL" as const, sourceLabel: movement.externalSourceLabel ?? null } : {}),
       amount: movement.amount,
       occurredAt: movement.occurredAt.toISOString(),
       description: movement.description,
