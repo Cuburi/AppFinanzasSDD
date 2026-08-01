@@ -326,7 +326,7 @@ describe("ActiveMonthPage", () => {
     expect(apiMock.getActiveMonth).toHaveBeenCalledTimes(1);
   });
 
-  it("uses an active-pocket selector for deposits instead of a manual pocket ID", async () => {
+  it("funds a pocket from a subcategory with the strict active-month payload", async () => {
     const user = userEvent.setup();
 
     render(<ActiveMonthPage />);
@@ -339,20 +339,81 @@ describe("ActiveMonthPage", () => {
     const depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
     if (!depositForm) throw new Error("Missing deposit form.");
 
-    await user.selectOptions(within(depositForm).getByLabelText("Origen subcategoría (opcional)"), "sub-bonus");
+    await user.selectOptions(within(depositForm).getByLabelText("Origen de los fondos"), "SUBCATEGORY");
+    await user.selectOptions(within(depositForm).getByLabelText("Subcategoría de origen"), "sub-bonus");
     await user.selectOptions(within(depositForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
     await user.type(within(depositForm).getByLabelText("Monto", { selector: "input" }), "125");
+    fireEvent.change(within(depositForm).getByLabelText("Fecha del depósito"), { target: { value: "2026-05-12" } });
     await user.click(within(depositForm).getByRole("button", { name: "Depositar en bolsillo" }));
 
     await waitFor(() =>
       expect(apiMock.depositToPocket).toHaveBeenCalledWith({
+        sourceKind: "SUBCATEGORY",
         monthId: "month-1",
         sourceSubcategoryId: "sub-bonus",
         targetPocketId: "pocket-emergency",
         amount: 125,
-        externalSourceLabel: undefined,
+        occurredAt: "2026-05-12",
       }),
     );
+  });
+
+  it("offers monthly available funds without exposing an external funding path", async () => {
+    const user = userEvent.setup();
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    const depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+
+    await user.selectOptions(within(depositForm).getByLabelText("Origen de los fondos"), "MONTH_AVAILABLE");
+    await user.selectOptions(within(depositForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
+    await user.type(within(depositForm).getByLabelText("Monto", { selector: "input" }), "75");
+    fireEvent.change(within(depositForm).getByLabelText("Fecha del depósito"), { target: { value: "2026-05-13" } });
+    await user.click(within(depositForm).getByRole("button", { name: "Depositar en bolsillo" }));
+
+    await waitFor(() => expect(apiMock.depositToPocket).toHaveBeenCalledWith({
+      sourceKind: "MONTH_AVAILABLE",
+      monthId: "month-1",
+      targetPocketId: "pocket-emergency",
+      amount: 75,
+      occurredAt: "2026-05-13",
+    }));
+    expect(within(depositForm).queryByLabelText(/externo/i)).not.toBeInTheDocument();
+    expect(within(depositForm).queryByLabelText("Subcategoría de origen")).not.toBeInTheDocument();
+  });
+
+  it("keeps deposits safely disabled while active pockets are loading or unavailable", async () => {
+    const user = userEvent.setup();
+    let resolvePockets!: (pockets: SavingsPocket[]) => void;
+    apiMock.getPockets.mockReturnValueOnce(new Promise<SavingsPocket[]>((resolve) => { resolvePockets = resolve; }));
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    expect(screen.getByText("Cargando bolsillos activos.")).toHaveAttribute("role", "status");
+    expect(screen.getByLabelText("Bolsillo destino")).toBeDisabled();
+    expect(within(screen.getByRole("region", { name: "Depositar en bolsillo" })).getByRole("button", { name: "Depositar en bolsillo" })).toBeDisabled();
+
+    resolvePockets(activePockets);
+    expect(await screen.findByRole("option", { name: "Emergencias ($250 COP)" })).toBeInTheDocument();
+  });
+
+  it("retries a transient active-pocket load failure and restores deposit controls", async () => {
+    const user = userEvent.setup();
+    apiMock.getPockets.mockRejectedValueOnce(new Error("Pocket service unavailable.")).mockResolvedValueOnce(activePockets);
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    expect(await screen.findByText("No se pudieron cargar los bolsillos activos.")).toHaveAttribute("role", "alert");
+    const depositRegion = screen.getByRole("region", { name: "Depositar en bolsillo" });
+    expect(within(depositRegion).getByRole("button", { name: "Depositar en bolsillo" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Reintentar bolsillos activos" }));
+
+    await waitFor(() => expect(apiMock.getPockets).toHaveBeenCalledTimes(2));
+    expect(await within(depositRegion).findByRole("option", { name: "Emergencias ($250 COP)" })).toBeInTheDocument();
+    expect(within(depositRegion).getByLabelText("Bolsillo destino")).toBeEnabled();
+    expect(within(depositRegion).getByRole("button", { name: "Depositar en bolsillo" })).toBeEnabled();
   });
 
   it("offers only the loaded active pockets as deposit destinations", async () => {
@@ -820,6 +881,7 @@ describe("ActiveMonthPage", () => {
     await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
     const depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
     if (!depositForm) throw new Error("Missing deposit form.");
+    await user.selectOptions(within(depositForm).getByLabelText("Origen de los fondos"), "MONTH_AVAILABLE");
     await user.selectOptions(within(depositForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
     await user.type(within(depositForm).getByLabelText("Monto", { selector: "input" }), "125");
     await user.click(within(depositForm).getByRole("button", { name: "Depositar en bolsillo" }));

@@ -61,6 +61,40 @@ describe("pockets api", () => {
     expect(fetch).toHaveBeenNthCalledWith(3, "/api/pockets/pocket-emergency", { method: "DELETE" });
     expect(fetch).toHaveBeenNthCalledWith(4, "/api/pockets/pocket-emergency");
   });
+
+  it("serializes strict active-month pocket deposits without contradictory source fields", async () => {
+    const monthPayload = { month: { id: "month-1" } };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 201 }));
+
+    await api.depositToPocket({
+      sourceKind: "SUBCATEGORY",
+      monthId: "month-1",
+      sourceSubcategoryId: "sub-bonus",
+      targetPocketId: "pocket-emergency",
+      amount: 125,
+      occurredAt: "2026-05-12",
+    });
+    await api.depositToPocket({
+      sourceKind: "MONTH_AVAILABLE",
+      monthId: "month-1",
+      targetPocketId: "pocket-emergency",
+      amount: 75,
+      occurredAt: "2026-05-13",
+    });
+
+    expect(fetch).toHaveBeenNthCalledWith(1, "/api/pockets/deposits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-bonus", targetPocketId: "pocket-emergency", amount: 125, occurredAt: "2026-05-12" }),
+    });
+    expect(fetch).toHaveBeenNthCalledWith(2, "/api/pockets/deposits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-emergency", amount: 75, occurredAt: "2026-05-13" }),
+    });
+  });
 });
 
 describe("credit cards api", () => {
