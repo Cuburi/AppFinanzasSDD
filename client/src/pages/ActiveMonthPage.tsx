@@ -594,6 +594,7 @@ export const ActiveMonthPage = () => {
           : { ...input, sourceKind: "MONTH_AVAILABLE" },
       );
       dashboard.replaceMonth(updatedMonth);
+      await loadActivePockets();
       setDepositAmount("");
       setMessage("Depósito a bolsillo registrado.");
     } catch (submitError) {

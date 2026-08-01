@@ -383,6 +383,47 @@ describe("ActiveMonthPage", () => {
     expect(within(depositForm).queryByLabelText("Subcategoría de origen")).not.toBeInTheDocument();
   });
 
+  it("refreshes the visible destination pocket balance from the server after a successful deposit", async () => {
+    const user = userEvent.setup();
+    apiMock.getPockets.mockResolvedValueOnce(activePockets).mockResolvedValueOnce([
+      { ...activePockets[0], balance: 375 },
+      activePockets[1],
+    ]);
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    const depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+
+    await user.selectOptions(within(depositForm).getByLabelText("Origen de los fondos"), "MONTH_AVAILABLE");
+    await user.selectOptions(within(depositForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
+    await user.type(within(depositForm).getByLabelText("Monto", { selector: "input" }), "125");
+    await user.click(within(depositForm).getByRole("button", { name: "Depositar en bolsillo" }));
+
+    expect(await within(depositForm).findByRole("option", { name: "Emergencias ($375 COP)" })).toBeInTheDocument();
+    expect(apiMock.getPockets).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the successful deposit visible when its pocket refresh fails", async () => {
+    const user = userEvent.setup();
+    apiMock.getPockets.mockResolvedValueOnce(activePockets).mockRejectedValueOnce(new Error("Pocket service unavailable."));
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    const depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+
+    await user.selectOptions(within(depositForm).getByLabelText("Origen de los fondos"), "MONTH_AVAILABLE");
+    await user.selectOptions(within(depositForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
+    await user.type(within(depositForm).getByLabelText("Monto", { selector: "input" }), "125");
+    await user.click(within(depositForm).getByRole("button", { name: "Depositar en bolsillo" }));
+
+    expect(await screen.findByText("Depósito a bolsillo registrado.")).toBeInTheDocument();
+    expect(screen.queryByText("No se pudo registrar el depósito.")).not.toBeInTheDocument();
+    expect(screen.getByText("No se pudieron cargar los bolsillos activos.")).toHaveAttribute("role", "alert");
+    expect(apiMock.getPockets).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps deposits safely disabled while active pockets are loading or unavailable", async () => {
     const user = userEvent.setup();
     let resolvePockets!: (pockets: SavingsPocket[]) => void;
