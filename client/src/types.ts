@@ -31,10 +31,13 @@ export type EditableTemplate = {
 
 export type SavingsPocketMovement = {
   id: string;
+  type: string;
   amount: number;
   description: string | null;
   occurredAt: string;
   direction: "in" | "out";
+  sourceKind?: "EXTERNAL";
+  sourceLabel?: string | null;
 };
 
 export type SavingsPocket = {
