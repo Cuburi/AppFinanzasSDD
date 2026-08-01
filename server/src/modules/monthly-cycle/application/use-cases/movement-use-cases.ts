@@ -18,12 +18,7 @@ export type MovementUseCases = {
   depositToPocket(input: DepositToPocketInput): Promise<MonthView | null>;
 };
 
-type StrictDepositBase = { targetPocketId: string; amount: number; occurredAt: string; description?: string | null };
-export type StrictDepositToPocketInput = StrictDepositBase & (
-  | { sourceKind: "SUBCATEGORY"; monthId: string; sourceSubcategoryId: string; externalSourceLabel?: never }
-  | { sourceKind: "MONTH_AVAILABLE"; monthId: string; sourceSubcategoryId?: never; externalSourceLabel?: never }
-  | { sourceKind: "EXTERNAL"; monthId?: never; sourceSubcategoryId?: never; externalSourceLabel: string }
-);
+export type StrictDepositToPocketInput = DepositToPocketInput;
 
 const invalidDepositSource = () => new SemanticError("INVALID_DEPOSIT_SOURCE", 400, "Pocket deposit source is invalid.");
 
@@ -35,7 +30,7 @@ const assertStrictDepositShape = (input: StrictDepositToPocketInput) => {
     if (!input.monthId || !input.sourceSubcategoryId || input.externalSourceLabel != null) throw invalidDepositSource();
   } else if (input.sourceKind === "MONTH_AVAILABLE") {
     if (!input.monthId || input.sourceSubcategoryId != null || input.externalSourceLabel != null) throw invalidDepositSource();
-  } else if (input.sourceKind !== "EXTERNAL" || input.monthId != null || input.sourceSubcategoryId != null || !input.externalSourceLabel?.trim()) {
+  } else if (input.sourceKind !== "EXTERNAL" || input.monthId != null || input.sourceSubcategoryId != null) {
     throw invalidDepositSource();
   }
   return amount;
@@ -75,4 +70,7 @@ export const createStrictDepositToPocketUseCase = (ports: MonthlyCyclePorts) => 
   return month ? mapMonth(month) : null;
 };
 
-export const createMovementUseCases = (ports: MonthlyCyclePorts): MovementUseCases => createMovementService(ports);
+export const createMovementUseCases = (ports: MonthlyCyclePorts): MovementUseCases => ({
+  ...createMovementService(ports),
+  depositToPocket: createStrictDepositToPocketUseCase(ports),
+});

@@ -473,7 +473,7 @@ test("updateTemplate rejects inactive or nonexistent default pockets", async () 
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
-      assert.equal(error.statusCode, 400);
+        assert.equal(error.statusCode, 400);
       assert.match(error.message, /default pocket must exist and be active/i);
       return true;
     },
@@ -491,7 +491,7 @@ test("updateTemplate rejects inactive or nonexistent default pockets", async () 
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
-      assert.equal(error.statusCode, 400);
+        assert.equal(error.statusCode, 400);
       assert.match(error.message, /default pocket must exist and be active/i);
       return true;
     },
@@ -541,15 +541,17 @@ test("depositToPocket rejects inactive or nonexistent target pockets", async () 
   await assert.rejects(
     () =>
       serviceWithInactivePocket.depositToPocket({
+        sourceKind: "SUBCATEGORY",
         monthId: month.id,
         sourceSubcategoryId: subcategoryId,
         targetPocketId: "pocket-inactive",
         amount: 10,
+        occurredAt: "2026-05-10T00:00:00.000Z",
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
-      assert.equal(error.statusCode, 400);
-      assert.match(error.message, /target pocket must exist and be active/i);
+      assert.equal(error.statusCode, 404);
+      assert.match(error.message, /target pocket was not found/i);
       return true;
     },
   );
@@ -557,15 +559,17 @@ test("depositToPocket rejects inactive or nonexistent target pockets", async () 
   await assert.rejects(
     () =>
       serviceWithMissingPocket.depositToPocket({
+        sourceKind: "SUBCATEGORY",
         monthId: month.id,
         sourceSubcategoryId: subcategoryId,
         targetPocketId: "pocket-missing",
         amount: 10,
+        occurredAt: "2026-05-10T00:00:00.000Z",
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
-      assert.equal(error.statusCode, 400);
-      assert.match(error.message, /target pocket must exist and be active/i);
+      assert.equal(error.statusCode, 404);
+      assert.match(error.message, /target pocket was not found/i);
       return true;
     },
   );
@@ -1406,15 +1410,17 @@ test("depositToPocket rejects source subcategory deposits in closed months", asy
   await assert.rejects(
     () =>
       service.depositToPocket({
+        sourceKind: "SUBCATEGORY",
         monthId: month.id,
         sourceSubcategoryId: subcategoryId,
         targetPocketId: "pocket-home",
         amount: 10,
+        occurredAt: "2026-05-10T00:00:00.000Z",
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months/i);
+      assert.match(error.message, /month is not active/i);
       return true;
     },
   );
