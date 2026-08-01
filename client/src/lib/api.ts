@@ -48,6 +48,21 @@ const readJson = async <T>(response: Response): Promise<T> => {
   return (await response.json()) as T;
 };
 
+type ActiveMonthPocketDepositInput = {
+  monthId: string;
+  targetPocketId: string;
+  amount: number;
+  occurredAt: string;
+} & (
+  | { sourceKind: "SUBCATEGORY"; sourceSubcategoryId: string }
+  | { sourceKind: "MONTH_AVAILABLE" }
+);
+
+const serializeActiveMonthPocketDeposit = (input: ActiveMonthPocketDepositInput) =>
+  input.sourceKind === "SUBCATEGORY"
+    ? { sourceKind: input.sourceKind, monthId: input.monthId, sourceSubcategoryId: input.sourceSubcategoryId, targetPocketId: input.targetPocketId, amount: input.amount, occurredAt: input.occurredAt }
+    : { sourceKind: input.sourceKind, monthId: input.monthId, targetPocketId: input.targetPocketId, amount: input.amount, occurredAt: input.occurredAt };
+
 export const api = {
   async getDebts(): Promise<DebtView[]> {
     const response = await fetch("/api/debts");
@@ -349,22 +364,15 @@ export const api = {
 
     return readJson<Month>(response);
   },
-  async depositToPocket(input: {
-    monthId?: string;
-    sourceSubcategoryId?: string;
-    targetPocketId: string;
-    amount: number;
-    description?: string;
-    externalSourceLabel?: string;
-  }): Promise<Month | null> {
+  async depositToPocket(input: ActiveMonthPocketDepositInput): Promise<Month> {
     const response = await fetch("/api/pockets/deposits", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(input),
+      body: JSON.stringify(serializeActiveMonthPocketDeposit(input)),
     });
-    const payload = await readJson<{ month: Month | null }>(response);
+    const payload = await readJson<{ month: Month }>(response);
 
     return payload.month;
   },

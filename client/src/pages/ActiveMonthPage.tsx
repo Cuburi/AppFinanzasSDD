@@ -57,10 +57,12 @@ export const ActiveMonthPage = () => {
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalOccurredAt, setWithdrawalOccurredAt] = useState("");
   const [withdrawalDescription, setWithdrawalDescription] = useState("");
+  const [depositSourceKind, setDepositSourceKind] = useState<"SUBCATEGORY" | "MONTH_AVAILABLE">("SUBCATEGORY");
   const [depositSourceSubcategoryId, setDepositSourceSubcategoryId] = useState("");
   const [depositPocketId, setDepositPocketId] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
-  const [depositExternalSource, setDepositExternalSource] = useState("");
+  const [depositOccurredAt, setDepositOccurredAt] = useState("");
+  const [pocketsLoadStatus, setPocketsLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [incomeSourceName, setIncomeSourceName] = useState("");
   const [incomeAmount, setIncomeAmount] = useState("");
   const [incomeReceivedAt, setIncomeReceivedAt] = useState("");
@@ -128,30 +130,31 @@ export const ActiveMonthPage = () => {
     resetCorrectionForms();
   };
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [pockets, creditCards] = await Promise.all([
-          api.getPockets("active"),
-          api
-            .getCreditCards("active")
-            .then((cards) => {
-              setCreditCardLoadError(null);
-              return cards;
-            })
-            .catch(() => {
-              setCreditCardLoadError("No se pudieron cargar las tarjetas activas. Puedes registrar gastos sin tarjeta.");
-              return [];
-            }),
-        ]);
-        setActivePockets(pockets);
-        setActiveCreditCards(creditCards);
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar los bolsillos activos.");
-      }
-    };
+  const loadActivePockets = async () => {
+    setPocketsLoadStatus("loading");
+    setError(null);
+    try {
+      const pockets = await api.getPockets("active");
+      setActivePockets(pockets);
+      setPocketsLoadStatus("ready");
+    } catch (loadError) {
+      setPocketsLoadStatus("error");
+      setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar los bolsillos activos.");
+    }
+  };
 
-    void load();
+  useEffect(() => {
+    void loadActivePockets();
+    void api
+      .getCreditCards("active")
+      .then((cards) => {
+        setCreditCardLoadError(null);
+        setActiveCreditCards(cards);
+      })
+      .catch(() => {
+        setCreditCardLoadError("No se pudieron cargar las tarjetas activas. Puedes registrar gastos sin tarjeta.");
+        setActiveCreditCards([]);
+      });
   }, []);
 
   useEffect(() => {
@@ -172,6 +175,7 @@ export const ActiveMonthPage = () => {
     setExpenseHistoryMonthId(null);
     setExpenseOccurredAt(formatMonthDate(activeMonth));
     setWithdrawalOccurredAt(formatMonthDate(activeMonth));
+    setDepositOccurredAt(formatMonthDate(activeMonth));
     void refreshExpenseHistoryBestEffort(activeMonth.id);
   }, [activeMonth?.id, dashboard.viewModel.lifecycle]);
 
@@ -578,17 +582,20 @@ export const ActiveMonthPage = () => {
     setMessage(null);
 
     try {
-      const updatedMonth = await api.depositToPocket({
+      const input = {
         monthId: activeMonth.id,
-        sourceSubcategoryId: depositSourceSubcategoryId || undefined,
         targetPocketId: depositPocketId,
         amount: Number(depositAmount),
-        externalSourceLabel: depositSourceSubcategoryId ? undefined : depositExternalSource,
-      });
-      if (updatedMonth) dashboard.replaceMonth(updatedMonth);
-      else await dashboard.refresh();
+        occurredAt: depositOccurredAt || formatMonthDate(activeMonth),
+      };
+      const updatedMonth = await api.depositToPocket(
+        depositSourceKind === "SUBCATEGORY"
+          ? { ...input, sourceKind: "SUBCATEGORY", sourceSubcategoryId: depositSourceSubcategoryId }
+          : { ...input, sourceKind: "MONTH_AVAILABLE" },
+      );
+      dashboard.replaceMonth(updatedMonth);
+      await loadActivePockets();
       setDepositAmount("");
-      setDepositExternalSource("");
       setMessage("Depósito a bolsillo registrado.");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo registrar el depósito.");
@@ -686,7 +693,8 @@ export const ActiveMonthPage = () => {
             title={editingIncomeId ? "Editar ingreso" : "Registrar ingreso"} variant="secondary"
           /> : null}
           {secondaryForm === "withdrawal" ? <RegistrationSlip actions={<><Button disabled={submitting || !canMutateActiveMonth} type="submit">Retirar efectivo</Button><Button variant="secondary" disabled={submitting} onClick={() => setSecondaryForm(null)} type="button">Cancelar retiro</Button></>} formClassName="secondary-movement-form" mode="create" onSubmit={handleCashWithdrawal} primaryFields={<><label className="field small-field"><span>Monto a retirar</span><input min="0.01" step="0.01" type="number" value={withdrawalAmount} onChange={(event) => setWithdrawalAmount(event.target.value)} required /></label><label className="field"><span>Fecha del retiro</span><input type="date" value={withdrawalOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setWithdrawalOccurredAt(event.target.value)} required /></label></>} purpose="Salida a efectivo" supportingFields={<label className="field"><span>Descripción del retiro (opcional)</span><input value={withdrawalDescription} onChange={(event) => setWithdrawalDescription(event.target.value)} /></label>} title="Retirar efectivo" variant="secondary" /> : null}
-          {secondaryForm === "deposit" ? <RegistrationSlip actions={<><Button disabled={submitting || !canMutateActiveMonth} type="submit">Depositar en bolsillo</Button><Button variant="secondary" disabled={submitting} onClick={() => setSecondaryForm(null)} type="button">Cancelar depósito</Button></>} formClassName="secondary-movement-form" mode="create" onSubmit={handleDeposit} primaryFields={<><label className="field"><span>Bolsillo destino</span><select value={depositPocketId} onChange={(event) => setDepositPocketId(event.target.value)} required><option value="">Selecciona un bolsillo activo</option>{activePockets.map((pocket) => <option key={pocket.id} value={pocket.id}>{pocket.name} ({formatCop(pocket.balance)})</option>)}</select></label><label className="field small-field"><span>Monto</span><input min="0.01" step="0.01" type="number" value={depositAmount} onChange={(event) => setDepositAmount(event.target.value)} required /></label></>} purpose="Reserva en bolsillo" supportingFields={<><label className="field"><span>Origen subcategoría (opcional)</span><select value={depositSourceSubcategoryId} onChange={(event) => setDepositSourceSubcategoryId(event.target.value)}><option value="">Ingreso externo</option>{subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label><label className="field"><span>Origen externo</span><input disabled={Boolean(depositSourceSubcategoryId)} value={depositExternalSource} onChange={(event) => setDepositExternalSource(event.target.value)} /></label></>} title="Depositar en bolsillo" variant="secondary" /> : null}
+          {secondaryForm === "deposit" ? <RegistrationSlip actions={<><Button disabled={submitting || !canMutateActiveMonth || pocketsLoadStatus !== "ready"} type="submit">Depositar en bolsillo</Button><Button variant="secondary" disabled={submitting} onClick={() => setSecondaryForm(null)} type="button">Cancelar depósito</Button></>} formClassName="secondary-movement-form" mode="create" onSubmit={handleDeposit} primaryFields={<><label className="field"><span>Bolsillo destino</span><select disabled={pocketsLoadStatus !== "ready"} value={depositPocketId} onChange={(event) => setDepositPocketId(event.target.value)} required><option value="">Selecciona un bolsillo activo</option>{activePockets.map((pocket) => <option key={pocket.id} value={pocket.id}>{pocket.name} ({formatCop(pocket.balance)})</option>)}</select></label><label className="field small-field"><span>Monto</span><input min="0.01" step="0.01" type="number" value={depositAmount} onChange={(event) => setDepositAmount(event.target.value)} required /></label></>} purpose="Reserva en bolsillo" supportingFields={<><label className="field"><span>Origen de los fondos</span><select value={depositSourceKind} onChange={(event) => setDepositSourceKind(event.target.value as "SUBCATEGORY" | "MONTH_AVAILABLE")} required><option value="SUBCATEGORY">Subcategoría</option><option value="MONTH_AVAILABLE">Disponible del mes</option></select></label>{depositSourceKind === "SUBCATEGORY" ? <label className="field"><span>Subcategoría de origen</span><select value={depositSourceSubcategoryId} onChange={(event) => setDepositSourceSubcategoryId(event.target.value)} required><option value="">Selecciona una subcategoría</option>{subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label> : null}<label className="field"><span>Fecha del depósito</span><input type="date" value={depositOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setDepositOccurredAt(event.target.value)} required /></label>{pocketsLoadStatus === "loading" ? <p role="status">Cargando bolsillos activos.</p> : null}{pocketsLoadStatus === "error" ? <p role="alert">No se pudieron cargar los bolsillos activos.</p> : null}</>} title="Depositar en bolsillo" variant="secondary" /> : null}
+          {secondaryForm === "deposit" && pocketsLoadStatus === "error" ? <Button onClick={() => void loadActivePockets()} type="button" variant="tertiary">Reintentar bolsillos activos</Button> : null}
         </>
       ) : null}
 
