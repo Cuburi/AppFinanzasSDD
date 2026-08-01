@@ -9,7 +9,7 @@ const assertInvalidDepositSource = (payload: unknown) => assert.throws(() => par
 );
 
 test("pocket deposit DTO parses every strict source shape", () => {
-  const base = { targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" };
+  const base = { targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00-03:00" };
 
   assert.deepEqual(parseDepositToPocketInput({ ...base, sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "subcategory-food" }), {
     ...base, description: null, sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "subcategory-food",
@@ -28,6 +28,7 @@ test("pocket deposit DTO rejects compatibility and contradictory source shapes",
   assert.throws(() => parseDepositToPocketInput({ ...base, monthId: "month-1", sourceSubcategoryId: "subcategory-food" }), /source kind must/i);
   assert.throws(() => parseDepositToPocketInput({ ...base, sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: "subcategory-food" }), /cannot specify/i);
   assert.throws(() => parseDepositToPocketInput({ ...base, sourceKind: "EXTERNAL", monthId: "month-1", externalSourceLabel: "Bonus" }), /cannot specify/i);
+  for (const payload of [{ ...base, sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: null }, { ...base, sourceKind: "EXTERNAL", monthId: null }]) assertInvalidDepositSource(payload);
 });
 
 test("pocket deposit DTO classifies missing branch-required fields as invalid sources", () => {
@@ -37,9 +38,6 @@ test("pocket deposit DTO classifies missing branch-required fields as invalid so
   assertInvalidDepositSource({ ...base, sourceKind: "MONTH_AVAILABLE" });
 });
 
-test("pocket deposit DTO rejects explicitly-null forbidden source fields", () => {
-  const base = { targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" };
-
-  assertInvalidDepositSource({ ...base, sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: null });
-  assertInvalidDepositSource({ ...base, sourceKind: "EXTERNAL", monthId: null });
+test("pocket deposit DTO rejects impossible calendar dates", () => {
+  const base = { sourceKind: "EXTERNAL", targetPocketId: "pocket-safe", amount: 25 }; for (const occurredAt of ["2026-02-29T00:00:00.000Z", "2026-02-30T00:00:00.000Z"]) assert.throws(() => parseDepositToPocketInput({ ...base, occurredAt }), (error: unknown) => error instanceof SemanticError && error.code === "INVALID_DATE" && error.statusCode === 400);
 });

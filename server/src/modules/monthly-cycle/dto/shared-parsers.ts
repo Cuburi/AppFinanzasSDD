@@ -42,8 +42,8 @@ export const readPositiveAmount = (value: unknown, label: string): number => {
 
 export const readIsoDateString = (value: unknown, label: string): string => {
   const date = readNonEmptyString(value, label);
-
-  if (Number.isNaN(Date.parse(date))) {
+  const [, year, month, day] = /^(\d{4})-(\d{2})-(\d{2})(?:T|$)/.exec(date) ?? [];
+  if (Number.isNaN(Date.parse(date)) || (year && (Number(month) < 1 || Number(month) > 12 || Number(day) < 1 || Number(day) > new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()))) {
     throw new Error(`${label} must be a valid date.`);
   }
 
