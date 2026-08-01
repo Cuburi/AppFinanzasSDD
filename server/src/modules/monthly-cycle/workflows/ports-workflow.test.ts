@@ -33,6 +33,7 @@ test("template workflow updates through transaction-scoped ports instead of a Pr
     months: {} as MonthlyCyclePrismaPortSet["months"],
     movements: {} as MonthlyCyclePrismaPortSet["movements"],
     incomes: {} as MonthlyCyclePrismaPortSet["incomes"],
+    ledger: {} as MonthlyCyclePrismaPortSet["ledger"],
     structure: {} as MonthlyCyclePrismaPortSet["structure"],
     templates: {
       async readCategories() {
@@ -101,6 +102,7 @@ test("movement workflow validates pocket deposits through ports inside the trans
     months: {} as MonthlyCyclePrismaPortSet["months"],
     templates: {} as MonthlyCyclePrismaPortSet["templates"],
     incomes: {} as MonthlyCyclePrismaPortSet["incomes"],
+    ledger: {} as MonthlyCyclePrismaPortSet["ledger"],
     structure: {} as MonthlyCyclePrismaPortSet["structure"],
     pockets: {
       async ensurePocketIsActive(pocketId, label) {

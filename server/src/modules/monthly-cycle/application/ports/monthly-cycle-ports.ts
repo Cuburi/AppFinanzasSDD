@@ -10,6 +10,7 @@ export const MONTHLY_CYCLE_PORT_NAMES = [
   "templates",
   "movements",
   "incomes",
+  "ledger",
   "structure",
   "pockets",
   "creditCards",
@@ -80,6 +81,10 @@ export interface IncomeRepositoryPort {
   delete(incomeId: string): Promise<void>;
 }
 
+export interface MonthlyLedgerReadPort {
+  read(monthId: string): Promise<MonthRecord>;
+}
+
 export interface MonthStructureRepositoryPort {
   createMonthCategory(input: { monthId: string; name: string; sortOrder: number; templateCategoryId: string | null }): Promise<{ id: string }>;
   updateMonthCategory(input: { categoryId: string; name: string }): Promise<void>;
@@ -119,6 +124,7 @@ export type MonthlyCyclePorts = {
   templates: TemplateRepositoryPort;
   movements: MovementRepositoryPort;
   incomes: IncomeRepositoryPort;
+  ledger: MonthlyLedgerReadPort;
   structure: MonthStructureRepositoryPort;
   pockets: PocketValidationPort;
   creditCards: CreditCardValidationPort;

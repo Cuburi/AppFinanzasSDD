@@ -2,6 +2,7 @@ import type { CashUseCases } from "./application/use-cases/cash-use-cases.js";
 import type { ClosureUseCases } from "./application/use-cases/closure-use-cases.js";
 import type { ExpenseHistoryUseCases } from "./application/use-cases/expense-history-use-cases.js";
 import type { IncomeUseCases } from "./application/use-cases/income-use-cases.js";
+import type { LedgerUseCases } from "./application/use-cases/ledger-use-cases.js";
 import type { LifecycleUseCases } from "./application/use-cases/lifecycle-use-cases.js";
 import type { MonthStructureUseCases } from "./application/use-cases/month-structure-use-cases.js";
 import type { MovementUseCases } from "./application/use-cases/movement-use-cases.js";
@@ -13,6 +14,7 @@ export type MonthlyCycleServiceParts = {
   movementUseCases: MovementUseCases;
   templateUseCases: TemplateUseCases;
   incomeUseCases: IncomeUseCases;
+  ledgerUseCases: LedgerUseCases;
   cashUseCases: CashUseCases;
   reportsUseCases: ReportsUseCases;
   expenseHistoryUseCases: ExpenseHistoryUseCases;
@@ -25,6 +27,7 @@ export const composeMonthlyCycleService = ({
   movementUseCases,
   templateUseCases,
   incomeUseCases,
+  ledgerUseCases,
   cashUseCases,
   reportsUseCases,
   expenseHistoryUseCases,
@@ -46,6 +49,7 @@ export const composeMonthlyCycleService = ({
   deleteMonthSubcategory: monthStructureUseCases.deleteMonthSubcategory,
   listExpenseHistory: expenseHistoryUseCases.listExpenseHistory,
   getBasicReport: reportsUseCases.getBasicReport,
+  getMonthlyLedger: ledgerUseCases.getMonthlyLedger,
   withdrawCash: cashUseCases.withdrawCash,
   getCashSummary: cashUseCases.getCashSummary,
   depositToPocket: movementUseCases.depositToPocket,

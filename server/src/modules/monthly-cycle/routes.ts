@@ -8,6 +8,7 @@ import {
   type DepositToPocketInput,
   type ExpenseHistoryQueryInput,
   type ExpenseHistoryView,
+  type MonthlyLedgerView,
   type MonthView,
   type OpenMonthInput,
   type RecordExpenseInput,
@@ -25,6 +26,7 @@ import {
   parseDeleteMonthCategoryInput,
   parseDeleteMonthSubcategoryInput,
   parseExpenseHistoryQueryInput,
+  parseMonthlyLedgerQueryInput,
   parseBasicReportInput,
   parseOpenMonthInput,
   parseRecordExpenseInput,
@@ -44,6 +46,7 @@ import type { ClosureUseCases } from "./application/use-cases/closure-use-cases.
 import type { ReportsUseCases } from "./application/use-cases/reports-use-cases.js";
 import type { ExpenseHistoryUseCases } from "./application/use-cases/expense-history-use-cases.js";
 import type { MonthStructureUseCases } from "./application/use-cases/month-structure-use-cases.js";
+import type { LedgerUseCases } from "./application/use-cases/ledger-use-cases.js";
 import { DomainError, SemanticError } from "./shared/service-errors.js";
 
 const isDomainError = (error: unknown): error is DomainError => error instanceof DomainError;
@@ -59,8 +62,9 @@ export type ExpenseHistoryRouteService = ExpenseHistoryUseCases;
 export type LifecycleRouteService = Pick<LifecycleUseCases, "openMonth" | "getActiveMonth">;
 export type MovementRouteService = MovementUseCases;
 export type MonthStructureRouteService = MonthStructureUseCases;
+export type LedgerRouteService = LedgerUseCases;
 
-export type MonthlyCycleRouteService = TemplateRouteService & IncomeRouteService & CashRouteService & ClosureRouteService & ReportsRouteService & ExpenseHistoryRouteService & LifecycleRouteService & MovementRouteService & MonthStructureRouteService;
+export type MonthlyCycleRouteService = TemplateRouteService & IncomeRouteService & CashRouteService & ClosureRouteService & ReportsRouteService & ExpenseHistoryRouteService & LifecycleRouteService & MovementRouteService & MonthStructureRouteService & LedgerRouteService;
 
 export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRouteService>) => {
   const service = routeService as MonthlyCycleRouteService;
@@ -268,6 +272,23 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
       }
 
       response.status(400).json({ message: readMessage(error) });
+    }
+  });
+
+  router.get("/months/:id/ledger", async (request, response) => {
+    try {
+      const ledger: MonthlyLedgerView = await service.getMonthlyLedger(parseMonthlyLedgerQueryInput(request.params.id, request.query));
+      response.json(ledger);
+    } catch (error) {
+      if (error instanceof SemanticError) {
+        response.status(error.statusCode).json({ code: error.code, message: error.message });
+        return;
+      }
+      if (isDomainError(error)) {
+        response.status(error.statusCode).json({ message: error.message });
+        return;
+      }
+      response.status(500).json({ message: "Internal server error." });
     }
   });
 

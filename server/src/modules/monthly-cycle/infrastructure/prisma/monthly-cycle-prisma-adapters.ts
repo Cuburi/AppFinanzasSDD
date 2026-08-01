@@ -223,6 +223,11 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       await db.monthlyIncome.delete({ where: { id: incomeId } });
     },
   },
+  ledger: {
+    read(monthId) {
+      return readMonthById(db, monthId);
+    },
+  },
   structure: {
     createMonthCategory(input) {
       return db.monthCategory.create({ data: { monthId: input.monthId, name: input.name, sortOrder: input.sortOrder, templateCategoryId: input.templateCategoryId } });
