@@ -3,6 +3,7 @@ import test from "node:test";
 import { MonthStatus, Prisma } from "../../../../lib/prisma-client.js";
 
 import { DomainError, SemanticError } from "../../shared/service-errors.js";
+import { monthInclude } from "../../shared/service-types.js";
 import { createMonthlyCyclePrismaAdapters, createMonthlyCyclePrismaTransactionRunner } from "./monthly-cycle-prisma-adapters.js";
 
 const amount = (value: number) => new Prisma.Decimal(value.toFixed(2));
@@ -75,6 +76,17 @@ test("monthly-cycle Prisma adapters expose active owned credit-card validation t
       select: { id: true },
     },
   ]);
+});
+
+test("monthly-cycle Prisma ledger adapter isolates two month reads", async () => {
+  const calls: unknown[] = [];
+  const records = { "month-1": { id: "month-1", movements: [{ id: "movement-1" }] }, "month-2": { id: "month-2", movements: [{ id: "movement-2" }] } };
+  const ports = createMonthlyCyclePrismaAdapters({ month: { async findUnique(args: { where: { id: keyof typeof records } }) { calls.push(args); return records[args.where.id]; } } } as any);
+
+  const [first, second] = await Promise.all([ports.ledger.read("month-1"), ports.ledger.read("month-2")]);
+
+  assert.deepEqual([first.id, first.movements.map(({ id }) => id), second.id, second.movements.map(({ id }) => id)], ["month-1", ["movement-1"], "month-2", ["movement-2"]]);
+  assert.deepEqual(calls, [{ where: { id: "month-1" }, include: monthInclude }, { where: { id: "month-2" }, include: monthInclude }]);
 });
 
 test("monthly-cycle Prisma credit-card validation rejects missing inactive or unowned cards", async () => {

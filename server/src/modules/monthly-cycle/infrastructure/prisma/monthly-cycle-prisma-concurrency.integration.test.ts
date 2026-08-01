@@ -4,6 +4,7 @@ import test from "node:test";
 import { MovementType, Prisma, PrismaClient } from "../../../../lib/prisma-client.js";
 import { calculateMonthBalances } from "../../balance-calculator.js";
 import { createStrictDepositToPocketUseCase } from "../../application/use-cases/movement-use-cases.js";
+import { createLedgerUseCases } from "../../application/use-cases/ledger-use-cases.js";
 import type { MonthlyCyclePorts } from "../../application/ports/monthly-cycle-ports.js";
 import { createMonthlyCyclePrismaAdapters, createMonthlyCyclePrismaTransactionRunner } from "./monthly-cycle-prisma-adapters.js";
 
@@ -104,5 +105,28 @@ test("strict deposit rolls back all effects when persistence fails after its mov
     await prisma.month.delete({ where: { id: month.id } });
     await prisma.savingsPocket.delete({ where: { id: pocket.id } });
     await prisma.$disconnect();
+  }
+});
+
+test("ledger reads through the PostgreSQL adapter isolate two months", async () => {
+  if (!process.env.DATABASE_URL?.includes("appfinanzas_dev")) throw new Error("This integration test requires the dev PostgreSQL profile.");
+  const year = 4400 + (Date.now() % 1000);
+  const monthIds: string[] = [];
+
+  try {
+    const firstMonth = await prisma.month.create({ data: { year, month: 1, openedAt: new Date(Date.UTC(year, 0, 1)) } });
+    monthIds.push(firstMonth.id);
+    const secondMonth = await prisma.month.create({ data: { year, month: 2, openedAt: new Date(Date.UTC(year, 1, 1)) } });
+    monthIds.push(secondMonth.id);
+    await Promise.all([prisma.monthlyIncome.create({ data: { monthId: firstMonth.id, sourceName: "first", amount: new Prisma.Decimal(1), receivedAt: new Date(Date.UTC(year, 0, 2)) } }), prisma.monthlyIncome.create({ data: { monthId: secondMonth.id, sourceName: "second", amount: new Prisma.Decimal(2), receivedAt: new Date(Date.UTC(year, 1, 2)) } })]);
+    const ledger = createLedgerUseCases(createMonthlyCyclePrismaAdapters(prisma as never) as MonthlyCyclePorts);
+    const [first, second] = await Promise.all([ledger.getMonthlyLedger({ monthId: firstMonth.id, includeSystemEvents: false }), ledger.getMonthlyLedger({ monthId: secondMonth.id, includeSystemEvents: false })]);
+    assert.deepEqual([first.monthId, first.entries.map((entry) => [entry.amount, entry.metadata.description]), second.monthId, second.entries.map((entry) => [entry.amount, entry.metadata.description])], [firstMonth.id, [[1, null]], secondMonth.id, [[2, null]]]);
+  } finally {
+    try {
+      await prisma.month.deleteMany({ where: { id: { in: monthIds } } });
+    } finally {
+      await prisma.$disconnect();
+    }
   }
 });

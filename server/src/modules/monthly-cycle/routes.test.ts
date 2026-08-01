@@ -6,7 +6,7 @@ import { PaymentMethod } from "../../lib/prisma-client.js";
 
 import { monthlyCycleRouter } from "./routes.js";
 import { DomainError, SemanticError } from "./shared/service-errors.js";
-import type { BasicMonthlyReportView, MonthView } from "./dto/index.js";
+import type { BasicMonthlyReportView, MonthView, MonthlyLedgerView } from "./dto/index.js";
 
 const report: BasicMonthlyReportView = {
   summary: {
@@ -137,6 +137,60 @@ test("monthlyCycleRouter maps missing report months to 404", async () => {
 
     assert.equal(response.status, 404);
     assert.deepEqual(await response.json(), { message: "Month was not found." });
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter exposes the unpaginated ledger and rejects invalid system-event flags before delegation", async () => {
+  const calls: unknown[] = [];
+  const ledger: MonthlyLedgerView = { monthId: "month-1", status: "CLOSED", entries: [] };
+  const server = createTestServer({ async getMonthlyLedger(input: unknown) { calls.push(input); return ledger; } });
+
+  try {
+    const omitted = await request(server, "/api/months/month-1/ledger");
+    const response = await request(server, "/api/months/month-1/ledger?includeSystemEvents=true");
+    const invalid = await request(server, "/api/months/month-1/ledger?includeSystemEvents=yes");
+
+    assert.equal(omitted.status, 200);
+    assert.deepEqual(await omitted.json(), ledger);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), ledger);
+    assert.equal(invalid.status, 400);
+    assert.deepEqual(await invalid.json(), { code: "INVALID_QUERY", message: "includeSystemEvents must be true or false." });
+    assert.deepEqual(calls, [{ monthId: "month-1", includeSystemEvents: false }, { monthId: "month-1", includeSystemEvents: true }]);
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter returns a safe 500 response for unexpected ledger failures", async () => {
+  const server = createTestServer({
+    async getMonthlyLedger() {
+      throw new Error("Prisma connection string contains postgres://internal-secret");
+    },
+  });
+
+  try {
+    const response = await request(server, "/api/months/month-1/ledger");
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(await response.json(), { message: "Internal server error." });
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter maps blank ledger month ids to semantic 400 before service delegation", async () => {
+  let calls = 0;
+  const server = createTestServer({ async getMonthlyLedger() { calls += 1; throw new Error("Invalid route input should not reach service."); } });
+
+  try {
+    const response = await request(server, "/api/months/%20%20%20/ledger");
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { code: "INVALID_QUERY", message: "Month id is required." });
+    assert.equal(calls, 0);
   } finally {
     server.close();
   }
