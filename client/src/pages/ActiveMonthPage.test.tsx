@@ -29,6 +29,20 @@ const apiMock = vi.hoisted(() => ({
   getExpenseHistory: vi.fn(),
 }));
 
+const ledgerEntry = (entryKey: string, eventType: string, description: string | null, occurredAt = "2026-05-12T12:00:00.000Z") => ({
+  entryKey,
+  occurredAt,
+  eventType,
+  direction: eventType === "MONTHLY_INCOME" ? "INFLOW" : "OUTFLOW",
+  source: { kind: "MONTH", id: "month-1" },
+  destination: { kind: eventType.includes("EXPENSE") ? "EXPENSE" : "MONTH", id: entryKey },
+  amount: 20,
+  balanceEffects: { availableMoney: -20, cashBalance: 0, subcategoryAvailable: -20, pocketBalance: 0 },
+  metadata: { description, paymentMethod: "CASH", isSystemEvent: false },
+});
+
+const ledgerResponse = (...entries: ReturnType<typeof ledgerEntry>[]) => ({ monthId: "month-1", status: "ACTIVE", entries });
+
 vi.mock("../lib/api", () => ({
   api: apiMock,
 }));
@@ -142,6 +156,14 @@ describe("ActiveMonthPage", () => {
         subcategory: { id: "sub-bonus", name: "Bonus" },
       },
     ]);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ledgerResponse(
+        ledgerEntry("expense-1", "CASH_EXPENSE", "Café"),
+        ledgerEntry("expense-2", "NON_CASH_EXPENSE", "Gasto sin descripción"),
+        ledgerEntry("income-1", "MONTHLY_INCOME", "Sueldo"),
+      ),
+    }));
   });
 
   it("keeps the literal dollar sign and fractional values in Colombian COP output", () => {
@@ -160,7 +182,49 @@ describe("ActiveMonthPage", () => {
     expect(within(financial).getByText("$375 COP")).toBeInTheDocument();
     expect(financial.compareDocumentPosition(expenseCapture) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(quickActions.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(activity).getByRole("heading", { name: "Gastos e ingresos" })).toBeInTheDocument();
+    expect(within(activity).getByRole("heading", { name: "Movimientos del mes" })).toBeInTheDocument();
+  });
+
+  it("renders only the canonical ledger in backend order, including unknown rows as read-only", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ledgerResponse(
+        ledgerEntry("expense-1", "CASH_EXPENSE", "Primero"),
+        ledgerEntry("unknown-1", "ALIEN_EVENT", "Después"),
+        ledgerEntry("missing-expense", "CASH_EXPENSE", "Sin resolver"),
+        ledgerEntry("income-1", "MONTHLY_INCOME", "Último"),
+      ),
+    }));
+    render(<ActiveMonthPage />);
+
+    await screen.findByText("Primero");
+    const ledger = screen.getByRole("region", { name: "Movimientos del mes" });
+    expect(ledger).toHaveTextContent("Primero");
+    expect(ledger).toHaveTextContent("Después");
+    expect(ledger).toHaveTextContent("Último");
+    expect(ledger.textContent!.indexOf("Primero")).toBeLessThan(ledger.textContent!.indexOf("Después"));
+    expect(ledger.textContent!.indexOf("Después")).toBeLessThan(ledger.textContent!.indexOf("Último"));
+    expect(screen.queryByRole("region", { name: "Gastos e ingresos" })).not.toBeInTheDocument();
+    expect(within(ledger).getByText("Este tipo de movimiento no se reconoce y no se puede editar ni eliminar desde este historial.")).toBeInTheDocument();
+    expect(within(ledger).getByText("El registro original ya no está disponible para editar ni eliminar desde este historial.")).toBeInTheDocument();
+  });
+
+  it("keeps a successful expense mutation successful when canonical ledger refresh fails", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ledgerResponse(ledgerEntry("expense-1", "CASH_EXPENSE", "Café")) })
+      .mockRejectedValueOnce(new Error("Ledger unavailable.")));
+    render(<ActiveMonthPage />);
+
+    const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
+    if (!expenseForm) throw new Error("Missing expense form.");
+    await user.selectOptions(within(expenseForm).getByLabelText("Subcategoría del gasto"), "sub-bonus");
+    await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
+    await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
+
+    expect(await screen.findByText("Gasto registrado y saldos recalculados.")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudieron cargar los movimientos del mes.");
+    expect(screen.queryByText("No se pudo registrar el gasto.")).not.toBeInTheDocument();
   });
 
   it("keeps Estructura del mes closed by default and exposes the month-only versus template-promotion guidance when expanded", async () => {
@@ -227,9 +291,9 @@ describe("ActiveMonthPage", () => {
     const user = userEvent.setup();
     render(<ActiveMonthPage />);
 
-    const activity = await screen.findByRole("region", { name: "Gastos e ingresos" });
-    await within(activity).findByText("Café");
-    await user.click(within(activity).getByRole("button", { name: "Editar ingreso Sueldo" }));
+    const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
+    await within(ledger).findByText("Sueldo");
+    await user.click(within(ledger).getByRole("button", { name: "Editar ingreso Sueldo" }));
     expect(screen.getByRole("region", { name: "Editar ingreso" })).toHaveClass("registration-slip-edit");
     expect(screen.getByLabelText("Fuente del ingreso")).toHaveFocus();
   });
@@ -253,8 +317,8 @@ describe("ActiveMonthPage", () => {
     const user = userEvent.setup();
     render(<ActiveMonthPage />);
 
-    const activity = await screen.findByRole("region", { name: "Gastos e ingresos" });
-    await user.click(within(activity).getByRole("button", { name: "Editar ingreso Sueldo" }));
+    const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
+    await user.click(within(ledger).getByRole("button", { name: "Editar ingreso Sueldo" }));
     expect(screen.getByRole("region", { name: "Editar ingreso" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Retirar efectivo" }));
@@ -271,16 +335,13 @@ describe("ActiveMonthPage", () => {
     expect(apiMock.updateMonthlyIncome).not.toHaveBeenCalled();
   });
 
-  it("combines only existing expense and income data in chronological activity and opens income editing inline", async () => {
+  it("opens income editing from the canonical ledger", async () => {
     const user = userEvent.setup();
     render(<ActiveMonthPage />);
 
-    const activity = await screen.findByRole("region", { name: "Gastos e ingresos" });
-    expect(within(activity).getByText("Incluye gastos e ingresos registrados; no incluye retiros ni depósitos a bolsillos.")).toBeInTheDocument();
-    await within(activity).findByText("Café");
-    expect(within(activity).getByText("Café").compareDocumentPosition(within(activity).getByText("Sueldo")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    await user.click(within(activity).getByRole("button", { name: "Editar ingreso Sueldo" }));
+    const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
+    await within(ledger).findByText("Café");
+    await user.click(within(ledger).getByRole("button", { name: "Editar ingreso Sueldo" }));
     expect(screen.getByRole("region", { name: "Editar ingreso" })).toBeInTheDocument();
     expect(screen.getByLabelText("Fuente del ingreso")).toHaveFocus();
   });
@@ -483,7 +544,6 @@ describe("ActiveMonthPage", () => {
     expect(within(financialSurface).getByRole("progressbar", { name: "Presupuesto utilizado" })).toHaveAttribute("aria-valuenow", "0");
     expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
     expect(screen.getByText("Sueldo")).toBeInTheDocument();
-    expect(screen.getByText(/neto/)).toBeInTheDocument();
   });
 
   it("derives budget utilization separately while displaying only actual expense history, excluding a pocket deposit reflected in availability", async () => {
@@ -517,9 +577,7 @@ describe("ActiveMonthPage", () => {
     expect(await screen.findByRole("region", { name: "Efectivo físico" })).toHaveTextContent("$80 COP");
     expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1");
     expect(await screen.findByText("Café")).toBeInTheDocument();
-    expect(screen.getByText("Tarjeta: Visa Daily")).toBeInTheDocument();
-    expect(screen.getByText("Bonus · Ingresos · Efectivo")).toBeInTheDocument();
-    expect(screen.getByText("Bonus · Ingresos · No efectivo")).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Movimientos del mes" })).toHaveTextContent("Café");
   });
 
   it("offers active credit cards while keeping the default cash/no-card expense path", async () => {
@@ -530,8 +588,8 @@ describe("ActiveMonthPage", () => {
     expect(apiMock.getCreditCards).toHaveBeenCalledWith("active");
     expect(cardSelect).toHaveValue("");
     expect(screen.getByRole("option", { name: "Sin tarjeta / efectivo" })).toBeInTheDocument();
-    expect(screen.getAllByRole("option", { name: "Visa Daily" })).toHaveLength(2);
-    expect(screen.getAllByRole("option", { name: "Mastercard Travel" })).toHaveLength(2);
+    expect(screen.getAllByRole("option", { name: "Visa Daily" })).toHaveLength(1);
+    expect(screen.getAllByRole("option", { name: "Mastercard Travel" })).toHaveLength(1);
   });
 
   it("records a card-linked expense as non-cash", async () => {
@@ -587,222 +645,26 @@ describe("ActiveMonthPage", () => {
     );
   });
 
-  it("filters expense history by selected credit card", async () => {
-    const user = userEvent.setup();
 
-    render(<ActiveMonthPage />);
-
-    const historyFilter = await screen.findByLabelText("Filtrar historial por tarjeta");
-    await user.selectOptions(historyFilter, "card-1");
-
-    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenLastCalledWith("month-1", { creditCardId: "card-1" }));
-  });
-
-  it("keeps Gastado at the full monthly expense total when filtering visible history by card", async () => {
-    const user = userEvent.setup();
-    const cashExpense: ExpenseHistoryItem = {
-      id: "expense-cash",
-      occurredAt: "2026-05-12T00:00:00.000Z",
-      paymentMethod: "CASH",
-      amount: 20,
-      description: "Café",
-      creditCardId: null,
-      category: { id: "cat-income", name: "Ingresos" },
-      subcategory: { id: "sub-bonus", name: "Bonus" },
-    };
-    const cardExpense: ExpenseHistoryItem = {
-      ...cashExpense,
-      id: "expense-card",
-      paymentMethod: "NON_CASH",
-      amount: 35,
-      description: "Supermercado",
-      creditCardId: "card-1",
-    };
-    apiMock.getExpenseHistory.mockResolvedValueOnce([cashExpense, cardExpense]).mockResolvedValueOnce([cardExpense]);
-
-    render(<ActiveMonthPage />);
-
-    expect(await screen.findByText("Café")).toBeInTheDocument();
-    expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(1);
-    await user.selectOptions(screen.getByLabelText("Filtrar historial por tarjeta"), "card-1");
-
-    await waitFor(() => expect(screen.queryByText("Café")).not.toBeInTheDocument());
-    expect(screen.getByText("Supermercado")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Resumen financiero del mes" })).toHaveTextContent("Gastado$55 COP");
-  });
-
-  it("keeps a refreshed filtered history and full spend total when the previous month response arrives late", async () => {
+  it("keeps the refreshed canonical ledger when a prior-month response arrives late", async () => {
     const user = userEvent.setup();
     const nextMonth = { ...activeMonth, id: "month-2", month: 6 };
-    const cashExpense: ExpenseHistoryItem = {
-      id: "expense-cash",
-      occurredAt: "2026-06-12T00:00:00.000Z",
-      paymentMethod: "CASH",
-      amount: 20,
-      description: "Café de B",
-      creditCardId: null,
-      category: { id: "cat-income", name: "Ingresos" },
-      subcategory: { id: "sub-bonus", name: "Bonus" },
-    };
-    const cardExpense: ExpenseHistoryItem = { ...cashExpense, id: "expense-card", paymentMethod: "NON_CASH", amount: 35, description: "Tarjeta de B", creditCardId: "card-1" };
-    let resolveInitialFull!: (history: ExpenseHistoryItem[]) => void;
-    let resolveNextFiltered!: (history: ExpenseHistoryItem[]) => void;
-    let resolveNextFull!: (history: ExpenseHistoryItem[]) => void;
+    let resolvePreviousLedger!: (value: Response) => void;
+    let resolveCurrentLedger!: (value: Response) => void;
     apiMock.getActiveMonth.mockResolvedValueOnce(activeMonth).mockResolvedValueOnce(nextMonth);
-    apiMock.getExpenseHistory.mockImplementation((monthId: string, filters?: { creditCardId?: string }) =>
-      new Promise<ExpenseHistoryItem[]>((resolve) => {
-        if (monthId === "month-1" && !filters?.creditCardId) resolveInitialFull = resolve;
-        if (monthId === "month-2" && filters?.creditCardId) resolveNextFiltered = resolve;
-        if (monthId === "month-2" && !filters?.creditCardId) resolveNextFull = resolve;
-      }),
-    );
+    vi.stubGlobal("fetch", vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolvePreviousLedger = resolve; }))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveCurrentLedger = resolve; })));
 
     render(<ActiveMonthPage />);
 
-    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1"));
-    await user.selectOptions(screen.getByLabelText("Filtrar historial por tarjeta"), "card-1");
-    await user.click(screen.getByRole("button", { name: "Refrescar" }));
-    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-2", { creditCardId: "card-1" }));
-    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-2"));
-
-    resolveNextFiltered([cardExpense]);
-    resolveNextFull([cashExpense, cardExpense]);
-    expect(await screen.findByText("Tarjeta de B")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Resumen financiero del mes" })).toHaveTextContent("Gastado$55 COP");
-
-    resolveInitialFull([{ ...cashExpense, id: "expense-a", amount: 10, description: "Gasto de A" }]);
+    await user.click(await screen.findByRole("button", { name: "Refrescar" }));
+    resolveCurrentLedger({ ok: true, json: async () => ({ monthId: "month-2", status: "ACTIVE", entries: [ledgerEntry("income-2", "MONTHLY_INCOME", "Mes actual")] }) } as Response);
+    expect(await screen.findByText("Mes actual")).toBeInTheDocument();
+    resolvePreviousLedger({ ok: true, json: async () => ledgerResponse(ledgerEntry("expense-1", "CASH_EXPENSE", "Mes anterior")) } as Response);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(screen.queryByText("Gasto de A")).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Resumen financiero del mes" })).toHaveTextContent("Gastado$55 COP");
-  });
-
-  it("marks Gastado unavailable after its unfiltered monthly source fails and retries only that source", async () => {
-    apiMock.getExpenseHistory.mockRejectedValueOnce(new Error("No se pudo consultar el historial.")).mockResolvedValueOnce([
-      {
-        id: "expense-retried",
-        occurredAt: "2026-05-12T00:00:00.000Z",
-        paymentMethod: "CASH",
-        amount: 20,
-        description: "Café recargado",
-        creditCardId: null,
-        category: { id: "cat-income", name: "Ingresos" },
-        subcategory: { id: "sub-bonus", name: "Bonus" },
-      },
-    ]);
-
-    render(<ActiveMonthPage />);
-
-    const financialSurface = await screen.findByRole("region", { name: "Resumen financiero del mes" });
-    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo cargar el gasto del mes.");
-    expect(financialSurface).toHaveTextContent("GastadoNo disponible");
-    expect(financialSurface).not.toHaveTextContent("Gastado$0 COP");
-
-    await userEvent.setup().click(screen.getByRole("button", { name: "Reintentar Gastado" }));
-
-    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(2));
-    expect(apiMock.getExpenseHistory).toHaveBeenLastCalledWith("month-1");
-    expect(await screen.findByText("Café recargado")).toBeInTheDocument();
-    expect(financialSurface).toHaveTextContent("Gastado$20 COP");
-    expect(screen.queryByText("No hay gastos registrados para este mes.")).not.toBeInTheDocument();
-  });
-
-  it("preserves filtered visible history while retrying the unfiltered Gastado source", async () => {
-    const user = userEvent.setup();
-    const cashExpense = { id: "expense-cash", occurredAt: "2026-05-12T00:00:00.000Z", paymentMethod: "CASH" as const, amount: 20, description: "Café", creditCardId: null, category: { id: "cat-income", name: "Ingresos" }, subcategory: { id: "sub-bonus", name: "Bonus" } };
-    const cardExpense = { ...cashExpense, id: "expense-card", paymentMethod: "NON_CASH" as const, amount: 35, description: "Solo tarjeta", creditCardId: "card-1" };
-    apiMock.getExpenseHistory.mockRejectedValueOnce(new Error("No se pudo consultar el historial.")).mockResolvedValueOnce([cardExpense]).mockResolvedValueOnce([cashExpense, cardExpense]);
-
-    render(<ActiveMonthPage />);
-
-    await screen.findByRole("button", { name: "Reintentar Gastado" });
-    await user.selectOptions(screen.getByLabelText("Filtrar historial por tarjeta"), "card-1");
-    expect(await screen.findByText("Solo tarjeta")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Reintentar Gastado" }));
-
-    expect(await screen.findByText("Solo tarjeta")).toBeInTheDocument();
-    expect(screen.queryByText("Café")).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Resumen financiero del mes" })).toHaveTextContent("Gastado$55 COP");
-  });
-
-  it("marks Gastado unavailable instead of showing the previous month total while the next month source is pending", async () => {
-    const user = userEvent.setup();
-    const nextMonth = { ...activeMonth, id: "month-2", month: 6 };
-    const previousExpense: ExpenseHistoryItem = {
-      id: "expense-a",
-      occurredAt: "2026-05-12T00:00:00.000Z",
-      paymentMethod: "CASH",
-      amount: 55,
-      description: "Gasto de A",
-      creditCardId: null,
-      category: { id: "cat-income", name: "Ingresos" },
-      subcategory: { id: "sub-bonus", name: "Bonus" },
-    };
-    let resolveNextHistory!: (history: ExpenseHistoryItem[]) => void;
-    apiMock.getActiveMonth.mockResolvedValueOnce(activeMonth).mockResolvedValueOnce(nextMonth);
-    apiMock.getExpenseHistory.mockImplementation((monthId: string) =>
-      monthId === "month-1"
-        ? Promise.resolve([previousExpense])
-        : new Promise<ExpenseHistoryItem[]>((resolve) => {
-            resolveNextHistory = resolve;
-          }),
-    );
-
-    render(<ActiveMonthPage />);
-
-    expect(await screen.findByText("Gasto de A")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Resumen financiero del mes" })).toHaveTextContent("Gastado$55 COP");
-
-    await user.click(screen.getByRole("button", { name: "Refrescar" }));
-    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-2"));
-
-    const financialSurface = screen.getByRole("region", { name: "Resumen financiero del mes" });
-    expect(financialSurface).toHaveTextContent("GastadoNo disponible");
-    expect(financialSurface).not.toHaveTextContent("Gastado$55 COP");
-
-    resolveNextHistory([]);
-  });
-
-  it("never renders prior-month expenses with the next month income while replacement history is pending or fails", async () => {
-    const user = userEvent.setup();
-    const nextMonth: Month = {
-      ...activeMonth,
-      id: "month-2",
-      month: 6,
-      incomes: [{ ...activeMonth.incomes[0], id: "income-2", monthId: "month-2", sourceName: "Sueldo de B" }],
-    };
-    const previousExpense: ExpenseHistoryItem = {
-      id: "expense-a",
-      occurredAt: "2026-05-12T00:00:00.000Z",
-      paymentMethod: "CASH",
-      amount: 55,
-      description: "Gasto de A",
-      creditCardId: null,
-      category: { id: "cat-income", name: "Ingresos" },
-      subcategory: { id: "sub-bonus", name: "Bonus" },
-    };
-    let rejectNextHistory!: (error: Error) => void;
-    apiMock.getActiveMonth.mockResolvedValueOnce(activeMonth).mockResolvedValueOnce(nextMonth);
-    apiMock.getExpenseHistory.mockImplementation((monthId: string) =>
-      monthId === "month-1"
-        ? Promise.resolve([previousExpense])
-        : new Promise<ExpenseHistoryItem[]>((_, reject) => {
-            rejectNextHistory = reject;
-          }),
-    );
-
-    render(<ActiveMonthPage />);
-
-    expect(await screen.findByText("Gasto de A")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Refrescar" }));
-    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-2"));
-
-    expect(screen.getByText("Sueldo de B")).toBeInTheDocument();
-    expect(screen.queryByText("Gasto de A")).not.toBeInTheDocument();
-
-    rejectNextHistory(new Error("No se pudo consultar el historial."));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Reintentar Gastado" })).toBeInTheDocument());
-    expect(screen.queryByText("Gasto de A")).not.toBeInTheDocument();
-    expect(screen.getByText("Sueldo de B")).toBeInTheDocument();
+    expect(screen.queryByText("Mes anterior")).not.toBeInTheDocument();
+    expect(screen.getByText("Mes actual")).toBeInTheDocument();
   });
 
   it("keeps the active month usable when credit cards cannot be loaded", async () => {
@@ -813,25 +675,6 @@ describe("ActiveMonthPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudieron cargar las tarjetas activas. Puedes registrar gastos sin tarjeta.");
     expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Sin tarjeta / efectivo" })).toBeInTheDocument();
-  });
-
-  it("uses the current fallback label when an expense references an unavailable card", async () => {
-    apiMock.getExpenseHistory.mockResolvedValueOnce([
-      {
-        id: "expense-with-missing-card",
-        occurredAt: "2026-05-16T00:00:00.000Z",
-        paymentMethod: "NON_CASH",
-        amount: 15,
-        description: "Compra anterior",
-        creditCardId: "card-removed",
-        category: { id: "cat-income", name: "Ingresos" },
-        subcategory: { id: "sub-bonus", name: "Bonus" },
-      },
-    ]);
-
-    render(<ActiveMonthPage />);
-
-    expect(await screen.findByText("Tarjeta: Tarjeta no disponible")).toBeInTheDocument();
   });
 
   it("records an expense with date and payment method", async () => {
@@ -973,6 +816,53 @@ describe("ActiveMonthPage", () => {
     await waitFor(() => expect(apiMock.deleteExpense).toHaveBeenCalledWith("month-1", "expense-1"));
     expect(await screen.findByText("Gasto eliminado del mes activo y saldos recalculados.")).toBeInTheDocument();
     expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps a refreshed canonical expense visible but read-only after its expense-history refresh fails", async () => {
+    const user = userEvent.setup();
+    apiMock.updateExpense.mockResolvedValueOnce({ ...activeMonth, availableMoney: 390 });
+    apiMock.getExpenseHistory.mockResolvedValueOnce([{ id: "expense-1", occurredAt: "2026-05-12T00:00:00.000Z", paymentMethod: "CASH", amount: 20, description: "Café", creditCardId: null, category: { id: "cat-income", name: "Ingresos" }, subcategory: { id: "sub-bonus", name: "Bonus" } }]).mockRejectedValueOnce(new Error("History unavailable."));
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ledgerResponse(ledgerEntry("expense-1", "CASH_EXPENSE", "Café")) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ledgerResponse(ledgerEntry("expense-1", "CASH_EXPENSE", "Café corregido")) }));
+
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Editar gasto Café" })); const expenseForm = screen.getByRole("button", { name: "Actualizar gasto" }).closest("form");
+    if (!expenseForm) throw new Error("Missing expense edit form.");
+    await user.clear(within(expenseForm).getByLabelText("Monto", { selector: "input" })); await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "30"); await user.click(within(expenseForm).getByRole("button", { name: "Actualizar gasto" }));
+
+    const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
+    expect(await within(ledger).findByText("Café corregido")).toBeInTheDocument();
+    expect(within(ledger).queryByRole("button", { name: /Editar gasto/ })).not.toBeInTheDocument();
+    expect(within(ledger).getByText("No se puede editar ni eliminar este gasto hasta que se actualice el historial de gastos del mes.")).toBeInTheDocument();
+    expect(apiMock.updateExpense).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses locally resolved income source names for action identity when ledger descriptions are notes or absent", async () => {
+    const user = userEvent.setup();
+    const incomes = [{ ...activeMonth.incomes[0], id: "income-noted", sourceName: "Nómina ACME", notes: "Pago de mayo" }, { ...activeMonth.incomes[0], id: "income-freelance", sourceName: "Diseño freelance", notes: null }, { ...activeMonth.incomes[0], id: "income-rent", sourceName: "Arriendo", notes: null }];
+    apiMock.getActiveMonth.mockResolvedValue({ ...activeMonth, incomes });
+    apiMock.updateMonthlyIncome.mockResolvedValueOnce({ ...activeMonth, incomes });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ledgerResponse(
+        ledgerEntry("income-noted", "MONTHLY_INCOME", "Pago de mayo"),
+        ledgerEntry("income-freelance", "MONTHLY_INCOME", null),
+        ledgerEntry("income-rent", "MONTHLY_INCOME", null),
+      ),
+    }));
+
+    render(<ActiveMonthPage />);
+
+    const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
+    for (const sourceName of ["Nómina ACME", "Diseño freelance", "Arriendo"]) expect(within(ledger).getByRole("button", { name: `Editar ingreso ${sourceName}` })).toBeInTheDocument();
+    await user.click(within(ledger).getByRole("button", { name: "Editar ingreso Diseño freelance" })); const incomeForm = screen.getByRole("button", { name: "Actualizar ingreso" }).closest("form");
+    if (!incomeForm) throw new Error("Missing income edit form.");
+    await user.clear(within(incomeForm).getByLabelText("Fuente del ingreso")); await user.type(within(incomeForm).getByLabelText("Fuente del ingreso"), "Diseño freelance actualizado"); await user.click(within(incomeForm).getByRole("button", { name: "Actualizar ingreso" }));
+
+    await waitFor(() => expect(apiMock.updateMonthlyIncome).toHaveBeenCalledWith(expect.objectContaining({ incomeId: "income-freelance", sourceName: "Diseño freelance actualizado" })));
+    expect(apiMock.updateMonthlyIncome).not.toHaveBeenCalledWith(expect.objectContaining({ incomeId: "income-rent" }));
   });
 
   it("does not submit expense corrections when the active month is closed", async () => {
@@ -1209,50 +1099,6 @@ describe("ActiveMonthPage", () => {
     await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("form", { name: "Editar categoría del mes activo" })).not.toBeInTheDocument();
     expect(screen.queryByRole("form", { name: "Editar subcategoría del mes activo" })).not.toBeInTheDocument();
-  });
-
-  it("keeps the refreshed month history when a previous month history response arrives late", async () => {
-    const user = userEvent.setup();
-    const nextMonth = { ...activeMonth, id: "month-2", month: 6 };
-    const previousHistory: ExpenseHistoryItem[] = [
-      {
-        id: "expense-a",
-        occurredAt: "2026-05-12T00:00:00.000Z",
-        paymentMethod: "CASH",
-        amount: 20,
-        description: "Gasto de A",
-        creditCardId: null,
-        category: { id: "cat-income", name: "Ingresos" },
-        subcategory: { id: "sub-bonus", name: "Bonus" },
-      },
-    ];
-    const refreshedHistory: ExpenseHistoryItem[] = [{ ...previousHistory[0], id: "expense-b", description: "Gasto de B" }];
-    const resolvePreviousHistories: Array<(history: ExpenseHistoryItem[]) => void> = [];
-    let resolveRefreshedHistory!: (history: ExpenseHistoryItem[]) => void;
-
-    apiMock.getActiveMonth.mockResolvedValueOnce(activeMonth).mockResolvedValueOnce(nextMonth);
-    apiMock.getExpenseHistory.mockImplementation((monthId: string) =>
-      new Promise<ExpenseHistoryItem[]>((resolve) => {
-        if (monthId === "month-1") resolvePreviousHistories.push(resolve);
-        else resolveRefreshedHistory = resolve;
-      }),
-    );
-
-    render(<ActiveMonthPage />);
-
-    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1"));
-    await user.click(screen.getByRole("button", { name: "Refrescar" }));
-    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-2"));
-
-    resolveRefreshedHistory(refreshedHistory);
-    expect(await screen.findByText("Gasto de B")).toBeInTheDocument();
-
-    resolvePreviousHistories.forEach((resolve) => resolve(previousHistory));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await waitFor(() => {
-      expect(screen.getByText("Gasto de B")).toBeInTheDocument();
-      expect(screen.queryByText("Gasto de A")).not.toBeInTheDocument();
-    });
   });
 
   it("keeps server deletion guard failures visible without removing month snapshot items", async () => {

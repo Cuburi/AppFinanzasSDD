@@ -4,9 +4,10 @@ import { api } from "../lib/api";
 import { Button, Card, StatusPill } from "../components/ui";
 import { ActiveMonthDashboard } from "../features/monthly-cycle/active-month-dashboard/components/ActiveMonthDashboard";
 import { RegistrationSlip } from "../features/monthly-cycle/active-month-dashboard/components/RegistrationSlip";
-import { ActivityLedger } from "../features/monthly-cycle/active-month-dashboard/components/ActivityLedger";
+import { MonthlyLedger } from "../features/monthly-cycle/active-month-dashboard/components/MonthlyLedger";
 import { useActiveMonthDashboard } from "../features/monthly-cycle/active-month-dashboard/controllers/useActiveMonthDashboard";
-import { buildActivityRows } from "../features/monthly-cycle/active-month-dashboard/model/buildActivityRows";
+import { useActiveMonthLedger } from "../features/monthly-cycle/active-month-dashboard/controllers/useActiveMonthLedger";
+import { buildMonthlyLedgerViewModel } from "../features/monthly-cycle/active-month-dashboard/model/monthlyLedger";
 import type { CreditCardView, ExpenseHistoryItem, Month, MonthCategory, MonthlyIncome, MonthSubcategory, PaymentMethod, SavingsPocket } from "../types";
 
 const now = new Date();
@@ -123,6 +124,8 @@ export const ActiveMonthPage = () => {
       // A failed history refresh must not turn an already-persisted mutation into a user-facing mutation failure.
     }
   };
+
+  const ledger = useActiveMonthLedger(activeMonth?.id ?? null);
 
   const refresh = async () => {
     historyMonthId.current = null;
@@ -280,6 +283,7 @@ export const ActiveMonthPage = () => {
       const updatedMonth = await mutation();
       dashboard.replaceMonth(updatedMonth);
       await refreshExpenseHistoryBestEffort(updatedMonth.id);
+      await ledger.retry();
       afterSuccess?.(updatedMonth);
       if (setLocalFeedback) setLocalFeedback({ kind: "success", text: successMessage });
       else setMessage(successMessage);
@@ -513,6 +517,7 @@ export const ActiveMonthPage = () => {
         description: withdrawalDescription || undefined,
       });
       dashboard.replaceMonth(updatedMonth);
+      await ledger.retry();
       setWithdrawalAmount("");
       setWithdrawalDescription("");
       setMessage("Retiro de efectivo registrado y saldos recalculados.");
@@ -543,6 +548,7 @@ export const ActiveMonthPage = () => {
         : await api.createMonthlyIncome(input);
 
       dashboard.replaceMonth(updatedMonth);
+      await ledger.retry();
       resetIncomeForm(updatedMonth);
       setIncomeFeedback({ kind: "success", text: editingIncomeId ? "Ingreso actualizado y totales recalculados." : "Ingreso registrado y totales recalculados." });
     } catch (submitError) {
@@ -562,6 +568,7 @@ export const ActiveMonthPage = () => {
     try {
       const updatedMonth = await api.deleteMonthlyIncome(activeMonth.id, income.id);
       dashboard.replaceMonth(updatedMonth);
+      await ledger.retry();
       if (editingIncomeId === income.id) {
         resetIncomeForm(updatedMonth);
       }
@@ -594,6 +601,7 @@ export const ActiveMonthPage = () => {
           : { ...input, sourceKind: "MONTH_AVAILABLE" },
       );
       dashboard.replaceMonth(updatedMonth);
+      await ledger.retry();
       await loadActivePockets();
       setDepositAmount("");
       setMessage("Depósito a bolsillo registrado.");
@@ -659,23 +667,31 @@ export const ActiveMonthPage = () => {
 
       {activeMonth ? (
         <>
-          <ActivityLedger
-            canMutate={canMutateActiveMonth && !submitting}
-            getExpenseCardLabel={(expense) => getCreditCardLabel(expense.creditCardId)}
-            onDeleteExpense={(expense) => void handleDeleteExpense(expense)}
-            onDeleteIncome={(income) => void handleDeleteIncome(income)}
-            onEditExpense={startEditingExpense}
-            onEditIncome={startEditingIncome}
-            rows={buildActivityRows(expenseHistoryMonthId === activeMonth.id ? expenseHistory : [], activeMonth.incomes)}
+          <MonthlyLedger
+            days={ledger.monthId === activeMonth.id ? buildMonthlyLedgerViewModel({ monthId: activeMonth.id, status: activeMonth.status, entries: ledger.entries }).days : []}
+            actionLabel={(entry) => { const income = activeMonth.incomes.find((item) => item.id === entry.entryKey); return income ? `ingreso ${income.sourceName}` : `gasto ${entry.metadata.description ?? "sin descripción"}`; }}
+            isActionable={(entry) => entry.eventType === "MONTHLY_INCOME"
+              ? activeMonth.incomes.some((item) => item.id === entry.entryKey)
+              : hasCurrentMonthlyExpenseHistory && monthlyExpenseHistory.some((item) => item.id === entry.entryKey)}
+            onDelete={canMutateActiveMonth && !submitting ? (entry) => {
+              const expense = monthlyExpenseHistory.find((item) => item.id === entry.entryKey);
+              const income = activeMonth.incomes.find((item) => item.id === entry.entryKey);
+              if (expense) void handleDeleteExpense(expense);
+              if (income) void handleDeleteIncome(income);
+            } : undefined}
+            onEdit={canMutateActiveMonth && !submitting ? (entry) => {
+              const expense = monthlyExpenseHistory.find((item) => item.id === entry.entryKey);
+              const income = activeMonth.incomes.find((item) => item.id === entry.entryKey);
+              if (expense) startEditingExpense(expense);
+              if (income) startEditingIncome(income);
+            } : undefined}
+            onRetry={() => void ledger.retry()}
+            status={ledger.status}
+            unavailableActionReason={(entry) => entry.eventType !== "MONTHLY_INCOME" && !hasCurrentMonthlyExpenseHistory
+              ? "No se puede editar ni eliminar este gasto hasta que se actualice el historial de gastos del mes."
+              : undefined}
           />
           {creditCardLoadError ? <p className="error" role="alert">{creditCardLoadError}</p> : null}
-          <label className="field activity-filter">
-            <span>Filtrar historial por tarjeta</span>
-            <select value={historyCreditCardId} onChange={handleHistoryCreditCardChange}>
-              <option value="">Todas las tarjetas y efectivo</option>
-              {activeCreditCards.map((card) => <option key={card.id} value={card.id}>{formatCreditCardLabel(card)}</option>)}
-            </select>
-          </label>
           <section aria-label="Acciones secundarias" className="secondary-action-strip">
             <Button disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("income")} type="button" variant="secondary">Registrar ingreso</Button>
             <Button disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("withdrawal")} type="button" variant="secondary">Retirar efectivo</Button>
