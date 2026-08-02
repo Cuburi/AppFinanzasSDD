@@ -856,6 +856,10 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
+    const notedIncome = ledger.querySelector('[data-entry-key="income-noted"]');
+    expect(notedIncome).not.toBeNull();
+    expect(within(notedIncome as HTMLElement).getByText("Fuente: Nómina ACME")).toBeInTheDocument();
+    expect(within(notedIncome as HTMLElement).getByText("Pago de mayo")).toBeInTheDocument();
     for (const sourceName of ["Nómina ACME", "Diseño freelance", "Arriendo"]) expect(within(ledger).getByRole("button", { name: `Editar ingreso ${sourceName}` })).toBeInTheDocument();
     await user.click(within(ledger).getByRole("button", { name: "Editar ingreso Diseño freelance" })); const incomeForm = screen.getByRole("button", { name: "Actualizar ingreso" }).closest("form");
     if (!incomeForm) throw new Error("Missing income edit form.");
@@ -863,6 +867,15 @@ describe("ActiveMonthPage", () => {
 
     await waitFor(() => expect(apiMock.updateMonthlyIncome).toHaveBeenCalledWith(expect.objectContaining({ incomeId: "income-freelance", sourceName: "Diseño freelance actualizado" })));
     expect(apiMock.updateMonthlyIncome).not.toHaveBeenCalledWith(expect.objectContaining({ incomeId: "income-rent" }));
+  });
+
+  it("keeps closed no-note incomes distinguishable by their visible source identity without edit or delete controls", async () => {
+    const incomes = ["Nómina ACME", "Diseño freelance"].map((sourceName, index) => ({ ...activeMonth.incomes[0], id: `income-${index}`, sourceName, notes: null }));
+    apiMock.getActiveMonth.mockResolvedValue({ ...activeMonth, status: "CLOSED", closedAt: "2026-05-31T00:00:00.000Z", incomes }); vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ledgerResponse(...incomes.map((income) => ledgerEntry(income.id, "MONTHLY_INCOME", null))) }));
+    render(<ActiveMonthPage />);
+    const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
+    for (const income of incomes) expect(within(ledger.querySelector(`[data-entry-key="${income.id}"]`) as HTMLElement).getByText(`Fuente: ${income.sourceName}`)).toBeInTheDocument();
+    expect(within(ledger).queryByRole("button", { name: /Editar|Eliminar/ })).not.toBeInTheDocument();
   });
 
   it("does not submit expense corrections when the active month is closed", async () => {

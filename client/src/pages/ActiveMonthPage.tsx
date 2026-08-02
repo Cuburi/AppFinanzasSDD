@@ -670,6 +670,7 @@ export const ActiveMonthPage = () => {
           <MonthlyLedger
             days={ledger.monthId === activeMonth.id ? buildMonthlyLedgerViewModel({ monthId: activeMonth.id, status: activeMonth.status, entries: ledger.entries }).days : []}
             actionLabel={(entry) => { const income = activeMonth.incomes.find((item) => item.id === entry.entryKey); return income ? `ingreso ${income.sourceName}` : `gasto ${entry.metadata.description ?? "sin descripción"}`; }}
+            identityLabel={(entry) => { const income = activeMonth.incomes.find((item) => item.id === entry.entryKey); return income ? `Fuente: ${income.sourceName}` : undefined; }}
             isActionable={(entry) => entry.eventType === "MONTHLY_INCOME"
               ? activeMonth.incomes.some((item) => item.id === entry.entryKey)
               : hasCurrentMonthlyExpenseHistory && monthlyExpenseHistory.some((item) => item.id === entry.entryKey)}
