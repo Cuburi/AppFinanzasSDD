@@ -837,3 +837,34 @@ body { background: var(--color-bg); }
 @media (prefers-contrast: more) {
   .card, .field input, .field select { border-color: var(--color-text); }
 }
+
+/* Canonical ledger stays structural: ruled rows, semantic states, and stable actions. */
+.monthly-ledger { display: grid; gap: var(--space-4); }
+.monthly-ledger-day { border-top: 1px solid var(--color-border-strong); display: grid; min-width: 0; }
+.monthly-ledger-day h3 { font-size: 1rem; margin: var(--space-3) 0 var(--space-1); }
+.monthly-ledger-entry, .monthly-ledger-system-run { border-bottom: 1px solid var(--color-border); min-width: 0; padding: var(--space-3) 0; }
+.monthly-ledger-row { align-items: start; display: grid; gap: var(--space-2); grid-template-columns: 5.5rem minmax(0, 1fr) auto; }
+.monthly-ledger-row time, .monthly-ledger-row span, .monthly-ledger-read-only { color: var(--color-text-muted); }
+.monthly-ledger-row div { display: grid; gap: var(--space-1); min-width: 0; overflow-wrap: anywhere; }
+.monthly-ledger-amount { font-variant-numeric: tabular-nums lining-nums; text-align: right; white-space: nowrap; }
+.monthly-ledger-details { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: var(--space-2) 0 0; }
+.monthly-ledger-details div { display: grid; gap: var(--space-1); }
+.monthly-ledger-details dt { color: var(--color-text-subtle); font-size: .75rem; font-weight: 650; letter-spacing: .075em; text-transform: uppercase; }
+.monthly-ledger-details dd { margin: 0; }
+.monthly-ledger-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.monthly-ledger-read-only { margin: var(--space-2) 0 0; }
+.monthly-ledger-disclosure { background: transparent; border: 0; color: var(--color-text); cursor: pointer; font: inherit; font-weight: 650; min-height: 44px; padding: 0; text-align: left; }
+.monthly-ledger-disclosure::after { color: var(--color-guidance); content: "+"; font-size: 1.25rem; margin-left: var(--space-2); }
+.monthly-ledger-disclosure[aria-expanded="true"]::after { content: "−"; }
+
+@media (max-width: 390px) {
+  .monthly-ledger-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .monthly-ledger-row time { grid-column: 1; }
+  .monthly-ledger-row div { grid-column: 1; }
+  .monthly-ledger-amount { grid-column: 2; grid-row: 1 / span 2; }
+  .monthly-ledger-actions .button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .monthly-ledger-disclosure { transition-delay: 0ms; transform: none; }
+}
