@@ -48,6 +48,15 @@ test("keeps the canonical ledger usable and contained on a narrow viewport", asy
   await disclosures.nth(1).click();
   await expect(ledgerRegion).toContainText("Ajuste final");
 
+  const ordinaryDetails = ledgerRegion.locator('[data-ledger-item="expense-b"] .monthly-ledger-entry details');
+  const ordinarySummary = ordinaryDetails.locator("summary");
+  await expect(ordinaryDetails).not.toHaveAttribute("open");
+  await ordinarySummary.focus();
+  await expect(ordinarySummary).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(ordinaryDetails).toHaveAttribute("open", "");
+  expect((await ordinarySummary.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+
   for (const target of await ledgerRegion.getByRole("button").all()) {
     const box = await target.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
@@ -76,4 +85,22 @@ test("reflows expanded ledger content at a 200% viewport equivalent", async ({ p
   }))).toEqual([true, true, true]);
   await ledgerRegion.scrollIntoViewIfNeeded();
   await page.screenshot({ path: "../docs/verification/unified-monthly-ledger-frontend/active-month-200pct.png", fullPage: true });
+});
+
+test("removes ordinary disclosure motion under reduced-motion preferences", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await mockMonthlyLedgerContracts(page);
+  await page.goto("/active-month");
+
+  const ledgerRegion = page.getByRole("region", { name: "Movimientos del mes" });
+  const ordinaryDetails = ledgerRegion.locator('[data-ledger-item="expense-b"] .monthly-ledger-entry details');
+  const disclosure = ordinaryDetails.locator("summary");
+  await expect(ordinaryDetails).not.toHaveAttribute("open", { timeout: 15_000 });
+  await disclosure.click();
+  await expect(ordinaryDetails).toHaveAttribute("open", "");
+  await expect(ledgerRegion).toContainText("Origen: Mes");
+  expect(await disclosure.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return style.transitionDelay === "0s" && style.transform === "none";
+  })).toBe(true);
 });

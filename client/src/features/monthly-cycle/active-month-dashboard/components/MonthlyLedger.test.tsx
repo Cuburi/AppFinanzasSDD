@@ -96,12 +96,24 @@ describe("MonthlyLedger", () => {
     expect(Array.from(ledger.querySelectorAll("[data-ledger-item]")).map((item) => item.getAttribute("data-ledger-item"))).toEqual(["system-a", "expense-b", "system-c"]);
   });
 
-  it("shows complete entry details and only gives eligible records working actions", async () => {
+  it("uses a native details summary and keeps complete details collapsed by default", async () => {
     const user = userEvent.setup();
     const onEdit = vi.fn();
     const onDelete = vi.fn();
     render(<MonthlyLedger days={days} onDelete={onDelete} onEdit={onEdit} status="ready" />);
 
+    const details = document.querySelector<HTMLDetailsElement>(".monthly-ledger-entry details");
+    const disclosure = details?.querySelector("summary");
+    expect(details).toBeInTheDocument();
+    expect(details).not.toHaveAttribute("open");
+    expect(disclosure).toHaveTextContent("Ver detalles de Market groceries");
+    expect(disclosure).not.toHaveAttribute("aria-controls");
+    expect(document.querySelector("time")).toHaveAttribute("dateTime", "2026-08-02T14:30:00.000Z");
+    expect(screen.getByRole("button", { name: "Editar Market groceries" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Eliminar Market groceries" })).toBeInTheDocument();
+
+    await user.click(disclosure!);
+    expect(details).toHaveAttribute("open");
     expect(screen.getByText("Origen: Mes")).toBeInTheDocument();
     expect(screen.getByText("Destino: Gasto")).toBeInTheDocument();
     expect(screen.getByText("Medio de pago: Efectivo")).toBeInTheDocument();
@@ -109,7 +121,9 @@ describe("MonthlyLedger", () => {
     expect(screen.getByText("Saldo en efectivo: $0 COP")).toBeInTheDocument();
     expect(screen.getByText("Disponible de subcategoría: $-12.000 COP")).toBeInTheDocument();
     expect(screen.getByText("Saldo del bolsillo: $0 COP")).toBeInTheDocument();
-    expect(document.querySelector("time")).toHaveAttribute("dateTime", "2026-08-02T14:30:00.000Z");
+
+    await user.click(disclosure!);
+    expect(details).not.toHaveAttribute("open");
 
     await user.click(screen.getByRole("button", { name: "Editar Market groceries" }));
     await user.click(screen.getByRole("button", { name: "Eliminar Market groceries" }));

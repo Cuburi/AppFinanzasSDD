@@ -833,9 +833,13 @@ body { background: var(--color-bg); }
 .monthly-ledger-details dd { margin: 0; }
 .monthly-ledger-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
 .monthly-ledger-read-only { margin: var(--space-2) 0 0; }
-.monthly-ledger-disclosure { background: transparent; border: 0; color: var(--color-text); cursor: pointer; font: inherit; font-weight: 650; min-height: 44px; padding: 0; text-align: left; }
+.monthly-ledger-disclosure { background: transparent; border: 0; color: var(--color-text); cursor: pointer; display: grid; font: inherit; font-weight: 650; min-height: 44px; padding: 0; text-align: left; }
+.monthly-ledger-disclosure::-webkit-details-marker { display: none; }
 .monthly-ledger-disclosure::after { color: var(--color-guidance); content: "+"; font-size: 1.25rem; margin-left: var(--space-2); }
-.monthly-ledger-disclosure[aria-expanded="true"]::after { content: "−"; }
+.monthly-ledger-entry details[open] > .monthly-ledger-disclosure::after { content: "−"; }
+.monthly-ledger-disclosure-hide { display: none; }
+.monthly-ledger-entry details[open] > .monthly-ledger-disclosure .monthly-ledger-disclosure-show { display: none; }
+.monthly-ledger-entry details[open] > .monthly-ledger-disclosure .monthly-ledger-disclosure-hide { display: inline; }
 
 @media (max-width: 390px) {
   .monthly-ledger-row { grid-template-columns: minmax(0, 1fr) auto; }
