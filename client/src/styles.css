@@ -731,20 +731,7 @@ body { background: var(--color-bg); }
 .month-structure-disclosure > summary > span { display: grid; gap: var(--space-1); }
 .month-structure-disclosure > summary > span > span { color: var(--color-text-muted); max-width: 68ch; }
 .month-structure-content { border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
-.activity-ledger { border-top: 1px solid var(--color-border-strong); padding-top: var(--space-4); }
-.activity-ledger-header { align-items: end; display: flex; gap: var(--space-4); justify-content: space-between; }
-.activity-ledger-header h2, .activity-ledger-header p { margin: 0; }
-.activity-ledger-header p, .activity-ledger-concept span, .activity-ledger-row time, .activity-ledger-column-label { color: var(--color-text-muted); }
-.activity-ledger-header p { margin-top: var(--space-1); max-width: 68ch; }
-.activity-ledger-column-label { font-size: 0.75rem; font-weight: 650; letter-spacing: 0.075em; text-transform: uppercase; }
-.activity-ledger-rows { border-top: 1px solid var(--color-border); }
-.activity-ledger-row { align-items: center; border-bottom: 1px solid var(--color-border); display: grid; gap: var(--space-3); grid-template-columns: 6rem 6.5rem minmax(12rem, 1fr) minmax(8rem, auto) auto; padding: var(--space-3) 0; }
-.activity-ledger-type, .activity-ledger-concept { display: grid; gap: var(--space-1); min-width: 0; }
-.activity-ledger-type { grid-template-columns: auto 1fr; }
-.activity-ledger-concept strong, .activity-ledger-concept span { overflow-wrap: anywhere; }
-.activity-ledger-amount { font-variant-numeric: tabular-nums lining-nums; text-align: right; white-space: nowrap; }
-.activity-ledger-actions, .secondary-action-strip { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.activity-filter { max-width: 24rem; }
+.secondary-action-strip { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .secondary-action-strip { border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
 
 @media (hover: hover) and (pointer: fine) {
@@ -810,13 +797,6 @@ body { background: var(--color-bg); }
   .income-capture-form .income-notes-field { grid-column: auto; }
   .registration-slip-actions { display: grid; }
   .registration-slip-actions .button { width: 100%; }
-  .activity-ledger-header { align-items: start; }
-  .activity-ledger-column-label { display: none; }
-  .activity-ledger-row { align-items: start; gap: var(--space-1) var(--space-2); grid-template-columns: minmax(0, 1fr) auto; }
-  .activity-ledger-row time, .activity-ledger-type { grid-column: 1; }
-  .activity-ledger-concept { grid-column: 1; grid-row: 2; }
-  .activity-ledger-amount { grid-column: 2; grid-row: 1 / span 2; }
-  .activity-ledger-actions { grid-column: 1 / -1; }
   .secondary-action-strip { display: grid; }
   .secondary-action-strip .button { width: 100%; }
 }
