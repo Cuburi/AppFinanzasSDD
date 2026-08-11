@@ -17,7 +17,10 @@ const requiredSnippets = [
   'pnpm prisma:dev:reset',
   'pnpm db:dev:reset',
   'pnpm db:personal:reset',
-  'CONFIRM_PERSONAL_RESET=RESET_APPFINANZAS_PERSONAL',
+  'pnpm db:personal:reset -- --confirm RESET_APPFINANZAS_PERSONAL --profile appfinanzas_personal',
+   'Existing unmarked clusters are rejected before mutation.',
+   'Root `.env` must select the same local profile, port, and database as the requested reset.',
+   'exclusive local Docker-daemon/Compose-project maintenance window',
   'Manual PostgreSQL fallback',
   'los comandos Prisma guardados esperan dev en `localhost:5433` y personal en `localhost:5434`',
   'Una topología distinta requiere cambiar deliberadamente los guards/scripts de perfiles',
@@ -54,6 +57,7 @@ const forbiddenSnippets = [
   'pnpm prisma:reset',
   'pnpm db:reset',
   'Si usás otro host, puerto, usuario o contraseña',
+  'CONFIRM_PERSONAL_RESET=RESET_APPFINANZAS_PERSONAL',
 ];
 
 const missing = requiredSnippets.filter((snippet) => !readme.includes(snippet));

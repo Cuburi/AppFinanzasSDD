@@ -1,11 +1,9 @@
-import { ResetFailure, validatePersonalConfirmation } from "./reset-local-database.mjs";
+import { ResetFailure, executeLocalReset, validatePersonalConfirmation } from "./reset-local-database.mjs";
 
 try {
   validatePersonalConfirmation(process.argv.slice(2));
-  throw new ResetFailure(
-    "PREFLIGHT_REJECTED",
-    "Reset engine is not wired in this contracts-only slice. No database mutation was performed.",
-  );
+  await executeLocalReset("personal");
+  console.log("Personal database reset completed.");
 } catch (error) {
   const message = error instanceof ResetFailure ? `${error.code}: ${error.message}` : String(error);
   console.error(`Personal database reset blocked. ${message}`);

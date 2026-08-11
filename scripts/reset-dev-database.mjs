@@ -1,11 +1,9 @@
-import { ResetFailure, validateDevInvocation } from "./reset-local-database.mjs";
+import { ResetFailure, executeLocalReset, validateDevInvocation } from "./reset-local-database.mjs";
 
 try {
   validateDevInvocation(process.argv.slice(2));
-  throw new ResetFailure(
-    "PREFLIGHT_REJECTED",
-    "Reset engine is not wired in this contracts-only slice. No database mutation was performed.",
-  );
+  await executeLocalReset("dev");
+  console.log("Dev database reset completed.");
 } catch (error) {
   const message = error instanceof ResetFailure ? `${error.code}: ${error.message}` : String(error);
   console.error(`Dev database reset blocked. ${message}`);

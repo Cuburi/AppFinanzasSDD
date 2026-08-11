@@ -118,22 +118,18 @@ El último comando ejecuta typecheck, tests y build de producción del frontend.
 
    Los dos primeros validan API + conexión a base de datos. Con una base limpia, `/api/months/active` devuelve `{ "month": null }` hasta que abras un mes; `/api/pockets` y `/api/debts` devuelven listas vacías hasta que cargues tus datos reales.
 
-### Reset local
+### Guarded local resets
 
-Para descartar datos dev y volver a aplicar migraciones:
-
-```bash
-pnpm prisma:dev:reset
-```
-
-Si querés borrar también el volumen Docker dev:
+Use these commands only for an intentional local pre-production reset. They verify the selected Compose target and data volume before mutation, recreate only that target, apply migrations, do not seed demo data, and verify an empty usable database.
 
 ```bash
 pnpm db:dev:reset
-pnpm prisma:dev:migrate
+pnpm db:personal:reset -- --confirm RESET_APPFINANZAS_PERSONAL --profile appfinanzas_personal
 ```
 
-Ambos caminos destruyen solo datos del perfil dev. Para borrar datos personales tenés que usar el comando explícito `pnpm db:personal:reset` con `CONFIRM_PERSONAL_RESET=RESET_APPFINANZAS_PERSONAL`; no lo uses salvo que quieras destruir tu base diaria.
+The personal command accepts exactly that ordered confirmation; missing, reordered, duplicated, or additional arguments abort before Docker discovery. Root `.env` must select the same local profile, port, and database as the requested reset. Existing unmarked clusters are rejected before mutation. Recreate a known local target manually under review instead of attempting to bootstrap a legacy marker automatically.
+
+Run a reset only during an exclusive local Docker-daemon/Compose-project maintenance window. Docker has no atomic compare-and-delete operation for named volumes; the final recheck minimizes, but cannot eliminate, concurrent daemon-client races. Never use either command for production data.
 
 ### Manual PostgreSQL fallback
 
@@ -156,7 +152,7 @@ No crees `prisma/.env`: el `.env` raíz es la fuente de verdad local. Por seguri
 | `pnpm db:dev:down` | Detiene el contenedor PostgreSQL dev sin borrar datos. |
 | `pnpm db:dev:reset` | Reinicia PostgreSQL dev borrando su volumen. **Destruye datos dev.** |
 | `pnpm db:personal:up` | Levanta PostgreSQL personal explícitamente. |
-| `pnpm db:personal:reset` | Reseteo personal guardado por `CONFIRM_PERSONAL_RESET=RESET_APPFINANZAS_PERSONAL`. **Destruye datos personales.** |
+| `pnpm db:personal:reset -- --confirm RESET_APPFINANZAS_PERSONAL --profile appfinanzas_personal` | Guarded personal reset with an exact destructive confirmation. **Destroys personal data.** |
 | `pnpm local:setup` | Valida `.env.example`, levanta PostgreSQL, genera Prisma Client y ejecuta migraciones sobre una base limpia. |
 | `pnpm local:check-readme` | Valida que el README mantenga el checklist local mínimo. |
 | `pnpm check:client` | Ejecuta typecheck, tests y build de producción del frontend. |
@@ -197,7 +193,7 @@ Antes de usar un cambio con datos personales diarios:
 - [ ] Crear o anotar el tag/checklist de promoción `personal-YYYY.MM.DD`.
 - [ ] Activar personal explícitamente con `pnpm env:personal`.
 - [ ] Aplicar solo comandos personales explícitos, como `pnpm prisma:personal:migrate` o `pnpm prisma:personal:studio`.
-- [ ] No correr resets personales salvo decisión consciente con `pnpm db:personal:reset` y `CONFIRM_PERSONAL_RESET=RESET_APPFINANZAS_PERSONAL`.
+- [ ] Do not run a personal reset unless you intentionally enter `pnpm db:personal:reset -- --confirm RESET_APPFINANZAS_PERSONAL --profile appfinanzas_personal`.
 
 ## Docker isolation verification
 

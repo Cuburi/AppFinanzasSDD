@@ -80,26 +80,28 @@ const withConfirmation = spawnSync(process.execPath, [
   'appfinanzas_personal',
 ], {
   encoding: 'utf8',
+  cwd: tempDir,
   env: {
     ...process.env,
     APPFINANZAS_ENV_PATH: tempPersonalEnvPath,
     PRISMA_PROFILE_GUARD_DRY_RUN: '1',
+    COMPOSE_PROJECT_NAME: 'unsafe-override',
   },
 });
 
 if (withConfirmation.status !== 1) {
-  console.error('Personal reset wrapper must fail closed with a deterministic nonzero status until the engine is wired.');
+  console.error('Personal reset wrapper must reject an unsafe Compose override during guarded preflight.');
   console.error(withConfirmation.stderr);
   process.exit(1);
 }
 
-if (!withConfirmation.stderr.includes('PREFLIGHT_REJECTED')) {
-  console.error('Personal reset wrapper must identify the deferred engine as a pre-mutation rejection.');
+if (!withConfirmation.stderr.includes('PREFLIGHT_REJECTED: Compose environment variable is not allowed: COMPOSE_PROJECT_NAME')) {
+  console.error('Personal reset wrapper must enter guarded preflight before it can invoke Docker.');
   process.exit(1);
 }
 
-if (!withConfirmation.stderr.toLowerCase().includes('reset engine is not wired') || !withConfirmation.stderr.includes('No database mutation was performed.')) {
-  console.error('Personal reset wrapper must clearly state that no mutation occurred while the engine is deferred.');
+if (withConfirmation.stderr.toLowerCase().includes('reset engine is not wired')) {
+  console.error('Personal reset wrapper must not retain the deferred-engine implementation.');
   process.exit(1);
 }
 

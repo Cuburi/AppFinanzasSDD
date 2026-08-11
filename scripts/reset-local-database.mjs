@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const failurePhases = Object.freeze({
   CONFIRMATION_REJECTED: "pre-mutation",
@@ -54,7 +58,7 @@ export class ResetFailure extends Error {
 const absolutePath = (cwd, relativePath) => `${cwd.replace(/[\\/]$/, "")}/${relativePath}`;
 const composeProjectName = (cwd) => cwd.replace(/[\\/]$/, "").split(/[\\/]/).at(-1).toLowerCase();
 
-const assertAllowedComposeEnvironment = (policy, environment) => {
+const assertAllowedComposeEnvironment = (environment) => {
   for (const [key, value] of Object.entries(environment)) {
     if (!key.startsWith("COMPOSE_") || value === undefined) continue;
     throw new ResetFailure("PREFLIGHT_REJECTED", `Compose environment variable is not allowed: ${key}`);
@@ -65,7 +69,7 @@ const assertAllowedComposeEnvironment = (policy, environment) => {
 export const createInvocationContext = ({ policyName, cwd, sourceHashes, environment = {} }) => {
   const policy = RESET_POLICIES[policyName];
   if (!policy) throw new ResetFailure("PREFLIGHT_REJECTED", `Unknown reset profile: ${policyName}`);
-  const composeEnv = assertAllowedComposeEnvironment(policy, environment);
+  const composeEnv = assertAllowedComposeEnvironment(environment);
   const composeFiles = policy.files.map((file) => ({
     path: absolutePath(cwd, file),
     sha256: sourceHashes[file],
@@ -104,6 +108,20 @@ export const buildComposeCommand = (context, commandArgs) => [
   context.composeEnv,
 ];
 
+export const buildSnapshotComposeCommand = (context, snapshotPath, commandArgs) => ["docker", ["compose", "--project-name", context.projectName, "--project-directory", context.cwd, "--file", snapshotPath, ...commandArgs], context.composeEnv];
+export const buildContainerRemovalCommands = (containerId) => [["stop", containerId], ["rm", containerId]];
+
+export const assertActiveProfile = (policyName, environmentFile) => {
+  const policy = RESET_POLICIES[policyName];
+  const databaseUrl = environmentFile.match(/^DATABASE_URL\s*=\s*["']?([^"'\r\n]+)["']?\s*$/m)?.[1];
+  let parsed;
+  try { parsed = new URL(databaseUrl); } catch { throw new ResetFailure("PREFLIGHT_REJECTED", "Root .env must define the requested local database profile."); }
+  if (!policy || parsed.hostname !== "localhost" || parsed.port !== policy.port || parsed.pathname !== `/${policy.database}`) {
+    throw new ResetFailure("PREFLIGHT_REJECTED", "Root .env does not select the requested reset profile.");
+  }
+  return policyName;
+};
+
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const canonicalize = (value) => {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -118,6 +136,10 @@ const rejectPreflight = (condition, message) => {
 
 const runtimeVolumeName = (context) => `${context.projectName}_${context.logicalVolume}`;
 const isWithinPath = (path, parent) => path === parent || path?.startsWith(`${parent}/`);
+const hasPublishedPort = (ports, port) => ports?.some((entry) => entry === `${port}:5432`
+  || (entry?.published === port && String(entry.target) === "5432"));
+const hasDataMount = (volumes, volume) => volumes?.some((entry) => entry === `${volume}:/var/lib/postgresql/data`
+  || (entry?.type === "volume" && entry.source === volume && entry.target === "/var/lib/postgresql/data"));
 
 const assertRenderedTarget = (context, config) => {
   const service = config.services?.[context.service];
@@ -128,8 +150,8 @@ const assertRenderedTarget = (context, config) => {
   rejectPreflight(service, "Rendered Compose configuration does not contain the target service.");
   rejectPreflight(service.container_name === `appfinanzas-${context.service}`, "Rendered target container name does not match the saved policy.");
   rejectPreflight(database === context.database, "Rendered target database does not match the saved policy.");
-  rejectPreflight(service.ports?.includes(`${context.port}:5432`), "Rendered target port does not match the saved policy.");
-  rejectPreflight(service.volumes?.includes(`${context.logicalVolume}:/var/lib/postgresql/data`), "Rendered target data mount does not match the saved policy.");
+  rejectPreflight(hasPublishedPort(service.ports, context.port), "Rendered target port does not match the saved policy.");
+  rejectPreflight(hasDataMount(service.volumes, context.logicalVolume), "Rendered target data mount does not match the saved policy.");
   rejectPreflight(Object.hasOwn(config.volumes ?? {}, context.logicalVolume), "Rendered target volume declaration does not match the saved policy.");
   rejectPreflight(canonicalJson(service.profiles ?? []) === canonicalJson(context.composeProfiles), "Rendered target profiles do not match the saved policy.");
 };
@@ -165,17 +187,22 @@ const inspectVerifiedTarget = (context, target) => {
 };
 
 export const createResetPlan = ({ context, render, inspectTarget }) => {
-  const json = render();
-  let config;
-  try { config = JSON.parse(json); } catch { throw new ResetFailure("PREFLIGHT_REJECTED", "Rendered Compose configuration is not valid JSON."); }
-  assertRenderedTarget(context, config);
-  const target = inspectVerifiedTarget(context, inspectTarget());
-  return Object.freeze({
-    context,
-    sourceHashes: Object.freeze(Object.fromEntries([...context.composeFiles, context.envFile].map(({ path, sha256: hash }) => [path.split(/[\\/]/).at(-1), hash]))),
-    renderedConfig: Object.freeze({ json, sha256: sha256(canonicalJson(config)) }),
-    target,
-  });
+  try {
+    const json = render();
+    let config;
+    try { config = JSON.parse(json); } catch { throw new ResetFailure("PREFLIGHT_REJECTED", "Rendered Compose configuration is not valid JSON."); }
+    assertRenderedTarget(context, config);
+    const target = inspectVerifiedTarget(context, inspectTarget());
+    return Object.freeze({
+      context,
+      sourceHashes: Object.freeze(Object.fromEntries([...context.composeFiles, context.envFile].map(({ path, sha256: hash }) => [path.split(/[\\/]/).at(-1), hash]))),
+      renderedConfig: Object.freeze({ json, sha256: sha256(canonicalJson(config)) }),
+      target,
+    });
+  } catch (error) {
+    if (error instanceof ResetFailure) throw error;
+    throw new ResetFailure("PREFLIGHT_REJECTED", `Target discovery failed: ${error.message}`);
+  }
 };
 
 export const verifyStablePlan = ({ plan, sourceHashes, render, inspectTarget }) => {
@@ -205,10 +232,10 @@ export const volumeFingerprint = ({ volume, containerId, mount }) => sha256(cano
   mount,
 }));
 
-export const removeVerifiedTarget = ({ plan, acquireLock, removeContainer, inspectVolume, removeVolume }) => {
+export const removeVerifiedTarget = ({ plan, acquireLock, removeContainer, inspectVolume, removeVolume, alreadyLocked = false }) => {
   let release;
   try {
-    release = acquireLock();
+    if (!alreadyLocked) release = acquireLock();
     const beforeRemoval = inspectVolume(plan.target.volume.name);
     const beforeFingerprint = volumeFingerprint({
       volume: beforeRemoval.volume,
@@ -234,6 +261,141 @@ export const removeVerifiedTarget = ({ plan, acquireLock, removeContainer, inspe
     throw new ResetFailure("MUTATION_FAILED", `Guarded target removal failed: ${error.message}`);
   } finally {
     if (release) release();
+  }
+};
+
+export const runResetWorkflow = ({
+  plan, sourceHashes, render, inspectTarget, acquireLock, removeContainer, inspectVolume, removeVolume,
+  recreate, verifyHealth, readSystemIdentifier, executeSql, migrate, verifyEmpty, verifyUsable,
+}) => {
+  let release;
+  try {
+    verifyStablePlan({ plan, sourceHashes, render, inspectTarget });
+    release = acquireLock();
+    removeVerifiedTarget({ plan, acquireLock, removeContainer, inspectVolume, removeVolume, alreadyLocked: true });
+    recreate(plan.context);
+    verifyHealth(plan.context);
+    const systemIdentifier = readSystemIdentifier();
+    executeSql(`ALTER DATABASE ${plan.context.database} SET appfinanzas.reset_profile = '${RESET_POLICIES[plan.context.applicationProfile].marker}:${systemIdentifier}'`);
+    migrate(plan.context.applicationProfile);
+    verifyEmpty(plan.context.database);
+    verifyUsable(plan.context.database);
+    return Object.freeze({ phase: "complete", profile: plan.context.applicationProfile });
+  } catch (error) {
+    if (error instanceof ResetFailure) throw error;
+    throw new ResetFailure("OPERATIONAL_FAILED", `Reset did not complete after mutation: ${error.message}`);
+  } finally {
+    if (release) release();
+  }
+};
+
+const commandOutput = (command, args, options = {}) => execFileSync(command, args, {
+  cwd: options.cwd,
+  shell: options.shell,
+  encoding: "utf8",
+  env: {
+    PATH: process.env.PATH,
+    ...(process.platform === "win32" ? {
+      ComSpec: process.env.ComSpec,
+      PATHEXT: process.env.PATHEXT,
+      SystemRoot: process.env.SystemRoot,
+      WINDIR: process.env.WINDIR,
+    } : {}),
+    ...options.environment,
+  },
+  stdio: ["ignore", "pipe", "pipe"],
+}).trim();
+
+export const buildSqlCommand = (containerId, database, query) => ["docker", ["exec", containerId, "psql", "-U", "postgres", "-d", database, "-q", "-tAc", query]];
+export const buildMigrationCommand = (profile, platform = process.platform) => [platform === "win32" ? "pnpm.cmd" : "pnpm", [`prisma:${profile}:migrate`], { shell: platform === "win32" }];
+export const applicationTableQuery = () => "SELECT coalesce(json_agg(format('%I.%I', table_schema, table_name)), '[]') FROM information_schema.tables WHERE table_schema = 'public' AND table_name NOT IN ('_prisma_migrations', 'MonthlyLedgerBackfillControl')";
+
+const parseComposePs = (output) => { try { return JSON.parse(output); } catch { return output.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)); } };
+
+export const acquireProjectLock = (cwd) => {
+  const path = absolutePath(cwd, ".appfinanzas-reset.lock");
+  let descriptor;
+  try { descriptor = openSync(path, "wx"); } catch { throw new Error("An exclusive reset lock is already held for this Compose project."); }
+  return () => { closeSync(descriptor); unlinkSync(path); };
+};
+
+export const executeLocalReset = async (policyName) => {
+  const policy = RESET_POLICIES[policyName];
+  if (!policy) throw new ResetFailure("PREFLIGHT_REJECTED", `Unknown reset profile: ${policyName}`);
+  assertAllowedComposeEnvironment(process.env);
+  const cwd = process.cwd();
+  const sourceHashes = Object.fromEntries([...policy.files, policy.envFile].map((file) => [file, sha256(readFileSync(absolutePath(cwd, file)))]));
+  const context = createInvocationContext({ policyName, cwd, sourceHashes, environment: process.env });
+  assertActiveProfile(policyName, readFileSync(absolutePath(cwd, policy.envFile), "utf8"));
+  const compose = (args) => {
+    const [command, commandArgs, environment] = buildComposeCommand(context, args);
+    return commandOutput(command, commandArgs, { cwd, environment });
+  };
+  const render = () => compose(["config", "--format", "json"]);
+  const targetId = () => {
+    const targets = parseComposePs(compose(["ps", "--format", "json", context.service]));
+    if (!Array.isArray(targets) || targets.length !== 1 || !targets[0].ID) throw new Error("Expected exactly one running target container.");
+    return targets[0].ID;
+  };
+  const sql = (containerId, query) => {
+    const [command, args] = buildSqlCommand(containerId, context.database, query);
+    return commandOutput(command, args, { cwd });
+  };
+  const inspectTarget = () => {
+    const id = targetId();
+    const container = JSON.parse(commandOutput("docker", ["inspect", id], { cwd }))[0];
+    const mount = container.Mounts.find(({ Destination, RW }) => Destination === "/var/lib/postgresql/data" && RW);
+    const volume = JSON.parse(commandOutput("docker", ["volume", "inspect", mount.Name], { cwd }))[0];
+    const consumers = commandOutput("docker", ["ps", "-a", "--filter", `volume=${mount.Name}`, "--format", "{{.ID}}"], { cwd }).split(/\r?\n/).filter(Boolean);
+    const hostPort = container.NetworkSettings.Ports?.["5432/tcp"]?.[0]?.HostPort;
+    const systemIdentifier = sql(id, "SELECT pg_control_system().system_identifier");
+    return {
+      id, name: container.Name?.replace(/^\//, ""), labels: container.Config.Labels, mounts: container.Mounts,
+      port: hostPort, database: sql(id, "SELECT current_database()"), marker: sql(id, "SELECT current_setting('appfinanzas.reset_profile', true)"),
+      systemIdentifier, dataDirectory: sql(id, "SHOW data_directory"), volume, consumers,
+    };
+  };
+  const inspectVolume = (name) => {
+    const volume = JSON.parse(commandOutput("docker", ["volume", "inspect", name], { cwd }))[0];
+    const consumers = commandOutput("docker", ["ps", "-a", "--filter", `volume=${name}`, "--format", "{{.ID}}"], { cwd }).split(/\r?\n/).filter(Boolean);
+    return { volume, consumers, mount: "/var/lib/postgresql/data" };
+  };
+  const plan = createResetPlan({ context, render, inspectTarget });
+  const snapshotDirectory = mkdtempSync(join(tmpdir(), "appfinanzas-reset-"));
+  const snapshotPath = join(snapshotDirectory, "compose.json");
+  writeFileSync(snapshotPath, plan.renderedConfig.json, { encoding: "utf8", mode: 0o600 });
+  let recreatedId;
+  try {
+    return runResetWorkflow({
+      plan, sourceHashes, render, inspectTarget,
+      acquireLock: () => acquireProjectLock(cwd),
+      removeContainer: (id) => buildContainerRemovalCommands(id).forEach((args) => commandOutput("docker", args, { cwd })),
+      inspectVolume, removeVolume: (name, args) => commandOutput("docker", ["volume", "rm", ...args, name], { cwd }),
+      recreate: () => {
+        const [command, args, environment] = buildSnapshotComposeCommand(context, snapshotPath, ["up", "--wait", "-d", context.service]);
+        commandOutput(command, args, { cwd, environment });
+        recreatedId = targetId();
+      },
+    verifyHealth: () => {
+      const state = JSON.parse(commandOutput("docker", ["inspect", recreatedId], { cwd }))[0].State;
+      if (state.Status !== "running" || state.Health?.Status !== "healthy") throw new Error("Recreated PostgreSQL container is not healthy.");
+    },
+    readSystemIdentifier: () => sql(recreatedId, "SELECT pg_control_system().system_identifier"),
+    executeSql: (query) => sql(recreatedId, query),
+     migrate: (profile) => {
+       const [command, args, options] = buildMigrationCommand(profile);
+       return commandOutput(command, args, { cwd, ...options });
+     },
+    verifyEmpty: () => {
+       const tables = JSON.parse(sql(recreatedId, applicationTableQuery()));
+      if (tables.some((table) => sql(recreatedId, `SELECT count(*) FROM ${table}`) !== "0")) throw new Error("Application tables are not empty.");
+    },
+      verifyUsable: () => {
+      if (sql(recreatedId, "BEGIN; CREATE TEMP TABLE reset_probe (id int); INSERT INTO reset_probe VALUES (1); SELECT id FROM reset_probe; ROLLBACK") !== "1") throw new Error("Database write/read probe failed.");
+      },
+    });
+  } finally {
+    rmSync(snapshotDirectory, { recursive: true, force: true });
   }
 };
 
