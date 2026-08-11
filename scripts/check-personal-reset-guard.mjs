@@ -80,6 +80,7 @@ const withConfirmation = spawnSync(process.execPath, [
   'appfinanzas_personal',
 ], {
   encoding: 'utf8',
+  cwd: tempDir,
   env: {
     ...process.env,
     APPFINANZAS_ENV_PATH: tempPersonalEnvPath,
@@ -89,7 +90,7 @@ const withConfirmation = spawnSync(process.execPath, [
 });
 
 if (withConfirmation.status !== 1) {
-  console.error('Personal reset wrapper must fail closed with a deterministic nonzero status until the engine is wired.');
+  console.error('Personal reset wrapper must reject an unsafe Compose override during guarded preflight.');
   console.error(withConfirmation.stderr);
   process.exit(1);
 }

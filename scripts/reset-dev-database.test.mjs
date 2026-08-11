@@ -18,6 +18,7 @@ import {
   buildSqlCommand,
   createResetPlan,
   createInvocationContext,
+  executeLocalReset,
   applicationTableQuery,
   removeVerifiedTarget,
   runResetWorkflow,
@@ -155,6 +156,43 @@ test("public reset wrappers route valid invocations into guarded preflight", () 
     assert.equal(result.status, 1);
     assert.match(result.stderr, /PREFLIGHT_REJECTED: Compose environment variable is not allowed: COMPOSE_PROJECT_NAME/);
     assert.doesNotMatch(result.stderr, /reset engine is not wired/i);
+  }
+});
+
+test("personal wrapper rejects unsafe Compose overrides before fresh-checkout filesystem access", () => {
+  const freshCheckout = mkdtempSync(join(tmpdir(), "appfinanzas-reset-fresh-checkout-"));
+  try {
+    const result = spawnSync(process.execPath, [
+      personalResetPath,
+      "--confirm", "RESET_APPFINANZAS_PERSONAL",
+      "--profile", "appfinanzas_personal",
+    ], {
+      cwd: freshCheckout,
+      encoding: "utf8",
+      env: { ...process.env, COMPOSE_PROJECT_NAME: "unsafe-override" },
+    });
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /PREFLIGHT_REJECTED: Compose environment variable is not allowed: COMPOSE_PROJECT_NAME/);
+    assert.doesNotMatch(result.stderr, /ENOENT/);
+  } finally {
+    rmSync(freshCheckout, { recursive: true, force: true });
+  }
+});
+
+test("the reset API rejects guarded preflight asynchronously", async () => {
+  const previousProjectName = process.env.COMPOSE_PROJECT_NAME;
+  process.env.COMPOSE_PROJECT_NAME = "unsafe-override";
+  try {
+    await assert.rejects(
+      executeLocalReset("personal"),
+      (error) => error instanceof ResetFailure
+        && error.code === "PREFLIGHT_REJECTED"
+        && /Compose environment variable is not allowed: COMPOSE_PROJECT_NAME/.test(error.message),
+    );
+  } finally {
+    if (previousProjectName === undefined) delete process.env.COMPOSE_PROJECT_NAME;
+    else process.env.COMPOSE_PROJECT_NAME = previousProjectName;
   }
 });
 

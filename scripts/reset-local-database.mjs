@@ -58,7 +58,7 @@ export class ResetFailure extends Error {
 const absolutePath = (cwd, relativePath) => `${cwd.replace(/[\\/]$/, "")}/${relativePath}`;
 const composeProjectName = (cwd) => cwd.replace(/[\\/]$/, "").split(/[\\/]/).at(-1).toLowerCase();
 
-const assertAllowedComposeEnvironment = (policy, environment) => {
+const assertAllowedComposeEnvironment = (environment) => {
   for (const [key, value] of Object.entries(environment)) {
     if (!key.startsWith("COMPOSE_") || value === undefined) continue;
     throw new ResetFailure("PREFLIGHT_REJECTED", `Compose environment variable is not allowed: ${key}`);
@@ -69,7 +69,7 @@ const assertAllowedComposeEnvironment = (policy, environment) => {
 export const createInvocationContext = ({ policyName, cwd, sourceHashes, environment = {} }) => {
   const policy = RESET_POLICIES[policyName];
   if (!policy) throw new ResetFailure("PREFLIGHT_REJECTED", `Unknown reset profile: ${policyName}`);
-  const composeEnv = assertAllowedComposeEnvironment(policy, environment);
+  const composeEnv = assertAllowedComposeEnvironment(environment);
   const composeFiles = policy.files.map((file) => ({
     path: absolutePath(cwd, file),
     sha256: sourceHashes[file],
@@ -319,9 +319,10 @@ export const acquireProjectLock = (cwd) => {
   return () => { closeSync(descriptor); unlinkSync(path); };
 };
 
-export const executeLocalReset = (policyName) => {
+export const executeLocalReset = async (policyName) => {
   const policy = RESET_POLICIES[policyName];
   if (!policy) throw new ResetFailure("PREFLIGHT_REJECTED", `Unknown reset profile: ${policyName}`);
+  assertAllowedComposeEnvironment(process.env);
   const cwd = process.cwd();
   const sourceHashes = Object.fromEntries([...policy.files, policy.envFile].map((file) => [file, sha256(readFileSync(absolutePath(cwd, file)))]));
   const context = createInvocationContext({ policyName, cwd, sourceHashes, environment: process.env });

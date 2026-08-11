@@ -2,7 +2,7 @@ import { ResetFailure, executeLocalReset, validatePersonalConfirmation } from ".
 
 try {
   validatePersonalConfirmation(process.argv.slice(2));
-  executeLocalReset("personal");
+  await executeLocalReset("personal");
   console.log("Personal database reset completed.");
 } catch (error) {
   const message = error instanceof ResetFailure ? `${error.code}: ${error.message}` : String(error);

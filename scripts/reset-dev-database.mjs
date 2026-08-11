@@ -2,7 +2,7 @@ import { ResetFailure, executeLocalReset, validateDevInvocation } from "./reset-
 
 try {
   validateDevInvocation(process.argv.slice(2));
-  executeLocalReset("dev");
+  await executeLocalReset("dev");
   console.log("Dev database reset completed.");
 } catch (error) {
   const message = error instanceof ResetFailure ? `${error.code}: ${error.message}` : String(error);
