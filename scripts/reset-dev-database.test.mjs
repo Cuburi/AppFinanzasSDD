@@ -8,9 +8,13 @@ import {
   RESET_POLICIES,
   ResetFailure,
   buildComposeCommand,
+  createResetPlan,
   createInvocationContext,
+  removeVerifiedTarget,
+  verifyStablePlan,
   validateDevInvocation,
   validatePersonalConfirmation,
+  volumeFingerprint,
 } from "./reset-local-database.mjs";
 
 const composePath = fileURLToPath(new URL("../docker-compose.yml", import.meta.url));
@@ -175,4 +179,134 @@ test("reset failures expose stable pre- and post-mutation taxonomy", () => {
   assert.equal(mutationFailure.code, "MUTATION_FAILED");
   assert.equal(mutationFailure.phase, "post-mutation");
   assert.throws(() => new ResetFailure("UNKNOWN", "invalid"), /Unknown reset failure code/);
+});
+
+const resetContext = () => createInvocationContext({
+  policyName: "dev",
+  cwd: "/repo",
+  sourceHashes: { "docker-compose.yml": "compose-hash", ".env": "env-hash" },
+});
+
+const verifiedTarget = {
+  id: "container-id",
+  name: "appfinanzas-postgres-dev",
+  labels: { "com.docker.compose.project": "repo", "com.docker.compose.service": "postgres-dev" },
+  mounts: [{ Name: "repo_appfinanzas_postgres_dev_data", Destination: "/var/lib/postgresql/data", RW: true }],
+  port: "5433",
+  database: "appfinanzas_dev",
+  marker: "dev:system-id",
+  systemIdentifier: "system-id",
+  dataDirectory: "/var/lib/postgresql/data/base",
+  volume: {
+    Name: "repo_appfinanzas_postgres_dev_data",
+    Driver: "local",
+    Scope: "local",
+    Options: {},
+    Labels: { "com.docker.compose.project": "repo", "com.docker.compose.volume": "appfinanzas_postgres_dev_data" },
+    CreatedAt: "2026-08-10T00:00:00Z",
+    Mountpoint: "/var/lib/docker/volumes/repo_appfinanzas_postgres_dev_data/_data",
+  },
+  consumers: ["container-id"],
+};
+
+const renderedDevService = () => JSON.stringify({
+  services: {
+    "postgres-dev": {
+      container_name: "appfinanzas-postgres-dev",
+      environment: { POSTGRES_DB: "appfinanzas_dev" },
+      ports: ["5433:5432"],
+      volumes: ["appfinanzas_postgres_dev_data:/var/lib/postgresql/data"],
+    },
+    "postgres-personal": { container_name: "appfinanzas-postgres-personal" },
+  },
+  volumes: { appfinanzas_postgres_dev_data: {} },
+});
+
+test("reset plans bind the rendered target, runtime volume, fingerprint, and sole owner", () => {
+  const render = renderedDevService;
+  const plan = createResetPlan({ context: resetContext(), render, inspectTarget: () => verifiedTarget });
+
+  assert.equal(plan.renderedConfig.sha256.length, 64);
+  assert.equal(plan.target.containerId, "container-id");
+  assert.equal(plan.target.volume.name, "repo_appfinanzas_postgres_dev_data");
+  assert.equal(plan.target.volume.fingerprint.length, 64);
+  assert.throws(
+    () => createResetPlan({ context: resetContext(), render, inspectTarget: () => ({ ...verifiedTarget, marker: null }) }),
+    (error) => error instanceof ResetFailure && error.code === "PREFLIGHT_REJECTED",
+  );
+  assert.throws(
+    () => createResetPlan({ context: resetContext(), render, inspectTarget: () => ({ ...verifiedTarget, consumers: ["container-id", "other-container"] }) }),
+    (error) => error instanceof ResetFailure && error.code === "PREFLIGHT_REJECTED",
+  );
+});
+
+test("stable-plan validation rejects source, rendered, proof, and containment drift", () => {
+  const render = renderedDevService;
+  const plan = createResetPlan({ context: resetContext(), render, inspectTarget: () => verifiedTarget });
+
+  assert.throws(
+    () => verifyStablePlan({ plan, sourceHashes: { "docker-compose.yml": "changed", ".env": "env-hash" }, render, inspectTarget: () => verifiedTarget }),
+    (error) => error instanceof ResetFailure && error.code === "PLAN_DRIFT",
+  );
+  assert.throws(
+    () => verifyStablePlan({ plan, sourceHashes: { "docker-compose.yml": "compose-hash", ".env": "env-hash" }, render: () => "{}", inspectTarget: () => verifiedTarget }),
+    (error) => error instanceof ResetFailure && error.code === "PLAN_DRIFT",
+  );
+  assert.throws(
+    () => verifyStablePlan({ plan, sourceHashes: { "docker-compose.yml": "compose-hash", ".env": "env-hash" }, render, inspectTarget: () => ({ ...verifiedTarget, systemIdentifier: "changed", marker: "dev:changed" }) }),
+    (error) => error instanceof ResetFailure && error.code === "PLAN_DRIFT",
+  );
+  assert.throws(
+    () => createResetPlan({ context: resetContext(), render, inspectTarget: () => ({ ...verifiedTarget, dataDirectory: "/var/lib/postgresql/data-old/base" }) }),
+    (error) => error instanceof ResetFailure && error.code === "PREFLIGHT_REJECTED",
+  );
+});
+
+const verifiedVolume = {
+  Name: "repo_appfinanzas_postgres_dev_data",
+  Driver: "local",
+  Scope: "local",
+  Options: {},
+  Labels: { "com.docker.compose.project": "repo", "com.docker.compose.volume": "appfinanzas_postgres_dev_data" },
+  CreatedAt: "2026-08-10T00:00:00Z",
+  Mountpoint: "/var/lib/docker/volumes/repo_appfinanzas_postgres_dev_data/_data",
+};
+
+test("volume fingerprint is canonical and mutation removes only the saved target without force", () => {
+  const first = volumeFingerprint({ volume: verifiedVolume, containerId: "container-id", mount: "/var/lib/postgresql/data" });
+  const reordered = volumeFingerprint({ volume: { ...verifiedVolume, Labels: { "com.docker.compose.volume": "appfinanzas_postgres_dev_data", "com.docker.compose.project": "repo" } }, containerId: "container-id", mount: "/var/lib/postgresql/data" });
+  const calls = [];
+  const plan = { target: { containerId: "container-id", volume: { name: verifiedVolume.Name, fingerprint: first } } };
+  let volumeInspection = 0;
+
+  removeVerifiedTarget({
+    plan,
+    acquireLock: () => () => calls.push("unlock"),
+    removeContainer: (id) => calls.push(["container", id]),
+    inspectVolume: () => ({ volume: verifiedVolume, consumers: volumeInspection++ === 0 ? ["container-id"] : [], mount: "/var/lib/postgresql/data" }),
+    removeVolume: (name, args) => calls.push(["volume", name, args]),
+  });
+
+  assert.equal(first, reordered);
+  assert.deepEqual(calls, [["container", "container-id"], ["volume", verifiedVolume.Name, []], "unlock"]);
+});
+
+test("mutation fails closed when lock, volume identity, attachment, or removal fails", () => {
+  const fingerprint = volumeFingerprint({ volume: verifiedVolume, containerId: "container-id", mount: "/var/lib/postgresql/data" });
+  const plan = { target: { containerId: "container-id", volume: { name: verifiedVolume.Name, fingerprint } } };
+  const dependencies = { acquireLock: () => () => {}, removeContainer: () => {}, removeVolume: () => {} };
+
+  for (const inspectVolume of [
+    () => ({ volume: { ...verifiedVolume, Driver: "other" }, consumers: [], mount: "/var/lib/postgresql/data" }),
+    () => ({ volume: verifiedVolume, consumers: ["other-container"], mount: "/var/lib/postgresql/data" }),
+  ]) {
+    assert.throws(
+      () => removeVerifiedTarget({ plan, inspectVolume, ...dependencies }),
+      (error) => error instanceof ResetFailure && error.code === "MUTATION_FAILED",
+    );
+  }
+  assert.throws(
+    () => removeVerifiedTarget({ plan, inspectVolume: () => ({ volume: verifiedVolume, consumers: [], mount: "/var/lib/postgresql/data" }), acquireLock: () => { throw new Error("locked"); }, removeContainer: () => {}, removeVolume: () => {} }),
+    (error) => error instanceof ResetFailure && error.code === "MUTATION_FAILED",
+  );
 });
