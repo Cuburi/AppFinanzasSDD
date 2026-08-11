@@ -61,7 +61,7 @@ const requiredScripts = {
   'env:personal': 'node scripts/use-env-profile.mjs personal',
   'db:dev:up': 'docker compose up --wait postgres-dev',
   'db:dev:down': 'docker compose stop postgres-dev',
-  'db:dev:reset': 'docker compose stop postgres-dev && docker compose rm -f -v postgres-dev && docker compose up --wait postgres-dev',
+  'db:dev:reset': 'node scripts/reset-dev-database.mjs',
   'db:personal:up': 'docker compose up --wait postgres-personal',
   'db:personal:down': 'docker compose stop postgres-personal',
   'db:personal:reset': 'node scripts/guard-personal-reset.mjs',
