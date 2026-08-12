@@ -110,6 +110,17 @@ test("CI exercises the server production build after Prisma generation", async (
   assert.match(workflow, /Build server[\s\S]*pnpm --dir server build/);
 });
 
+test("server CI provisions the isolated dev PostgreSQL profile before Prisma and migration tests", async () => {
+  const workflow = await readFile(path.join(serverRoot, "..", ".github", "workflows", "ci.yml"), "utf8");
+
+  assert.match(workflow, /server:[\s\S]*services:[\s\S]*postgres-dev:[\s\S]*image: postgres:16-alpine/);
+  assert.match(workflow, /POSTGRES_DB: appfinanzas_dev/);
+  assert.match(workflow, /5433:5432/);
+  assert.match(workflow, /--health-cmd "pg_isready -U postgres -d appfinanzas_dev"/);
+  assert.match(workflow, /Verify PostgreSQL readiness[\s\S]*pg_isready --host localhost --port 5433 --username postgres --dbname appfinanzas_dev/);
+  assert.match(workflow, /Run tests[\s\S]*DATABASE_URL: postgresql:\/\/postgres:postgres@localhost:5433\/appfinanzas_dev\?schema=public/);
+});
+
 test("build tooling scripts detect direct CLI execution from Windows and POSIX argv paths", () => {
   const copyScriptUrl = "file:///C:/repo/server/scripts/copy-prisma-generated.mjs";
   const verifyScriptUrl = "file:///home/app/server/scripts/verify-prisma-build.mjs";

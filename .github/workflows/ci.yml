@@ -68,6 +68,20 @@ jobs:
   server:
     name: Server checks
     runs-on: ubuntu-latest
+    services:
+      postgres-dev:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: appfinanzas_dev
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - "5433:5432"
+        options: >-
+          --health-cmd "pg_isready -U postgres -d appfinanzas_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
 
     steps:
       - name: Checkout repository
@@ -89,8 +103,21 @@ jobs:
       - name: Prepare dev environment profile
         run: pnpm env:dev
 
+      - name: Verify PostgreSQL readiness
+        run: |
+          for attempt in {1..30}; do
+            if pg_isready --host localhost --port 5433 --username postgres --dbname appfinanzas_dev; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
       - name: Generate Prisma client
         run: pnpm prisma:dev:generate
+
+      - name: Apply Prisma migrations
+        run: node scripts/run-prisma-with-profile.mjs dev -- migrate deploy --schema prisma/schema.prisma
 
       - name: Typecheck
         run: pnpm --dir server exec tsc -p tsconfig.json --noEmit
@@ -99,6 +126,8 @@ jobs:
         run: pnpm --dir server build
 
       - name: Run tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5433/appfinanzas_dev?schema=public
         run: pnpm --dir server test
 
   client:

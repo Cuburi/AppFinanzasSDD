@@ -72,34 +72,36 @@ if (!withoutConfirmation.stderr.includes('Personal database reset blocked')) {
   process.exit(1);
 }
 
-const withConfirmation = spawnSync(process.execPath, [guardScript], {
+const withConfirmation = spawnSync(process.execPath, [
+  guardScript,
+  '--confirm',
+  'RESET_APPFINANZAS_PERSONAL',
+  '--profile',
+  'appfinanzas_personal',
+], {
   encoding: 'utf8',
+  cwd: tempDir,
   env: {
     ...process.env,
     APPFINANZAS_ENV_PATH: tempPersonalEnvPath,
-    CONFIRM_PERSONAL_RESET: 'RESET_APPFINANZAS_PERSONAL',
     PRISMA_PROFILE_GUARD_DRY_RUN: '1',
+    COMPOSE_PROJECT_NAME: 'unsafe-override',
   },
 });
 
-if (withConfirmation.status !== 0) {
-  console.error('Personal reset guard must pass only with the explicit confirmation token.');
+if (withConfirmation.status !== 1) {
+  console.error('Personal reset wrapper must reject an unsafe Compose override during guarded preflight.');
   console.error(withConfirmation.stderr);
   process.exit(1);
 }
 
-if (!withConfirmation.stdout.includes('Personal reset confirmation accepted')) {
-  console.error('Personal reset guard must acknowledge the accepted confirmation token.');
+if (!withConfirmation.stderr.includes('PREFLIGHT_REJECTED: Compose environment variable is not allowed: COMPOSE_PROJECT_NAME')) {
+  console.error('Personal reset wrapper must enter guarded preflight before it can invoke Docker.');
   process.exit(1);
 }
 
-if (!withConfirmation.stdout.includes('profile=personal')) {
-  console.error('Personal reset guard must execute Prisma with the explicit personal profile.');
-  process.exit(1);
-}
-
-if (!withConfirmation.stdout.includes('migrate reset --schema prisma/schema.prisma --force')) {
-  console.error('Personal reset guard must run the intended Prisma reset after confirmation.');
+if (withConfirmation.stderr.toLowerCase().includes('reset engine is not wired')) {
+  console.error('Personal reset wrapper must not retain the deferred-engine implementation.');
   process.exit(1);
 }
 

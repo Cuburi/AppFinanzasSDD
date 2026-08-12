@@ -13,6 +13,7 @@ export const toPocketApiView = (pocket: SavingsPocketView): SavingsPocketView =>
     occurredAt: movement.occurredAt,
     description: movement.description,
     direction: movement.direction,
+    ...(movement.sourceKind ? { sourceKind: movement.sourceKind, sourceLabel: movement.sourceLabel ?? null } : {}),
   })),
 });
 

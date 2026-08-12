@@ -13,11 +13,13 @@ const compatiblePocket = {
   recentMovements: [
     {
       id: "movement-1",
-      type: "DEFICIT_COVER_FROM_POCKET",
+      type: "POCKET_DEPOSIT_EXTERNAL",
+      sourceKind: "EXTERNAL" as const,
+      sourceLabel: "Tax refund",
       amount: 50,
       occurredAt: "2026-05-13T00:00:00.000Z",
-      description: "Coverage",
-      direction: "out" as const,
+      description: null,
+      direction: "in" as const,
     },
   ],
 };

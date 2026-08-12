@@ -33,6 +33,7 @@ test("template workflow updates through transaction-scoped ports instead of a Pr
     months: {} as MonthlyCyclePrismaPortSet["months"],
     movements: {} as MonthlyCyclePrismaPortSet["movements"],
     incomes: {} as MonthlyCyclePrismaPortSet["incomes"],
+    ledger: {} as MonthlyCyclePrismaPortSet["ledger"],
     structure: {} as MonthlyCyclePrismaPortSet["structure"],
     templates: {
       async readCategories() {
@@ -54,12 +55,18 @@ test("template workflow updates through transaction-scoped ports instead of a Pr
     creditCards: {
       async ensureCreditCardIsActive() {},
     },
+    depositWriterGate: {
+      async isEnabled() { return true; },
+    },
   };
   const service = createTemplateService({
     ...txPorts,
     transactionRunner: {
       async run(work) {
         calls.push("transactionRunner.run");
+        return work(txPorts);
+      },
+      async runSerializable(work) {
         return work(txPorts);
       },
     },
@@ -95,6 +102,7 @@ test("movement workflow validates pocket deposits through ports inside the trans
     months: {} as MonthlyCyclePrismaPortSet["months"],
     templates: {} as MonthlyCyclePrismaPortSet["templates"],
     incomes: {} as MonthlyCyclePrismaPortSet["incomes"],
+    ledger: {} as MonthlyCyclePrismaPortSet["ledger"],
     structure: {} as MonthlyCyclePrismaPortSet["structure"],
     pockets: {
       async ensurePocketIsActive(pocketId, label) {
@@ -104,6 +112,12 @@ test("movement workflow validates pocket deposits through ports inside the trans
     },
     creditCards: {
       async ensureCreditCardIsActive() {},
+    },
+    depositWriterGate: {
+      async isEnabled() {
+        calls.push(["depositWriterGate.isEnabled"]);
+        return true;
+      },
     },
     movements: {
       async findById() {
@@ -129,18 +143,24 @@ test("movement workflow validates pocket deposits through ports inside the trans
         calls.push(["transactionRunner.run"]);
         return work(txPorts);
       },
+      async runSerializable(work) {
+        return work(txPorts);
+      },
     },
   });
 
   const result = await service.depositToPocket({
+    sourceKind: "EXTERNAL",
     amount: 25,
     targetPocketId: "pocket-home",
     externalSourceLabel: "Bonus",
+    occurredAt: "2026-05-10T00:00:00.000Z",
   });
 
   assert.equal(result, null);
   assert.deepEqual(calls, [
     ["transactionRunner.run"],
+    ["depositWriterGate.isEnabled"],
     ["pockets.ensurePocketIsActive", "pocket-home", "Target pocket"],
     ["movements.create", "POCKET_DEPOSIT_EXTERNAL", "25", "pocket-home"],
   ]);
@@ -148,7 +168,7 @@ test("movement workflow validates pocket deposits through ports inside the trans
 
 test("month lifecycle workflow reads active month through the month repository port", async () => {
   const service = createMonthLifecycleService({
-    transactionRunner: { async run() {} },
+    transactionRunner: { async run() {}, async runSerializable() {} },
     months: {
       async findActive() {
         return null;

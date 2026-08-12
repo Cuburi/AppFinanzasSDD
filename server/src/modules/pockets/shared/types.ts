@@ -19,6 +19,7 @@ export type PocketMovement = {
   amount: number;
   occurredAt: Date;
   description: string | null;
+  externalSourceLabel?: string | null;
 };
 
 export type PocketMovementView = {
@@ -28,6 +29,8 @@ export type PocketMovementView = {
   occurredAt: string;
   description: string | null;
   direction: "in" | "out";
+  sourceKind?: "EXTERNAL";
+  sourceLabel?: string | null;
 };
 
 export type SavingsPocketView = {

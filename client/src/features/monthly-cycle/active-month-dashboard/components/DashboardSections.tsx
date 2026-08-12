@@ -1,5 +1,6 @@
-import { Button, Card } from "../../../../components/ui";
+import { Button, Card, StatusPill } from "../../../../components/ui";
 import type { OpenMonthInput } from "../api/dashboardApi";
+import type { Month } from "../../../../types";
 
 export type DashboardActivationFormProps = {
   input: OpenMonthInput;
@@ -29,6 +30,39 @@ export function DashboardActivationForm({ input, onChange, onSubmit, pending }: 
   );
 }
 
-export function DashboardOperationalSection({ children }: { children: React.ReactNode }) {
-  return <section aria-label="Operación del mes">{children}</section>;
+export function DashboardOperationalSection({ activityContent, expenseContent, financialContent, month, primaryAction, quickActions, warnings }: {
+  activityContent?: React.ReactNode;
+  expenseContent?: React.ReactNode;
+  financialContent?: React.ReactNode;
+  month: Month;
+  primaryAction?: React.ReactNode;
+  quickActions?: React.ReactNode;
+  warnings?: React.ReactNode;
+}) {
+  const monthName = new Intl.DateTimeFormat("es-CO", { month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(month.year, month.month - 1, 1)));
+  const title = `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${month.year}`;
+  const isClosed = month.status === "CLOSED" || Boolean(month.closedAt);
+
+  return (
+    <section aria-label="Panel del mes activo" className="active-month-dashboard dashboard-operational stack-lg">
+      <section aria-label="Estado del mes" className="dashboard-context">
+        <div>
+          <h1 id="active-month-dashboard-title">{title}</h1>
+          <p className="section-description">Resumen operativo de tus finanzas personales.</p>
+        </div>
+        <div className="dashboard-context-actions">
+          <StatusPill aria-label={isClosed ? "Mes cerrado" : "Mes abierto"} tone={isClosed ? "neutral" : "success"}>{isClosed ? "Mes cerrado" : "Mes abierto"}</StatusPill>
+          <p className="dashboard-context-meta">Información actual del mes</p>
+          {quickActions ? <section aria-label="Acciones rápidas" className="dashboard-quick-actions">{quickActions}</section> : null}
+        </div>
+      </section>
+      <section aria-label="Tesorería del mes" className="dashboard-runway">
+        {financialContent ? <section aria-label="Resumen financiero">{financialContent}</section> : null}
+        {expenseContent ? <div className="dashboard-expense-slip">{expenseContent}</div> : null}
+        {primaryAction ? <section aria-label="Próxima acción" className="dashboard-actions dashboard-primary-action"><p className="eyebrow">Próxima acción</p>{primaryAction}</section> : null}
+      </section>
+      {warnings}
+      {activityContent ? <section aria-label="Actividad y contexto" className="dashboard-activity">{activityContent}</section> : null}
+    </section>
+  );
 }

@@ -5,8 +5,8 @@ import type { ErrorRequestHandler } from "express";
 import { PaymentMethod } from "../../lib/prisma-client.js";
 
 import { monthlyCycleRouter } from "./routes.js";
-import { DomainError } from "./shared/service-errors.js";
-import type { BasicMonthlyReportView, MonthView } from "./dto/index.js";
+import { DomainError, SemanticError } from "./shared/service-errors.js";
+import type { BasicMonthlyReportView, MonthView, MonthlyLedgerView } from "./dto/index.js";
 
 const report: BasicMonthlyReportView = {
   summary: {
@@ -142,6 +142,60 @@ test("monthlyCycleRouter maps missing report months to 404", async () => {
   }
 });
 
+test("monthlyCycleRouter exposes the unpaginated ledger and rejects invalid system-event flags before delegation", async () => {
+  const calls: unknown[] = [];
+  const ledger: MonthlyLedgerView = { monthId: "month-1", status: "CLOSED", entries: [] };
+  const server = createTestServer({ async getMonthlyLedger(input: unknown) { calls.push(input); return ledger; } });
+
+  try {
+    const omitted = await request(server, "/api/months/month-1/ledger");
+    const response = await request(server, "/api/months/month-1/ledger?includeSystemEvents=true");
+    const invalid = await request(server, "/api/months/month-1/ledger?includeSystemEvents=yes");
+
+    assert.equal(omitted.status, 200);
+    assert.deepEqual(await omitted.json(), ledger);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), ledger);
+    assert.equal(invalid.status, 400);
+    assert.deepEqual(await invalid.json(), { code: "INVALID_QUERY", message: "includeSystemEvents must be true or false." });
+    assert.deepEqual(calls, [{ monthId: "month-1", includeSystemEvents: false }, { monthId: "month-1", includeSystemEvents: true }]);
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter returns a safe 500 response for unexpected ledger failures", async () => {
+  const server = createTestServer({
+    async getMonthlyLedger() {
+      throw new Error("Prisma connection string contains postgres://internal-secret");
+    },
+  });
+
+  try {
+    const response = await request(server, "/api/months/month-1/ledger");
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(await response.json(), { message: "Internal server error." });
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter maps blank ledger month ids to semantic 400 before service delegation", async () => {
+  let calls = 0;
+  const server = createTestServer({ async getMonthlyLedger() { calls += 1; throw new Error("Invalid route input should not reach service."); } });
+
+  try {
+    const response = await request(server, "/api/months/%20%20%20/ledger");
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { code: "INVALID_QUERY", message: "Month id is required." });
+    assert.equal(calls, 0);
+  } finally {
+    server.close();
+  }
+});
+
 test("monthlyCycleRouter delegates template, month lifecycle, and pocket deposit routes through injected service", async () => {
   const calls: unknown[] = [];
   const server = createTestServer({
@@ -172,7 +226,7 @@ test("monthlyCycleRouter delegates template, month lifecycle, and pocket deposit
     const depositResponse = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-1", amount: 75, description: "Deposit" }),
+      body: JSON.stringify({ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z", description: "Deposit" }),
     });
 
     assert.equal(templateResponse.status, 200);
@@ -187,15 +241,134 @@ test("monthlyCycleRouter delegates template, month lifecycle, and pocket deposit
       {
         type: "depositToPocket",
         input: {
+          sourceKind: "SUBCATEGORY",
           monthId: "month-1",
           sourceSubcategoryId: "sub-market",
           targetPocketId: "pocket-1",
           amount: 75,
+          occurredAt: "2026-05-10T00:00:00.000Z",
           description: "Deposit",
-          externalSourceLabel: null,
         },
       },
     ]);
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter cuts over pocket deposits to strict source contracts before service execution", async () => {
+  let calls = 0;
+  const server = createTestServer({
+    async depositToPocket() {
+      calls += 1;
+      return month;
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+    const legacyResponse = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-1", amount: 75 }),
+    });
+    const contradictoryResponse = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sourceKind: "EXTERNAL", monthId: "month-1", externalSourceLabel: "Bonus", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    });
+    const invalidAmountResponse = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 0, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    });
+    const invalidDateResponse = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 75, occurredAt: "not-a-date" }),
+    });
+
+    assert.equal(legacyResponse.status, 400);
+    assert.deepEqual(await legacyResponse.json(), { code: "INVALID_DEPOSIT_SOURCE", message: "Pocket deposit source kind must be SUBCATEGORY, MONTH_AVAILABLE, or EXTERNAL." });
+    assert.equal(contradictoryResponse.status, 400);
+    assert.deepEqual(await contradictoryResponse.json(), { code: "INVALID_DEPOSIT_SOURCE", message: "External pocket deposits cannot specify a month or subcategory." });
+    assert.equal(invalidAmountResponse.status, 400);
+    assert.deepEqual(await invalidAmountResponse.json(), { code: "INVALID_AMOUNT", message: "Deposit amount must be greater than zero." });
+    assert.equal(invalidDateResponse.status, 400);
+    assert.deepEqual(await invalidDateResponse.json(), { code: "INVALID_DATE", message: "Pocket deposit date must be a valid date." });
+    assert.equal(calls, 0);
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter rejects missing and explicitly-null invalid deposit source fields before delegation", async () => {
+  let calls = 0;
+  const server = createTestServer({ async depositToPocket() { calls += 1; return month; } });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+    const postDeposit = (body: object) => fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const base = { targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z" };
+    for (const [body, message] of [
+      [{ ...base, sourceKind: "SUBCATEGORY", monthId: "month-1" }, "Source subcategory is required."],
+      [{ ...base, sourceKind: "MONTH_AVAILABLE" }, "Month id is required."],
+      [{ ...base, sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: null }, "Available-funds pocket deposits cannot specify a subcategory or external source label."],
+      [{ ...base, sourceKind: "EXTERNAL", monthId: null }, "External pocket deposits cannot specify a month or subcategory."],
+    ] as const) {
+      const response = await postDeposit(body);
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), { code: "INVALID_DEPOSIT_SOURCE", message });
+    }
+    assert.equal(calls, 0);
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter preserves strict pocket-deposit error codes", async () => {
+  const server = createTestServer({
+    async depositToPocket() {
+      throw new SemanticError("INSUFFICIENT_FUNDS", 409, "Insufficient funds for this pocket deposit.");
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    });
+
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { code: "INSUFFICIENT_FUNDS", message: "Insufficient funds for this pocket deposit." });
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter returns the service quiescence conflict for pocket deposits", async () => {
+  const server = createTestServer({
+    async depositToPocket() {
+      throw new DomainError(409, "Pocket deposits are temporarily disabled.");
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z", description: "Deposit", externalSourceLabel: "Bonus" }),
+    });
+
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { message: "Pocket deposits are temporarily disabled." });
   } finally {
     server.close();
   }

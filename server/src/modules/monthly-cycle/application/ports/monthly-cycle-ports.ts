@@ -10,9 +10,11 @@ export const MONTHLY_CYCLE_PORT_NAMES = [
   "templates",
   "movements",
   "incomes",
+  "ledger",
   "structure",
   "pockets",
   "creditCards",
+  "depositWriterGate",
   "transactionRunner",
 ] as const;
 
@@ -79,6 +81,10 @@ export interface IncomeRepositoryPort {
   delete(incomeId: string): Promise<void>;
 }
 
+export interface MonthlyLedgerReadPort {
+  read(monthId: string): Promise<MonthRecord>;
+}
+
 export interface MonthStructureRepositoryPort {
   createMonthCategory(input: { monthId: string; name: string; sortOrder: number; templateCategoryId: string | null }): Promise<{ id: string }>;
   updateMonthCategory(input: { categoryId: string; name: string }): Promise<void>;
@@ -101,6 +107,7 @@ export interface MonthStructureRepositoryPort {
 
 export interface PocketValidationPort {
   ensurePocketIsActive(pocketId: string, label: string): Promise<void>;
+  ensureStrictDepositTargetPocketIsActive?(pocketId: string): Promise<void>;
   ensureTemplateDefaultPocketsAreActive(input: TemplateInput): Promise<void>;
 }
 
@@ -108,17 +115,24 @@ export interface CreditCardValidationPort {
   ensureCreditCardIsActive(ownerId: string, creditCardId: string): Promise<void>;
 }
 
+export interface DepositWriterGatePort {
+  isEnabled(): Promise<boolean>;
+}
+
 export type MonthlyCyclePorts = {
   months: MonthRepositoryPort;
   templates: TemplateRepositoryPort;
   movements: MovementRepositoryPort;
   incomes: IncomeRepositoryPort;
+  ledger: MonthlyLedgerReadPort;
   structure: MonthStructureRepositoryPort;
   pockets: PocketValidationPort;
   creditCards: CreditCardValidationPort;
+  depositWriterGate: DepositWriterGatePort;
   transactionRunner: MonthlyCycleTransactionRunner;
 };
 
 export interface MonthlyCycleTransactionRunner {
   run<T>(work: (ports: Omit<MonthlyCyclePorts, "transactionRunner">) => Promise<T>): Promise<T>;
+  runSerializable<T>(work: (ports: Omit<MonthlyCyclePorts, "transactionRunner">) => Promise<T>): Promise<T>;
 }

@@ -131,6 +131,9 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
 
     async depositToPocket(input: DepositToPocketInput): Promise<MonthView | null> {
       const month = await ports.transactionRunner.run(async (txPorts) => {
+        if (!await txPorts.depositWriterGate.isEnabled()) {
+          throw new DomainError(409, "Pocket deposits are temporarily disabled.");
+        }
         await txPorts.pockets.ensurePocketIsActive(input.targetPocketId, "Target pocket");
 
         const existingMonth = input.monthId ? await txPorts.months.findById(input.monthId) : null;

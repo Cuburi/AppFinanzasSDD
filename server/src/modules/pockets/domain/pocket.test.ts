@@ -36,6 +36,47 @@ test("pocket domain projects the latest five movements with directions and ISO d
   assert.equal(toPocketView(pocket).recentMovements[0]?.occurredAt, "2026-05-06T00:00:00.000Z");
 });
 
+test("pocket history identifies true external funding without a month source", () => {
+  const pocket = rehydratePocket({
+    id: "pocket-1",
+    name: "Emergency",
+    goalAmount: null,
+    active: true,
+    incomingMovements: [{ id: "external-1", type: "POCKET_DEPOSIT_EXTERNAL", amount: 125, occurredAt: new Date("2026-05-10T00:00:00.000Z"), description: null, externalSourceLabel: "Tax refund" }],
+    outgoingMovements: [],
+  });
+
+  const [historyEntry] = projectRecentMovements(pocket);
+
+  assert.deepEqual(historyEntry, {
+    id: "external-1",
+    type: "POCKET_DEPOSIT_EXTERNAL",
+    sourceKind: "EXTERNAL",
+    sourceLabel: "Tax refund",
+    amount: 125,
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    description: null,
+    direction: "in",
+  });
+  assert.equal("monthId" in (historyEntry ?? {}), false);
+});
+
+test("pocket history does not label month-funded deposits as external", () => {
+  const pocket = rehydratePocket({
+    id: "pocket-1",
+    name: "Emergency",
+    goalAmount: null,
+    active: true,
+    incomingMovements: [{ id: "available-1", type: "POCKET_DEPOSIT_FROM_AVAILABLE", amount: 50, occurredAt: new Date("2026-05-11T00:00:00.000Z"), description: null }],
+    outgoingMovements: [],
+  });
+
+  const [historyEntry] = projectRecentMovements(pocket);
+
+  assert.equal(historyEntry?.sourceKind, undefined);
+  assert.equal(historyEntry?.sourceLabel, undefined);
+});
+
 test("createPocket returns normalized data with active default", () => {
   assert.deepEqual(createPocket({ name: "  Travel  ", goalAmount: undefined }), { name: "Travel", goalAmount: null, active: true });
 });
