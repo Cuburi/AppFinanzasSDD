@@ -1,0 +1,23 @@
+name: Feature request
+description: Propose an outcome and its value.
+title: "feature: "
+labels: ["type:feature", "status:needs-review"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What outcome do you need?
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: Why does it matter?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: What proves it is complete?
+    validations:
+      required: true

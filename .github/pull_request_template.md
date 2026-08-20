@@ -1,13 +1,13 @@
-## Approved issue
+## Issue context
 
-- [ ] This PR links an approved issue or SDD change.
+- [ ] Approved issue reviewed (manual convention; not a merge barrier).
 - [ ] Body includes `Refs #N`, `Closes #N`, `Fixes #N`, `Resolves #N`, `SDD:`, or `SDD change`.
 
 ## Target branch
 
 - [ ] Feature PR targets `dev`.
 - [ ] Promotion PR moves `dev` to `master` after `dev` is stable.
-- [ ] Direct pushes to `dev` and `master` remain blocked by branch protection.
+- [ ] Merge manually toward `dev`; promote `dev` to `master` manually when ready.
 
 ## Type label
 
@@ -17,6 +17,7 @@
 
 - [ ] CI is green on this PR.
 - [ ] Branch release readiness checks passed.
+- [ ] Immediately before Merge, confirm ordinary CI is green and review the checklist.
 
 ## Tests and docs
 
