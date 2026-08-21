@@ -13,14 +13,14 @@ Use GitHub Issue forms and a concise PR template to guide the sole maintainer. O
 | Automated checks | Keep ordinary CI only. | Tests, typechecks, builds, and release-readiness checks are already appropriate and understandable. |
 | Merge authority | Maintainer manually merges to `dev` and manually promotes `dev` to `master`. | Avoids bot authority and unnecessary governance complexity. |
 | Future hardening | Revisit branch protections and automated governance before another writer receives access. | The current design is intentionally scoped to a single trusted maintainer. |
-| Recovery exclusion | Preserve the planned shared recovery lock and isolated restore design. | Production recovery has separate operational risks and remains an independent work unit. |
+| Recovery deferral | Preserve the guarded local-reset baseline at `HEAD`; withdraw the shared recovery lock and isolated restore design. | Robust production recovery coordination has unresolved cross-workspace safety risks and requires a separate roadmap change. |
 
 ## Data Flow
 
 ```text
 Issue form -> maintainer review -> PR checklist + ordinary CI -> manual merge to dev
 stable dev + promotion checklist + ordinary CI -> manual promotion to master
-operator -> shared production lock -> backup/isolated restore -> local evidence
+operator -> guarded local reset baseline
 ```
 
 ## File Changes
@@ -31,9 +31,9 @@ operator -> shared production lock -> backup/isolated restore -> local evidence
 | `.github/pull_request_template.md` | Modify | Manual Issue, branch, CI, test, and profile-safety checklist. |
 | `.github/workflows/ci.yml` | Retain | Ordinary `Server checks`, `Client checks`, and `Branch release readiness` contexts. |
 | `scripts/check-repository-delivery-workflow.contract.mjs`, `package.json` | Create/Modify | Narrow local contract for forms, template, ordinary CI, and absence of special governance automation. |
-| `scripts/personal-production-operation-lock.mjs` | Create later | Shared lease lock and source identity protocol. |
-| `scripts/personal-production-recovery.mjs`, `.contract.mjs` | Create later | Locked backup/isolated restore and atomic evidence. |
-| `docs/delivery/`, `README.md`, `docs/deployment/` | Create/Modify later | Manual delivery and recovery procedures. |
+| `scripts/personal-production-operation-lock.mjs` | Not created | Withdrawn PR3A work; future roadmap only. |
+| `scripts/personal-production-recovery.mjs`, `.contract.mjs` | Not created | Future roadmap backup/isolated restore scope. |
+| `docs/delivery/`, `README.md`, `docs/deployment/` | Create/Modify later | Manual delivery procedures; recovery procedures remain deferred. |
 
 ## Interfaces / Contracts
 
@@ -42,19 +42,19 @@ operator -> shared production lock -> backup/isolated restore -> local evidence
 - CI retains its ordinary jobs. No workflow uses `pull_request_target`, checks out a trusted validator, calls the GitHub API for Issue policy, or publishes a special `PR governance` result.
 - The maintainer manually merges feature PRs toward `dev`. When `dev` is stable, the maintainer manually promotes it to `master` after ordinary CI and the promotion checklist are reviewed.
 - Before granting write access to another person or automation principal, revisit trusted-boundary and branch-protection hardening as a new change.
-- Recovery retains the planned unguessable lease token, source-fingerprint revalidation, `.partial` discard, isolated networkless restore, atomic evidence, and secret/row/path redaction.
+- The guarded local reset retains its `HEAD` safeguards. No shared production-operation lock or recovery implementation is active in this change.
 
 ## Testing Strategy
 
 | Layer | What to Test | Approach |
 |---|---|---|
 | Contract | Issue-form labels/required fields, disabled blank Issues, simple PR template, retained ordinary CI, and removed special automation. | Node assertions and repository-file inspection. |
-| Recovery contract | Locks, fingerprint, guards, restore isolation, and evidence. | Node assertions, temp directories, and networkless PostgreSQL restore. |
-| Acceptance | Manual checklist use, ordinary CI results, and recovery exercise. | Maintainer review and locally retained evidence. |
+| Guarded local reset | Preserve existing local reset behavior after wholesale restoration to `HEAD`. | Existing Node reset suite. |
+| Acceptance | Manual checklist use and ordinary CI results. | Maintainer review and locally retained evidence. |
 
 ## Migration / Rollout
 
-Remove special governance artifacts and commands, retain Issue forms and ordinary CI, and use the PR template for manual merges. Do not change external GitHub settings during this work. Schedule hardening only when repository write access expands.
+Remove special governance artifacts and commands, retain Issue forms and ordinary CI, and use the PR template for manual merges. Restore all PR3A executable changes wholesale to `HEAD`; do not change external GitHub settings. The next separate activity is future recovery-roadmap planning, not recovery implementation or roadmap creation/population in this change.
 
 ## Open Questions
 
