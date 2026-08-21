@@ -4,17 +4,17 @@
 
 | Field | Value |
 |-------|-------|
-| Estimated remaining changed lines | 650–950 |
-| 400-line budget risk | High |
-| Chained PRs recommended | Yes |
-| Suggested split | Recovery lock → backup/restore tooling → procedures and deferred-settings evidence |
-| Delivery strategy | force-chained |
-| Chain strategy | stacked-to-main toward `dev` |
+| Estimated remaining changed lines | Governance documentation/evidence only; reassess any future recovery roadmap separately. |
+| 400-line budget risk | Not applicable to withdrawn recovery work. |
+| Chained PRs recommended | No recovery chain in this change. |
+| Suggested split | No recovery lock, backup/restore, or recovery-procedure slice is active. |
+| Delivery strategy | Complete only active repository-delivery governance work; defer recovery planning. |
+| Chain strategy | None for withdrawn recovery work. |
 
-Decision needed before apply: No — resolved as force-chained
-Chained PRs recommended: Yes
-Chain strategy: stacked-to-main toward `dev`
-400-line budget risk: High
+Decision needed before apply: No — recovery is withdrawn from this change.
+Chained PRs recommended: No recovery chain.
+Chain strategy: None for withdrawn recovery work.
+400-line budget risk: Not applicable to withdrawn recovery work.
 
 ### Revised Work Units
 
@@ -22,9 +22,9 @@ Chain strategy: stacked-to-main toward `dev`
 |---|---|---|---|
 | 1 | Issue forms and simple manual PR checklist | Superseded slice | Retained in the simplified workflow; no special gate. |
 | 2 | Remove special governance automation | Simplification slice | Completed: contract-led deletion of trusted workflow, API enforcement, trailer gate, and special commands. |
-| 3A | Recovery lock and reset migration | PR 3A | Production recovery only; target `dev`; keep within 400 changed lines. |
-| 3B | Backup/restore tooling and integration | PR 3B | Production recovery only; target the prior slice; split again if the diff exceeds 400 lines. |
-| 4 | Procedures and deferred external-settings record | PR 4 | Docs/evidence only; no external GitHub setting changes. |
+| 3A | Recovery lock and reset migration | Withdrawn | Deferred to future roadmap; no executable PR3A work remains on this branch. |
+| 3B | Backup/restore tooling and integration | Deferred | Future roadmap scope only. |
+| 4 | Delivery procedures and deferred external-settings record | PR 4 | Docs/evidence only; no external GitHub setting changes or recovery content. |
 
 ## Phase 1: Issue Intake and Manual Checklist
 
@@ -43,16 +43,26 @@ Chain strategy: stacked-to-main toward `dev`
 - [x] Former `Approved-Issue` trailer validation is superseded. Approved-Issue review remains a visible manual convention only.
 - [x] Focused simplified contract passes and `git diff --check` passes.
 
-## Phase 3: Production Recovery (RED → GREEN)
+## Phase 3: Production Recovery — Withdrawn and Deferred
 
-- [ ] 3.1 RED: Add tests for shared lease ownership, stale recovery, complete source fingerprint, pre/post-export revalidation, and migration from `.appfinanzas-reset.lock`.
-- [ ] 3.2 GREEN: Create `scripts/personal-production-operation-lock.mjs` and integrate it into `scripts/reset-local-database.mjs`, preserving token-bound host locking across reset and recovery operations.
-- [ ] 3.3 RED/GREEN: Create `scripts/personal-production-recovery.mjs` and `.contract.mjs`; test profile/destination guards, identifiable external backup, partial-file cleanup, networkless isolated restore, redaction, atomic evidence, and live-target non-modification.
-- [ ] 3.4 Modify `docker-compose.yml`, `package.json`, and `scripts/check-readme-local-setup.mjs` with guarded backup/restore commands and PowerShell-safe invocation checks.
+> Maintainer decision: robust production recovery coordination is deferred to a future product-roadmap change. This branch preserves the already-merged guarded local reset at `HEAD`; it contains no active production-recovery executable work unit.
+
+- [ ] 3.1 WITHDRAWN: Shared production-operation lock characterization and implementation are deferred to the future roadmap; no implementation claim remains.
+- [ ] 3.2 WITHDRAWN: Reset migration to the shared lock is deferred; `scripts/reset-local-database.mjs` is restored wholesale to the guarded local-reset baseline at `HEAD`.
+- [ ] 3.3 DEFERRED: Backup/restore implementation and contract belong to the future roadmap.
+- [ ] 3.4 DEFERRED: Backup/restore package, Compose, and README integration belong to the future roadmap.
+
+### Historical PR3A Evidence
+
+The withdrawn attempt and its review findings are retained only in `review-ledger.md`. They do not describe shipped code, provide no active approval, and do not make this branch PR-ready.
 
 ## Phase 4: Procedures and Deferred External Settings
 
 - [ ] 4.1 Create `docs/delivery/repository-workflow.md`; document Issue lifecycle, manual merge toward `dev`, manual `dev` → `master` promotion, hotfix synchronization, rollback, and manual Notion synchronization.
 - [ ] 4.2 Create `docs/delivery/external-settings-evidence.md` as a deferred-settings record; explicitly state that no GitHub rulesets, required-check changes, or merge restrictions are applied by this change and list hardening review triggers.
-- [ ] 4.3 Modify `README.md` and `docs/deployment/personal-production-options.md` with recovery cadence, backup/restore exercise checklist, lock migration, isolation limits, and evidence retention.
-- [ ] 4.4 Run contract, integration, workflow-inspection, and recovery tests; verify ordinary CI, manual delivery guidance, recovery evidence, and absence of special governance automation.
+- [ ] 4.3 Modify delivery documentation only for manual promotion, rollback, and Notion synchronization; do not add recovery cadence, backup/restore, lock migration, isolation, or recovery-evidence instructions.
+- [ ] 4.4 Run repository-delivery contract and workflow-inspection checks; verify ordinary CI, manual delivery guidance, and absence of special governance automation. Recovery tests and evidence are future roadmap scope.
+
+## Next Separate Activity
+
+Plan the future production-recovery roadmap without creating or populating it in this change. Its planning must preserve the six historical safety requirements in `specs/personal-production-recovery/spec.md` and `review-ledger.md`.

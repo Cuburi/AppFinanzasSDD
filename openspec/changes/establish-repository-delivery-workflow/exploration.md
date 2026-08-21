@@ -2,20 +2,20 @@
 
 ### Current Scope Revision
 
-The original exploration considered automated Approved-Issue validation and special GitHub governance checks. That approach is superseded for the current solo-maintainer stage. The active scope keeps Issue forms, a simple PR template, ordinary CI, manual merges toward `dev`, manual `dev` → `master` promotion, and production recovery work.
+The original exploration considered automated Approved-Issue validation, special GitHub governance checks, and production recovery implementation. The active scope now keeps Issue forms, a simple PR template, ordinary CI, manual merges toward `dev`, manual `dev` → `master` promotion, and the already-integrated guarded local reset baseline. Robust production recovery coordination is future roadmap scope, not active work in this change.
 
 ### Retained Constraints
 
 - Issue forms should collect structured bug/feature information, apply type labels, start in `status:needs-review`, and disable blank Issues.
 - Approved-Issue review remains visible in the PR checklist but is not an automated merge barrier.
 - Ordinary CI stays responsible for tests, typechecks, builds, and release-readiness checks already appropriate to the repository.
-- Recovery must use a production-only profile, an external-to-volume backup destination, disposable restore isolation, and locally retained evidence.
+- The guarded local reset at `HEAD` remains preserved. Production recovery coordination, backup/restore, lock migration, and recovery evidence are not active requirements of this change.
 - GitHub remains the technical-status authority; Notion synchronization remains manual.
 
 ### Deferred Hardening
 
 Do not apply external GitHub rulesets, special required checks, merge restrictions, or additional trust-boundary automation in this change. Before another person or automation principal receives repository write access, create a new hardening change that reassesses branch protections and collaboration risks.
 
-### Delivery Plan
+### Deferred Recovery Follow-up
 
-The remaining work is force-chained toward `dev`: recovery lock/reset migration, then backup/restore tooling, then procedures and a deferred external-settings record. Each slice remains below the 400-line review budget where practical; split recovery tooling further if its diff exceeds that threshold.
+No recovery lock/reset migration, backup/restore tooling, recovery procedure, or recovery-evidence work unit is planned in this change. The next separate activity is roadmap planning for a future recovery change; no roadmap is created or populated here. That future planning must retain the six historical safety constraints in `specs/personal-production-recovery/spec.md` and `review-ledger.md`.
