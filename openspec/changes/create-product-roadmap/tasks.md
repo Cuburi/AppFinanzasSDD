@@ -64,7 +64,7 @@ Chain strategy: stacked-to-main (sequential PRs to `dev`)
 
 ## Phase 6: Canonical Publication and Post-publication Surfaces
 
-- [ ] 6.1 Publish and verify approved initiatives in `docs/product/roadmap.md`; record the source commit/version and validate required fields, dependencies, traceability, no task-tracker data, recovery safeguards, and history.
+- [x] 6.1 Publish and verify approved initiatives in `docs/product/roadmap.md`; record the source commit/version and validate required fields, dependencies, traceability, no task-tracker data, recovery safeguards, and history. Source pin `31138F924F0FDB6DDC1E5D6DF2C50BAF694D167161E3AF5348E7012F93DAA3F5` and 29-ID digest `8118B4702EC650B42CF2FB7CD9A0F3EE90580DCAADEF6A8D287EF66C0BA3CE52` passed documentary/static verification; see `publication-verification.md`.
 - [ ] 6.2 Archive or explicitly transform/refresh the draft into a separate refresher-owned Canonical Roadmap Mirror; never silently promote it.
 - [ ] 6.3 Establish the separate Proposed Roadmap Changes queue with required base version, action, values, rationale, and state; populate only from the approved canonical roadmap.
 

@@ -198,3 +198,19 @@
 | Canonical ID | Source IDs | Lens | Location | Severity | Status | Evidence |
 |---|---|---|---|---|---|---|
 | JD-APPROVAL-001 | JD-A-5.2-001; JD-B-5.2-001 | judgment-day | `notion-review-draft-manifest.md:3,264` | CRITICAL | verified | Both judges converged that the manifest recorded task 5.2 explicit approval while stale global and PR1-boundary text still said approval was excluded/pending. Fix Round 1 was independently verified: reconciliation and explicit approval are complete/pinned, the Notion draft remains non-canonical `DRAFT/UNAPPROVED`, and publication, mirror/queue/synchronization, application implementation, commit, push, and PR remain pending. |
+
+## Judgment Day — Task 6.1 Canonical Publication — Fix Round 1
+
+| Canonical ID | Source IDs | Lens | Location | Severity | Status | Evidence |
+|---|---|---|---|---|---|---|
+| JD-PUB-001 | JD-002; JD-B-6.1-003 | judgment-day | `docs/product/roadmap.md:29,99,108-110`; `publication-verification.md:22-34` | CRITICAL | verified | Both judges converged that the canonical roadmap exposed internal SDD task identifiers despite its no-task-tracker-data boundary. Fix Round 1 was independently verified: product-facing wording replaces task references, artifact/commit provenance remains, and the guard rejects bare `5.1`, `5.2`, `6.1`, `6.2`, and `6.3` identifiers. |
+| JD-PUB-INFO-001 | Judge A only | judgment-day | `publication-verification.md` | WARNING | info | Alleged missing fresh pre-publication Notion re-read was not converged. No change was made in this fix round. |
+| JD-PUB-INFO-002 | Judge B only | judgment-day | `docs/product/roadmap.md` initiative fields | WARNING | info | Alleged missing explicit per-initiative problem fields was not converged. No change was made in this fix round. |
+| JD-PUB-INFO-003 | Judge B only | judgment-day | `docs/product/roadmap.md` RM-026 wording | WARNING | info | Alleged RM-026 month-close wording issue was not converged. No change was made in this fix round. |
+
+### Task 6.1 Publication Convergence
+
+- Confirmed CRITICAL groups: 1
+- Fix Round 1 status: `JD-PUB-001` verified by Judge A and Judge B; the product roadmap contains no internal SDD task identifiers and the documented static guard rejects their reintroduction while preserving artifact and commit traceability.
+- Non-converged findings: 3, recorded as `WARNING` / `info`; no changes made.
+- Preserved boundary: no Notion edits, runtime code, commit, push, PR, Canonical Roadmap Mirror, or Proposed Roadmap Changes queue work occurred.
