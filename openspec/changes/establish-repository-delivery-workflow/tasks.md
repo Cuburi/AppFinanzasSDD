@@ -58,10 +58,10 @@ The withdrawn attempt and its review findings are retained only in `review-ledge
 
 ## Phase 4: Procedures and Deferred External Settings
 
-- [ ] 4.1 Create `docs/delivery/repository-workflow.md`; document Issue lifecycle, manual merge toward `dev`, manual `dev` → `master` promotion, hotfix synchronization, rollback, and manual Notion synchronization.
-- [ ] 4.2 Create `docs/delivery/external-settings-evidence.md` as a deferred-settings record; explicitly state that no GitHub rulesets, required-check changes, or merge restrictions are applied by this change and list hardening review triggers.
-- [ ] 4.3 Modify delivery documentation only for manual promotion, rollback, and Notion synchronization; do not add recovery cadence, backup/restore, lock migration, isolation, or recovery-evidence instructions.
-- [ ] 4.4 Run repository-delivery contract and workflow-inspection checks; verify ordinary CI, manual delivery guidance, and absence of special governance automation. Recovery tests and evidence are future roadmap scope.
+- [x] 4.1 Create `docs/delivery/repository-workflow.md`; document Issue lifecycle, manual merge toward `dev`, manual `dev` → `master` promotion, hotfix synchronization, rollback, and manual Notion synchronization.
+- [x] 4.2 Create `docs/delivery/external-settings-evidence.md` as a deferred-settings record; explicitly state that no GitHub rulesets, required-check changes, or merge restrictions are applied by this change and list hardening review triggers.
+- [x] 4.3 Modify delivery documentation only for manual promotion, rollback, and Notion synchronization; do not add recovery cadence, backup/restore, lock migration, isolation, or recovery-evidence instructions.
+- [x] 4.4 Run repository-delivery contract and workflow-inspection checks; verify ordinary CI, manual delivery guidance, and absence of special governance automation. Recovery tests and evidence are future roadmap scope. Evidence: `node scripts/check-repository-delivery-workflow.contract.mjs`, `git diff --check`, and package JSON parse passed on 2026-08-30.
 
 ## Next Separate Activity
 

@@ -33,7 +33,48 @@ const ciWorkflow = readRepositoryFile('.github/workflows/ci.yml');
 for (const context of ['name: Server checks', 'name: Client checks', 'name: Branch release readiness']) {
   assert.ok(ciWorkflow.includes(context), `.github/workflows/ci.yml missing ordinary CI context: ${context}`);
 }
+assert.match(
+  ciWorkflow,
+  /master-promotion-source:\s+name: Master promotion source\s+if: github\.event_name == 'pull_request' && github\.base_ref == 'master'/,
+  '.github/workflows/ci.yml must run the master source check only for PRs targeting master',
+);
+assert.match(
+  ciWorkflow,
+  /PR_HEAD_REF: \$\{\{ github\.head_ref \}\}[\s\S]*test "\$PR_HEAD_REF" = "dev"/,
+  '.github/workflows/ci.yml must reject a master PR whose head branch is not dev',
+);
 assert.doesNotMatch(ciWorkflow, /PR governance|pull_request_target:/);
+
+const repositoryWorkflow = readRepositoryFile('docs/delivery/repository-workflow.md');
+for (const section of [
+  '## Issue lifecycle',
+  '## Feature delivery to dev',
+  '## Promote dev to master',
+  '## Rollback after promotion',
+  '## Emergency hotfix synchronization',
+  '## Manual Notion synchronization',
+]) {
+  assert.ok(repositoryWorkflow.includes(section), `docs/delivery/repository-workflow.md missing: ${section}`);
+}
+for (const checklistItem of [
+  'green ordinary CI',
+  'Migration and environment review',
+  'Risk-based backup',
+  'Dev smoke test',
+  'post-production smoke test',
+]) {
+  assert.ok(repositoryWorkflow.includes(checklistItem), `promotion checklist missing: ${checklistItem}`);
+}
+
+const externalSettingsEvidence = readRepositoryFile('docs/delivery/external-settings-evidence.md');
+for (const statement of [
+  'No GitHub ruleset changes were applied by this change.',
+  'No required-check changes were applied by this change.',
+  'No merge-restriction changes were applied by this change.',
+  'Review this record before granting repository write access to another person or automation principal.',
+]) {
+  assert.ok(externalSettingsEvidence.includes(statement), `external settings evidence missing: ${statement}`);
+}
 
 const packageJson = JSON.parse(readRepositoryFile('package.json'));
 assert.equal(packageJson.scripts['local:check-pr-governance'], undefined);
