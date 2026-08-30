@@ -262,3 +262,15 @@ Any source/hash, row-set, source-state, digest, or available-revision mismatch w
 ## Slice evidence and boundary
 
 This PR1 work unit ends with a reconciled, explicitly approved, and Git/SDD-pinned priority proposal plus a created, source-pinned, non-canonical Review Draft. The draft itself remains **DRAFT/UNAPPROVED** until publication; canonical roadmap publication, post-publication Notion mirror/queue/synchronization, application implementation, commit, push, and PR creation remain excluded/pending. Reverting this manifest evidence does not alter the already-disposable Notion Draft; Git/SDD remains authoritative and usable.
+
+## Post-publication archive record — 2026-08-29
+
+After the Git-canonical roadmap was published, this exact pre-publication database was explicitly archived rather than promoted: it is now **Roadmap Review Draft — Archived / Not Canonical**. A complete 29-row read (`has_more = false`) confirmed every row, including RM-015, is `Draft State = Archived` and `Source State = Stale`. Its retained `1E23…F26` source pin truthfully identifies the historical review baseline; it is not the approved current proposal hash `31138…3F5`. Its row set and historical review evidence are retained. It is not the Canonical Roadmap Mirror and is not a proposal-edit surface.
+
+| Surface | ID / URL | Boundary |
+|---|---|---|
+| Archived Review Draft | Database `801a7199-4bf2-4230-92f9-c07a9fd94e5c`; `https://app.notion.com/p/801a71994bf2423092f9c07a9fd94e5c?pvs=204` | Historical review evidence only; non-canonical. |
+| Canonical Roadmap Mirror | Database `be464660-e4d5-4691-b7fb-26da1fffb03a`; data source `collection://a88f5474-137b-4dc8-8ed4-1d6da0d161a4`; `https://app.notion.com/p/be464660e4d54691b7fb26da1fffb03a` | Separate refresher-owned mirror of `docs/product/roadmap.md` at commit `3e8a96d`; direct edits are overwritten on refresh. |
+| Proposed Roadmap Changes | Database `9cdfa40c-cd2c-49c7-9342-7886d805b76c`; data source `collection://595c1f43-4d06-4df8-886b-f587934236c9`; `https://app.notion.com/p/9cdfa40ccd2c49c793427886d805b76c` | Separate manual proposal queue. It starts empty because no new proposal has been submitted. |
+
+No secrets are recorded. See `post-publication-verification.md` for the deterministic verification and queue operating rules.

@@ -214,3 +214,25 @@
 - Fix Round 1 status: `JD-PUB-001` verified by Judge A and Judge B; the product roadmap contains no internal SDD task identifiers and the documented static guard rejects their reintroduction while preserving artifact and commit traceability.
 - Non-converged findings: 3, recorded as `WARNING` / `info`; no changes made.
 - Preserved boundary: no Notion edits, runtime code, commit, push, PR, Canonical Roadmap Mirror, or Proposed Roadmap Changes queue work occurred.
+
+## Judgment Day — Tasks 6.2–7.3 Post-publication Surfaces — Round 0
+
+| Canonical ID | Source IDs | Lens | Location | Severity | Status | Evidence |
+|---|---|---|---|---|---|---|
+| JD-POST-001 | JD-A-001; JD-B-001 | judgment-day | archived Notion Draft; `notion-review-draft-manifest.md`; `post-publication-verification.md:22` | CRITICAL | verified | Fix Round 2 corrected RM-015 from `Current` to `Stale`; a complete fresh query returned exactly 29 archived rows (`has_more = false`) and every row is `Stale`. Documentary evidence identifies `1E23…F26` as the historical baseline and distinguishes it from the approved current `31138…3F5` proposal. |
+| JD-POST-002 | JD-A-002; JD-B-002 | judgment-day | Proposed Roadmap Changes queue; retained fixture `3cc9940c-26cb-800a-b950-d99cd66b5a81`; view `3cb9940c-26cb-817d-9ed7-000c86716745`; `post-publication-verification.md:24-25,42-49` | CRITICAL | verified | A fresh independent page fetch found `Intake Complete = YES` while `Existing RM ID`, `New Intent`, `Base Commit`, `Base Version`, `Proposed Values`, and `Rationale` remained empty and `State = Pending`. A simultaneous query of the formula-filtered `Intake — Incomplete / Blocked` view returned that same page, and a fresh view fetch confirmed its filter is `Workflow Validation = Blocked — intake incomplete`. This observable behavior proves that the acknowledgement checkbox cannot bypass structural validation. |
+| JD-POST-INFO-001 | JD-B-003 | judgment-day | `post-publication-verification.md:26,35`; Canonical Roadmap Mirror | WARNING | info | Judge B alone questioned outage-time stale visibility because an older mirror can remain labeled `Current` until the next observable refresh. It did not survive convergence and is retained as a non-blocking first-pass signal. |
+| JD-POST-INFO-002 | JD-B-004 | judgment-day | `post-publication-verification.md:8,23`; Canonical Roadmap Mirror | WARNING | info | Judge B alone observed that `Last Refreshed` is date-only, so multiple same-day refreshes cannot be distinguished. This is non-blocking info and does not drive fixes. |
+
+### Post-publication Surface Convergence
+
+- Confirmed CRITICAL groups: 2.
+- Suspect CRITICAL groups: 1, normalized to `WARNING` / `info` because it did not converge.
+- Non-blocking warnings: 1 additional date-precision signal.
+- Contradictions: 0.
+- Fix rounds used: 2 of 2.
+- Fix Round 1: marked archived Draft source states `Stale`; added the queue operating contract, manual completeness/integration evidence fields, and fail-closed views; corrected documentary overclaims without changing either INFO finding.
+- Fix Round 2: corrected missed RM-015, then verified all 29 archive rows are stale; added the computed structural completeness/integration indicator and made the incomplete view formula-driven rather than checkbox-driven. Documentation states only the enforcement Notion actually provides.
+- Final scoped re-judgment at the end of Fix Round 2: both judges verified JD-POST-001 and kept JD-POST-002 open because neither could inspect the formula definition or exercise it against retained evidence.
+- Verification follow-up — 2026-08-30: JD-POST-002 is verified through the retained behavioral fixture and fresh independent page, view-query, and view-filter reads. The fixture remains intact pending archive readiness.
+- Judgment: APPROVED for post-publication behavior. `JD-POST-INFO-001` and `JD-POST-INFO-002` remain WARNING / info and were not changed.
