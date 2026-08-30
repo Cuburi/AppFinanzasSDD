@@ -14,6 +14,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  master-promotion-source:
+    name: Master promotion source
+    if: github.event_name == 'pull_request' && github.base_ref == 'master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require dev as the promotion source
+        env:
+          PR_HEAD_REF: ${{ github.head_ref }}
+        run: |
+          test "$PR_HEAD_REF" = "dev" || {
+            echo "Only the dev branch may open a pull request targeting master. Received: $PR_HEAD_REF" >&2
+            exit 1
+          }
+
   branch-release-readiness:
     name: Branch release readiness
     runs-on: ubuntu-latest
