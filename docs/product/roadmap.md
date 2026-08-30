@@ -8,8 +8,9 @@ This is AppFinanzas' canonical, Git-owned product roadmap. It describes product 
 |---|---|
 | Canonical authority | This Git document |
 | Published from | `openspec/changes/create-product-roadmap/priority-horizon-proposal.md` |
-| Approved source commit/version | `e5bbe3d` (PR #179 merge into `dev`) |
+| Initial approved source commit/version | `e5bbe3d` (PR #179 merge into `dev`) |
 | Approved source SHA-256 | `31138F924F0FDB6DDC1E5D6DF2C50BAF694D167161E3AF5348E7012F93DAA3F5` |
+| Current canonical source commit/version | `b1acbc1` (`docs/product/roadmap.md`; RM-012-first reprioritization merged into `dev`) |
 | Approved review snapshot | 29 IDs (`RM-001`–`RM-029`); Notion revision `UNAVAILABLE`; digest `8118B4702EC650B42CF2FB7CD9A0F3EE90580DCAADEF6A8D287EF66C0BA3CE52` |
 | Publication rule | Fail closed: publication is invalid unless the current source bytes match the approved SHA-256 exactly. |
 
@@ -94,7 +95,7 @@ RM-018 cannot leave `Future-only` until all six safeguards are verified:
 
 ## Traceability, recovery, and manual boundaries
 
-The primary traceability record is the approved source proposal plus `initiative-classification.md`, `reconciliation.md`, `notion-review-draft-manifest.md`, the product documents cited in each initiative, merge commit `e5bbe3d`, and the active Engram evidence referenced above. Stable RM IDs are never renumbered; rename/delete decisions preserve their identity, lifecycle, and history. New intent receives an ID only through later approved Git work.
+The primary traceability record is the initial approved source proposal plus `initiative-classification.md`, `reconciliation.md`, `notion-review-draft-manifest.md`, the product documents cited in each initiative, initial publication merge commit `e5bbe3d`, RM-012-first reprioritization commit `b1acbc1`, and the active Engram evidence referenced above. Stable RM IDs are never renumbered; rename/delete decisions preserve their identity, lifecycle, and history. New intent receives an ID only through later approved Git work.
 
 Git remains usable if Notion is unavailable. The pre-publication **Roadmap Review Draft — Archived / Not Canonical** is retained as review evidence only; it was never promoted. The separate **Canonical Roadmap Mirror** is refresher-owned and reflects this published Git version. The separate **Proposed Roadmap Changes** queue is the only Notion intake surface for future intent. Neither is authoritative or an edit path to Git.
 
@@ -124,4 +125,4 @@ Manual reconciliation is maintainer-requested. No automatic synchronization is p
 | 2026-08-26 | Maintainer explicitly approved the pinned 29-ID proposal for canonical publication. | `notion-review-draft-manifest.md`; approved hash and digest in this publication record. |
 | 2026-08-26 | Published this Git-canonical roadmap from the exact approved source hash. | `publication-verification.md`; merge commit `e5bbe3d`; this document. |
 | 2026-08-29 | Archived the Review Draft, then created the separate refresher-owned Mirror from this Git roadmap and the separate manual Proposed Roadmap Changes queue. | `post-publication-verification.md`; recorded Notion surface IDs. |
-| 2026-08-30 | Reprioritized RM-012 to `unfinished` / `Now` sequence 1 and RM-026 to sequence 2. RM-012 has no established hard technical dependency on RM-026; duplicate-mutation protection is the minimum safeguard for safe daily use. | Approved proposal `3cc9940c-26cb-814f-b183-ee5a59fbbd7b`; maintainer rationale. |
+| 2026-08-30 | Reprioritized RM-012 to `unfinished` / `Now` sequence 1 and RM-026 to sequence 2. RM-012 has no established hard technical dependency on RM-026; duplicate-mutation protection is the minimum safeguard for safe daily use. | Approved proposal `3cc9940c-26cb-814f-b183-ee5a59fbbd7b`; Git-canonical commit `b1acbc1` merged into `dev`; maintainer rationale. |
