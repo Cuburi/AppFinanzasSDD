@@ -26,8 +26,8 @@ The approved source was re-read before publication. Any source/hash, review row-
 
 | ID | Outcome | Scope / non-goals | Status / horizon | Dependencies and rationale | Completion evidence / provenance |
 |---|---|---|---|---|---|
-| RM-026 | Record an expense without category or subcategory while preserving truthful monthly totals and an `Uncategorized` display. | Category/subcategory are optional; later categorization is optional; an expense may remain uncategorized indefinitely, including after close. Budget and broader analytics treatment require focused design. | `unfinished` / `Now` (1) | Depends on RM-001 and maintainer-accepted accounting semantics. It removes a daily recording barrier first. | No implementation completion claim. `C-29`; `maintainer:2026-08-23,2026-08-25`; reconciled review evidence. Publication does **not** authorize application code. |
-| RM-012 | Prevent retried financial CREATE requests from producing duplicate movements. | Request-level CREATE protection only; excludes transactions and blanket PATCH/DELETE idempotency. | `unfinished` / `Now` (2) | A bounded integrity safeguard after RM-026; protects existing and future money-moving workflows. | Duplicate-risk evidence only; no completion claim. `C-12`; `engram:#2404`. |
+| RM-012 | Prevent retried financial CREATE requests from producing duplicate movements. | Request-level CREATE protection only; excludes transactions and blanket PATCH/DELETE idempotency. | `unfinished` / `Now` (1) | A bounded integrity safeguard for safe daily use; protects existing and future money-moving workflows. No hard technical dependency on RM-026 has been established. | Duplicate-risk evidence only; no completion claim. `C-12`; `engram:#2404`; `maintainer:2026-08-30`. |
+| RM-026 | Record an expense without category or subcategory while preserving truthful monthly totals and an `Uncategorized` display. | Category/subcategory are optional; later categorization is optional; an expense may remain uncategorized indefinitely, including after close. Budget and broader analytics treatment require focused design. | `unfinished` / `Now` (2) | Depends on RM-001 and maintainer-accepted accounting semantics. It removes a daily recording barrier after the minimum integrity safeguard. | No implementation completion claim. `C-29`; `maintainer:2026-08-23,2026-08-25`; reconciled review evidence. Publication does **not** authorize application code. |
 
 RM-026 publication does **not** authorize application code. Its focused implementation remains a separate future SDD.
 
@@ -96,9 +96,24 @@ RM-018 cannot leave `Future-only` until all six safeguards are verified:
 
 The primary traceability record is the approved source proposal plus `initiative-classification.md`, `reconciliation.md`, `notion-review-draft-manifest.md`, the product documents cited in each initiative, merge commit `e5bbe3d`, and the active Engram evidence referenced above. Stable RM IDs are never renumbered; rename/delete decisions preserve their identity, lifecycle, and history. New intent receives an ID only through later approved Git work.
 
-Git remains usable if Notion is unavailable. The pre-publication **Roadmap Review Draft** remains non-canonical and disposable; it has not been promoted, archived, transformed, mirrored, or synchronized by this publication. Any future Canonical Roadmap Mirror or Proposed Roadmap Changes queue requires separately approved Git work. Until then, no Notion surface is the authority or an edit path to Git.
+Git remains usable if Notion is unavailable. The pre-publication **Roadmap Review Draft — Archived / Not Canonical** is retained as review evidence only; it was never promoted. The separate **Canonical Roadmap Mirror** is refresher-owned and reflects this published Git version. The separate **Proposed Roadmap Changes** queue is the only Notion intake surface for future intent. Neither is authoritative or an edit path to Git.
 
-Manual reconciliation is maintainer-requested. No automatic synchronization is permitted: webhooks, polling, bot commits, bidirectional synchronization, hidden last-write-wins, and silent rebase are prohibited. A later proposal must carry its base commit/version, explicit action, proposed values, rationale, and visible state; it cannot be integrated until approved Git publication, a successful mirror refresh, and verification.
+## Manual mirror refresh and proposal reconciliation
+
+### Quick path
+
+1. A roadmap refresher compares `docs/product/roadmap.md` with the Mirror and refreshes the records from the selected Git commit.
+2. A contributor records proposed intent in the separate Proposed Roadmap Changes queue using its required base commit/version and action.
+3. The maintainer requests manual reconciliation. Only approved Git publication, a successful mirror refresh, and verification may set a proposal to `Integrated`.
+
+| Surface | Role | Edit rule |
+|---|---|---|
+| Git roadmap | Sole canonical authority | Changes require normal Git/SDD review and publication. |
+| Canonical Roadmap Mirror | Refresher-owned reference | Direct edits are overwritten by the next requested refresh; submit intent to the queue instead. |
+| Proposed Roadmap Changes | Manual proposal intake | `Pending`, `Conflict`, `Integrated`, and `Rejected` are visible states; it cannot change Git itself. |
+| Archived Review Draft | Historical review evidence | Non-canonical; never reused as the Mirror or proposal queue. |
+
+Manual reconciliation is maintainer-requested. No automatic synchronization is permitted: webhooks, polling, bot commits, bidirectional synchronization, hidden last-write-wins, and silent rebase are prohibited. A later proposal must carry an existing RM ID or new intent, base commit/version, explicit `change`, `new`, `rename`, or `delete` action, proposed values, rationale, and visible state. A stale base stays `Pending` for explicit re-review or becomes `Conflict`; it is never auto-applied or rebased. Rename/delete preserves the stable RM ID, lifecycle, and history; new intent gets an RM ID only through approved Git work.
 
 ## Decision history
 
@@ -108,3 +123,5 @@ Manual reconciliation is maintainer-requested. No automatic synchronization is p
 | 2026-08-25 | Reconciled the sole authorized review delta: RM-026 became `unfinished` / `Now` sequence 1 after its optional-classification, totals, display, later-categorization, and month-close semantics were accepted. | `reconciliation.md`; `notion-review-draft-manifest.md`; `initiative-classification.md`; `priority-horizon-proposal.md`. |
 | 2026-08-26 | Maintainer explicitly approved the pinned 29-ID proposal for canonical publication. | `notion-review-draft-manifest.md`; approved hash and digest in this publication record. |
 | 2026-08-26 | Published this Git-canonical roadmap from the exact approved source hash. | `publication-verification.md`; merge commit `e5bbe3d`; this document. |
+| 2026-08-29 | Archived the Review Draft, then created the separate refresher-owned Mirror from this Git roadmap and the separate manual Proposed Roadmap Changes queue. | `post-publication-verification.md`; recorded Notion surface IDs. |
+| 2026-08-30 | Reprioritized RM-012 to `unfinished` / `Now` sequence 1 and RM-026 to sequence 2. RM-012 has no established hard technical dependency on RM-026; duplicate-mutation protection is the minimum safeguard for safe daily use. | Approved proposal `3cc9940c-26cb-814f-b183-ee5a59fbbd7b`; maintainer rationale. |
