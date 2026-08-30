@@ -65,11 +65,11 @@ Chain strategy: stacked-to-main (sequential PRs to `dev`)
 ## Phase 6: Canonical Publication and Post-publication Surfaces
 
 - [x] 6.1 Publish and verify approved initiatives in `docs/product/roadmap.md`; record the source commit/version and validate required fields, dependencies, traceability, no task-tracker data, recovery safeguards, and history. Source pin `31138F924F0FDB6DDC1E5D6DF2C50BAF694D167161E3AF5348E7012F93DAA3F5` and 29-ID digest `8118B4702EC650B42CF2FB7CD9A0F3EE90580DCAADEF6A8D287EF66C0BA3CE52` passed documentary/static verification; see `publication-verification.md`.
-- [ ] 6.2 Archive or explicitly transform/refresh the draft into a separate refresher-owned Canonical Roadmap Mirror; never silently promote it.
-- [ ] 6.3 Establish the separate Proposed Roadmap Changes queue with required base version, action, values, rationale, and state; populate only from the approved canonical roadmap.
+- [x] 6.2 Archive the Review Draft as non-canonical historical evidence and mark all 29 obsolete `1E23…F26` source pins `Stale`; create the separate refresher-owned Canonical Roadmap Mirror from `docs/product/roadmap.md`. See `post-publication-verification.md`.
+- [x] 6.3 Establish the separate Proposed Roadmap Changes queue with the visible manual completeness and integration-evidence contract. `Workflow Validation` computes structural completeness independently of the acknowledgement-only `Intake Complete` checkbox, while Notion does not enforce requiredness, evidence quality, or state transitions; formula-blocked or unsupported `Integrated` records must be corrected to non-`Integrated`. The queue intentionally starts empty because no new proposal exists; it is never populated from the archived draft. See `post-publication-verification.md`.
 
 ## Phase 7: Reconciliation Verification and Documentation
 
-- [ ] 7.1 Verify stale-base conflicts, integration ordering, refresh/outage visibility, rename/delete/new actions, and no false current claim.
-- [ ] 7.2 Verify Git remains usable without Notion and no automatic sync/webhook/polling/bot commit exists; document manual refresh/reconciliation in `docs/product/roadmap.md`.
-- [ ] 7.3 Record final Notion IDs/URLs, review evidence, unresolved risks, and proposal-queue operating rules without secrets.
+- [x] 7.1 Verify stale-base conflicts, manual integration prerequisites, refresh/outage visibility, rename/delete/new actions, and no false-current claim in the deterministic scenario matrix in `post-publication-verification.md`.
+- [x] 7.2 Verify Git remains usable without Notion and no automatic sync/webhook/polling/bot commit exists; document the maintainer-requested manual refresh/reconciliation workflow in `docs/product/roadmap.md`.
+- [x] 7.3 Record final Notion IDs/URLs, review evidence, the Notion enforcement limitation, and proposal-queue operating rules without secrets in `notion-review-draft-manifest.md` and `post-publication-verification.md`.
