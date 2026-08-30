@@ -1,0 +1,23 @@
+name: Bug report
+description: Report behavior that does not meet expectations.
+title: "bug: "
+labels: ["type:bug", "status:needs-review"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How can we reproduce it?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
