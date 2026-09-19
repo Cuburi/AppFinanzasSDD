@@ -156,6 +156,15 @@ const assertRenderedTarget = (context, config) => {
   rejectPreflight(canonicalJson(service.profiles ?? []) === canonicalJson(context.composeProfiles), "Rendered target profiles do not match the saved policy.");
 };
 
+const allowsDevRecovery = (context) => context.applicationProfile === "dev";
+const allowsUnmarkedExistingTarget = (context) => context.applicationProfile === "dev" || context.applicationProfile === "personal";
+
+const assertExpectedVolumeMetadata = (context, volume) => {
+  rejectPreflight(volume?.Name === runtimeVolumeName(context), "Target volume metadata does not match the proven data mount.");
+  rejectPreflight(volume.Labels?.["com.docker.compose.project"] === context.projectName, "Target volume Compose project label does not match.");
+  rejectPreflight(volume.Labels?.["com.docker.compose.volume"] === context.logicalVolume, "Target volume Compose volume label does not match.");
+};
+
 const inspectVerifiedTarget = (context, target) => {
   const mount = target.mounts?.filter(({ Destination, RW }) => Destination === "/var/lib/postgresql/data" && RW);
   rejectPreflight(target.id && target.name === `appfinanzas-${context.service}`, "Target container identity does not match the saved policy.");
@@ -163,13 +172,25 @@ const inspectVerifiedTarget = (context, target) => {
   rejectPreflight(target.labels?.["com.docker.compose.service"] === context.service, "Target Compose service label does not match.");
   rejectPreflight(target.port === context.port && target.database === context.database, "Target port or database does not match the saved policy.");
   rejectPreflight(mount?.length === 1 && mount[0].Name === runtimeVolumeName(context), "Target must have exactly one expected writable PostgreSQL data mount.");
-  rejectPreflight(isWithinPath(target.dataDirectory, mount[0].Destination), "SQL data directory is not inside the proven data mount.");
-  rejectPreflight(target.systemIdentifier && target.marker === `${RESET_POLICIES[context.applicationProfile].marker}:${target.systemIdentifier}`, "Target cluster marker is missing or mismatched.");
+  if (target.dataDirectory) rejectPreflight(isWithinPath(target.dataDirectory, mount[0].Destination), "SQL data directory is not inside the proven data mount.");
+  assertExpectedVolumeMetadata(context, target.volume);
   rejectPreflight(target.volume?.Name === mount[0].Name, "Target volume metadata does not match the proven data mount.");
   rejectPreflight(target.consumers?.length === 1 && target.consumers[0] === target.id, "Target volume must have exactly one consumer before mutation.");
+
+  const expectedMarker = target.systemIdentifier ? `${RESET_POLICIES[context.applicationProfile].marker}:${target.systemIdentifier}` : null;
+  let recoveryMode = "marked";
+  if (target.marker === expectedMarker && expectedMarker) {
+    recoveryMode = "marked";
+  } else if (allowsUnmarkedExistingTarget(context) && (target.marker === null || target.marker === "" || target.marker === undefined)) {
+    recoveryMode = context.applicationProfile === "personal" ? "unmarked-personal-target" : "unmarked-dev-target";
+  } else {
+    throw new ResetFailure("PREFLIGHT_REJECTED", "Target cluster marker is missing or mismatched.");
+  }
+
   const fingerprint = volumeFingerprint({ volume: target.volume, containerId: target.id, mount: mount[0].Destination });
   return Object.freeze({
     containerId: target.id,
+    recoveryMode,
     volume: Object.freeze({ name: mount[0].Name, fingerprint }),
     proof: Object.freeze({
       name: target.name,
@@ -182,9 +203,22 @@ const inspectVerifiedTarget = (context, target) => {
       dataDirectory: target.dataDirectory,
       volume: target.volume,
       consumers: target.consumers,
+      recoveryMode,
     }),
   });
 };
+
+const inspectVerifiedBootstrapTarget = (context, target) => {
+  rejectPreflight(allowsDevRecovery(context), "Only dev reset may bootstrap a missing target.");
+  rejectPreflight(target?.absent === true, "Target discovery did not prove an absent dev target.");
+  rejectPreflight(!target.volume, "Dev bootstrap requires no known target volume.");
+  rejectPreflight((target.consumers ?? []).length === 0, "Dev bootstrap target volume must have no consumers.");
+  return Object.freeze({ recoveryMode: "missing-dev-target", proof: Object.freeze({ absent: true, volume: null, consumers: [] }) });
+};
+
+const inspectVerifiedPlanTarget = (context, target) => target?.absent === true
+  ? inspectVerifiedBootstrapTarget(context, target)
+  : inspectVerifiedTarget(context, target);
 
 export const createResetPlan = ({ context, render, inspectTarget }) => {
   try {
@@ -192,7 +226,7 @@ export const createResetPlan = ({ context, render, inspectTarget }) => {
     let config;
     try { config = JSON.parse(json); } catch { throw new ResetFailure("PREFLIGHT_REJECTED", "Rendered Compose configuration is not valid JSON."); }
     assertRenderedTarget(context, config);
-    const target = inspectVerifiedTarget(context, inspectTarget());
+    const target = inspectVerifiedPlanTarget(context, inspectTarget());
     return Object.freeze({
       context,
       sourceHashes: Object.freeze(Object.fromEntries([...context.composeFiles, context.envFile].map(({ path, sha256: hash }) => [path.split(/[\\/]/).at(-1), hash]))),
@@ -213,8 +247,8 @@ export const verifyStablePlan = ({ plan, sourceHashes, render, inspectTarget }) 
   try { currentConfig = JSON.parse(currentJson); } catch { currentConfig = null; }
   const unchangedConfig = currentConfig && sha256(canonicalJson(currentConfig)) === plan.renderedConfig.sha256;
   if (!unchangedSources || !unchangedConfig) throw new ResetFailure("PLAN_DRIFT", "Compose source or rendered configuration changed after preflight.");
-  const target = inspectVerifiedTarget(plan.context, inspectTarget());
-  if (target.containerId !== plan.target.containerId || target.volume.name !== plan.target.volume.name || target.volume.fingerprint !== plan.target.volume.fingerprint || canonicalJson(target.proof) !== canonicalJson(plan.target.proof)) {
+  const target = inspectVerifiedPlanTarget(plan.context, inspectTarget());
+  if (canonicalJson(target) !== canonicalJson(plan.target)) {
     throw new ResetFailure("PLAN_DRIFT", "Target identity changed after preflight.");
   }
   return plan;
@@ -272,7 +306,11 @@ export const runResetWorkflow = ({
   try {
     verifyStablePlan({ plan, sourceHashes, render, inspectTarget });
     release = acquireLock();
-    removeVerifiedTarget({ plan, acquireLock, removeContainer, inspectVolume, removeVolume, alreadyLocked: true });
+    if (plan.target.containerId) {
+      removeVerifiedTarget({ plan, acquireLock, removeContainer, inspectVolume, removeVolume, alreadyLocked: true });
+    } else {
+      verifyStablePlan({ plan, sourceHashes, render, inspectTarget });
+    }
     recreate(plan.context);
     verifyHealth(plan.context);
     const systemIdentifier = readSystemIdentifier();
@@ -298,6 +336,7 @@ const commandOutput = (command, args, options = {}) => execFileSync(command, arg
     ...(process.platform === "win32" ? {
       ComSpec: process.env.ComSpec,
       PATHEXT: process.env.PATHEXT,
+      ProgramFiles: process.env.ProgramFiles,
       SystemRoot: process.env.SystemRoot,
       WINDIR: process.env.WINDIR,
     } : {}),
@@ -306,11 +345,25 @@ const commandOutput = (command, args, options = {}) => execFileSync(command, arg
   stdio: ["ignore", "pipe", "pipe"],
 }).trim();
 
+const tryCommandOutput = (command, args, options = {}) => {
+  try { return commandOutput(command, args, options); } catch { return null; }
+};
+
 export const buildSqlCommand = (containerId, database, query) => ["docker", ["exec", containerId, "psql", "-U", "postgres", "-d", database, "-q", "-tAc", query]];
-export const buildMigrationCommand = (profile, platform = process.platform) => [platform === "win32" ? "pnpm.cmd" : "pnpm", [`prisma:${profile}:migrate`], { shell: platform === "win32" }];
+export const buildMigrationCommand = (profile) => ["node", ["scripts/run-prisma-with-profile.mjs", profile, "--", "migrate", "deploy", "--schema", "prisma/schema.prisma"], { shell: false }];
+export const systemIdentifierQuery = () => "SELECT (pg_control_system()).system_identifier";
 export const applicationTableQuery = () => "SELECT coalesce(json_agg(format('%I.%I', table_schema, table_name)), '[]') FROM information_schema.tables WHERE table_schema = 'public' AND table_name NOT IN ('_prisma_migrations', 'MonthlyLedgerBackfillControl')";
 
-const parseComposePs = (output) => { try { return JSON.parse(output); } catch { return output.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)); } };
+export const parseComposePs = (output) => {
+  const trimmed = output.trim();
+  if (!trimmed) return [];
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return trimmed.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+  }
+};
 
 export const acquireProjectLock = (cwd) => {
   const path = absolutePath(cwd, ".appfinanzas-reset.lock");
@@ -332,27 +385,47 @@ export const executeLocalReset = async (policyName) => {
     return commandOutput(command, commandArgs, { cwd, environment });
   };
   const render = () => compose(["config", "--format", "json"]);
+  const targetRecord = () => {
+    const targets = parseComposePs(compose(["ps", "--all", "--format", "json", context.service]));
+    if (!Array.isArray(targets) || targets.length > 1) throw new Error("Expected at most one target container.");
+    if (targets.length === 0 || !targets[0].ID) return null;
+    return targets[0];
+  };
   const targetId = () => {
-    const targets = parseComposePs(compose(["ps", "--format", "json", context.service]));
-    if (!Array.isArray(targets) || targets.length !== 1 || !targets[0].ID) throw new Error("Expected exactly one running target container.");
-    return targets[0].ID;
+    const target = targetRecord();
+    if (!target) throw new Error("Expected exactly one target container.");
+    return target.ID;
   };
   const sql = (containerId, query) => {
     const [command, args] = buildSqlCommand(containerId, context.database, query);
     return commandOutput(command, args, { cwd });
   };
+  const containerDatabase = (container) => container.Config.Env?.find((entry) => entry.startsWith("POSTGRES_DB="))?.split("=").at(-1);
+  const containerHostPort = (container) => container.NetworkSettings.Ports?.["5432/tcp"]?.[0]?.HostPort
+    ?? container.HostConfig.PortBindings?.["5432/tcp"]?.[0]?.HostPort;
+  const inspectMissingTarget = () => {
+    const volumeName = runtimeVolumeName(context);
+    const output = tryCommandOutput("docker", ["volume", "inspect", volumeName], { cwd });
+    if (!output) return { absent: true, volume: null, consumers: [] };
+    const volume = JSON.parse(output)[0];
+    const consumers = commandOutput("docker", ["ps", "-a", "--filter", `volume=${volumeName}`, "--format", "{{.ID}}"], { cwd }).split(/\r?\n/).filter(Boolean);
+    return { absent: true, volume, consumers };
+  };
   const inspectTarget = () => {
-    const id = targetId();
+    const record = targetRecord();
+    if (!record) return inspectMissingTarget();
+    const id = record.ID;
     const container = JSON.parse(commandOutput("docker", ["inspect", id], { cwd }))[0];
     const mount = container.Mounts.find(({ Destination, RW }) => Destination === "/var/lib/postgresql/data" && RW);
     const volume = JSON.parse(commandOutput("docker", ["volume", "inspect", mount.Name], { cwd }))[0];
     const consumers = commandOutput("docker", ["ps", "-a", "--filter", `volume=${mount.Name}`, "--format", "{{.ID}}"], { cwd }).split(/\r?\n/).filter(Boolean);
-    const hostPort = container.NetworkSettings.Ports?.["5432/tcp"]?.[0]?.HostPort;
-    const systemIdentifier = sql(id, "SELECT pg_control_system().system_identifier");
+    const canReadSql = container.State?.Running === true;
+    const systemIdentifier = canReadSql ? sql(id, systemIdentifierQuery()) : null;
     return {
       id, name: container.Name?.replace(/^\//, ""), labels: container.Config.Labels, mounts: container.Mounts,
-      port: hostPort, database: sql(id, "SELECT current_database()"), marker: sql(id, "SELECT current_setting('appfinanzas.reset_profile', true)"),
-      systemIdentifier, dataDirectory: sql(id, "SHOW data_directory"), volume, consumers,
+      port: containerHostPort(container), database: canReadSql ? sql(id, "SELECT current_database()") : containerDatabase(container),
+      marker: canReadSql ? sql(id, "SELECT current_setting('appfinanzas.reset_profile', true)") : null,
+      systemIdentifier, dataDirectory: canReadSql ? sql(id, "SHOW data_directory") : undefined, volume, consumers,
     };
   };
   const inspectVolume = (name) => {
@@ -380,7 +453,7 @@ export const executeLocalReset = async (policyName) => {
       const state = JSON.parse(commandOutput("docker", ["inspect", recreatedId], { cwd }))[0].State;
       if (state.Status !== "running" || state.Health?.Status !== "healthy") throw new Error("Recreated PostgreSQL container is not healthy.");
     },
-    readSystemIdentifier: () => sql(recreatedId, "SELECT pg_control_system().system_identifier"),
+    readSystemIdentifier: () => sql(recreatedId, systemIdentifierQuery()),
     executeSql: (query) => sql(recreatedId, query),
      migrate: (profile) => {
        const [command, args, options] = buildMigrationCommand(profile);

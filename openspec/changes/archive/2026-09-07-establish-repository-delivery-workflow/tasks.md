@@ -46,11 +46,13 @@ Chain strategy: None for withdrawn recovery work.
 ## Phase 3: Production Recovery — Withdrawn and Deferred
 
 > Maintainer decision: robust production recovery coordination is deferred to a future product-roadmap change. This branch preserves the already-merged guarded local reset at `HEAD`; it contains no active production-recovery executable work unit.
+>
+> Closure convention: checked Phase 3 items record disposition closure only. They do not claim implementation, tests, or delivery of withdrawn/deferred recovery work.
 
-- [ ] 3.1 WITHDRAWN: Shared production-operation lock characterization and implementation are deferred to the future roadmap; no implementation claim remains.
-- [ ] 3.2 WITHDRAWN: Reset migration to the shared lock is deferred; `scripts/reset-local-database.mjs` is restored wholesale to the guarded local-reset baseline at `HEAD`.
-- [ ] 3.3 DEFERRED: Backup/restore implementation and contract belong to the future roadmap.
-- [ ] 3.4 DEFERRED: Backup/restore package, Compose, and README integration belong to the future roadmap.
+- [x] 3.1 WITHDRAWN: Shared production-operation lock characterization and implementation are deferred to the future roadmap; no implementation claim remains.
+- [x] 3.2 WITHDRAWN: Reset migration to the shared lock is deferred; `scripts/reset-local-database.mjs` is restored wholesale to the guarded local-reset baseline at `HEAD`.
+- [x] 3.3 DEFERRED: Backup/restore implementation and contract belong to the future roadmap.
+- [x] 3.4 DEFERRED: Backup/restore package, Compose, and README integration belong to the future roadmap.
 
 ### Historical PR3A Evidence
 

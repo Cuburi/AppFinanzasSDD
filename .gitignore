@@ -3,6 +3,8 @@ dist/
 .atl/
 *.http
 monthly-income-pr-plan.md
+.codegraph/
+NUL
 
 # Local environment files. Root `.env` is created from `.env.example` and stays untracked.
 .env

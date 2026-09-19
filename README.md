@@ -2,7 +2,7 @@
 
 AppFinanzasSDD es una aplicación de finanzas personales para organizar presupuestos mensuales por categorías y subcategorías, registrar gastos, controlar ahorros con propósito y preparar reportes útiles para tomar mejores decisiones.
 
-El proyecto también funciona como práctica guiada de desarrollo con SDD: primero se define el problema, después se baja a especificación, diseño, tareas e implementación incremental.
+El proyecto ahora usa Organic Driven Development (ODD) como flujo normal de trabajo: se explora el contexto real, se resuelven decisiones necesarias, se divide el avance en unidades recuperables y se valida cada unidad antes de integrarla. SDD/OpenSpec queda preservado como histórico y solo se usa para cambios futuros si alguien lo pide explícitamente.
 
 ## Estado actual
 
@@ -10,6 +10,12 @@ El proyecto también funciona como práctica guiada de desarrollo con SDD: prime
 - Backend Express + TypeScript con Prisma.
 - Frontend React + Vite + TypeScript.
 - Base de datos PostgreSQL.
+
+## Flujo de desarrollo
+
+ODD es el flujo predeterminado del proyecto. Para trabajo sustancial, cada feature se documenta en `odd/tasks/<feature-name>.md` antes de tocar código, con objetivo, alcance, tareas, criterios de aceptación, checks y evidencia. Las tareas se implementan por unidades pequeñas y revisables, manteniendo tests y documentación junto al comportamiento.
+
+Los artefactos existentes en `openspec/` se conservan como referencia histórica y como specs vigentes cuando correspondan, pero no se crean cambios SDD nuevos por defecto. SDD/OpenSpec solo se activa por pedido explícito o por una decisión aceptada de usar ese flujo para un cambio concreto.
 
 ## Estructura
 
@@ -124,10 +130,10 @@ Use these commands only for an intentional local pre-production reset. They veri
 
 ```bash
 pnpm db:dev:reset
-pnpm db:personal:reset -- --confirm RESET_APPFINANZAS_PERSONAL --profile appfinanzas_personal
+pnpm db:personal:reset --confirm RESET_APPFINANZAS_PERSONAL --profile appfinanzas_personal
 ```
 
-The personal command accepts exactly that ordered confirmation; missing, reordered, duplicated, or additional arguments abort before Docker discovery. Root `.env` must select the same local profile, port, and database as the requested reset. Existing unmarked clusters are rejected before mutation. Recreate a known local target manually under review instead of attempting to bootstrap a legacy marker automatically.
+The personal command accepts exactly that ordered confirmation; missing, reordered, duplicated, or additional arguments abort before Docker discovery. Root `.env` must select the same local profile, port, and database as the requested reset. The dev reset may recreate a missing disposable dev target or recover an unmarked dev target only after the Compose service, volume, labels, host port, database, and sole ownership match the dev policy. Personal reset stays stricter: it never bootstraps a missing target, but an existing unmarked personal target may reset only after exact confirmation and full local identity proof: Compose service, project label, host port, database, expected writable mount, expected volume metadata labels, and sole ownership. Mismatched markers, dev-vs-personal markers, wrong service, wrong volume, wrong port, wrong database, remote database URLs, ambiguous discovery, ambient `COMPOSE_*` overrides, or multi-consumer targets are rejected before mutation.
 
 Run a reset only during an exclusive local Docker-daemon/Compose-project maintenance window. Docker has no atomic compare-and-delete operation for named volumes; the final recheck minimizes, but cannot eliminate, concurrent daemon-client races. Never use either command for production data.
 
@@ -152,7 +158,7 @@ No crees `prisma/.env`: el `.env` raíz es la fuente de verdad local. Por seguri
 | `pnpm db:dev:down` | Detiene el contenedor PostgreSQL dev sin borrar datos. |
 | `pnpm db:dev:reset` | Reinicia PostgreSQL dev borrando su volumen. **Destruye datos dev.** |
 | `pnpm db:personal:up` | Levanta PostgreSQL personal explícitamente. |
-| `pnpm db:personal:reset -- --confirm RESET_APPFINANZAS_PERSONAL --profile appfinanzas_personal` | Guarded personal reset with an exact destructive confirmation. **Destroys personal data.** |
+| `pnpm db:personal:reset --confirm RESET_APPFINANZAS_PERSONAL --profile appfinanzas_personal` | Guarded personal reset with an exact destructive confirmation. **Destroys personal data.** |
 | `pnpm local:setup` | Valida `.env.example`, levanta PostgreSQL, genera Prisma Client y ejecuta migraciones sobre una base limpia. |
 | `pnpm local:check-readme` | Valida que el README mantenga el checklist local mínimo. |
 | `pnpm check:client` | Ejecuta typecheck, tests y build de producción del frontend. |
@@ -173,7 +179,7 @@ La estrategia actual: `master` simula producción estable y `dev` es la rama de 
 Checklist de rama y PR:
 
 - Nombrar ramas como `feat|fix|docs|chore|refactor|test|build|ci|perf|style|revert/<slug>`.
-- Vincular un issue aprobado o cambio SDD aprobado antes de pedir review.
+- Vincular un issue aprobado, una tarea ODD documentada o un cambio SDD explícitamente seleccionado antes de pedir review.
 - Aplicar exactamente un label `type:*` por PR.
 - Mantener CI verde antes de mergear una rama de trabajo a `dev`.
 - Si el cambio supera el presupuesto de review de 400 líneas, partirlo en PRs encadenados con tests/docs por unidad.
@@ -193,7 +199,7 @@ Antes de usar un cambio con datos personales diarios:
 - [ ] Crear o anotar el tag/checklist de promoción `personal-YYYY.MM.DD`.
 - [ ] Activar personal explícitamente con `pnpm env:personal`.
 - [ ] Aplicar solo comandos personales explícitos, como `pnpm prisma:personal:migrate` o `pnpm prisma:personal:studio`.
-- [ ] Do not run a personal reset unless you intentionally enter `pnpm db:personal:reset -- --confirm RESET_APPFINANZAS_PERSONAL --profile appfinanzas_personal`.
+- [ ] Do not run a personal reset unless you intentionally enter `pnpm db:personal:reset --confirm RESET_APPFINANZAS_PERSONAL --profile appfinanzas_personal`.
 
 ## Docker isolation verification
 
