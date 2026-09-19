@@ -68,7 +68,7 @@ test("listExpenseHistory validates subcategory ownership and reads filtered expe
 
   const history = await useCases.listExpenseHistory(input);
 
-  assert.deepEqual(history.expenses.map((item) => [item.id, item.amount, item.subcategory.id, item.creditCardId]), [["expense-1", 75, "sub-market", "card-1"]]);
+  assert.deepEqual(history.expenses.map((item) => [item.id, item.amount, item.subcategory?.id, item.creditCardId]), [["expense-1", 75, "sub-market", "card-1"]]);
   assert.deepEqual(calls, [
     ["months.findById", "month-1"],
     ["movements.findExpenseHistory", input],
@@ -86,4 +86,19 @@ test("listExpenseHistory rejects unknown subcategories before movement history r
     return true;
   });
   assert.deepEqual(calls, [["months.findById", "month-1"]]);
+});
+
+test("listExpenseHistory presents uncategorized expenses and does not validate a subcategory", async () => {
+  const { calls, ports } = createHistoryPorts();
+  const uncategorizedExpense = { ...expense, id: "expense-uncategorized", sourceSubcategoryId: null };
+  ports.movements.findExpenseHistory = async (input: ExpenseHistoryQueryInput) => {
+    calls.push(["movements.findExpenseHistory", input]);
+    return [uncategorizedExpense];
+  };
+
+  const input = { monthId: "month-1", classification: "UNCATEGORIZED" as const };
+  const history = await createExpenseHistoryUseCases(ports).listExpenseHistory(input);
+
+  assert.deepEqual(history.expenses.map((item) => [item.id, item.category, item.subcategory]), [["expense-uncategorized", null, null]]);
+  assert.deepEqual(calls, [["months.findById", "month-1"], ["movements.findExpenseHistory", input]]);
 });

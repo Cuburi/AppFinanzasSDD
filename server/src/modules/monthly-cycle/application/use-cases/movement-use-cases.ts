@@ -46,7 +46,7 @@ export const createStrictDepositToPocketUseCase = (ports: MonthlyCyclePorts) => 
     } else {
       await txPorts.pockets.ensurePocketIsActive(input.targetPocketId, "Target pocket");
     }
-    const existingMonth = input.monthId ? await txPorts.months.findById(input.monthId) : null;
+    const existingMonth = input.monthId ? await txPorts.months.lockForMutation(input.monthId) : null;
     if (existingMonth) {
       if (existingMonth.status !== MonthStatus.ACTIVE) throw new SemanticError("MONTH_NOT_ACTIVE", 409, "Month is not active.");
       try {

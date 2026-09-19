@@ -55,6 +55,7 @@ export const ActiveMonthPage = () => {
   const [monthlyExpenseHistoryStatus, setMonthlyExpenseHistoryStatus] = useState<MonthlyExpenseHistoryStatus>("idle");
   const [monthlyExpenseHistoryMonthId, setMonthlyExpenseHistoryMonthId] = useState<string | null>(null);
   const [historyCreditCardId, setHistoryCreditCardId] = useState("");
+  const [historyClassification, setHistoryClassification] = useState<"ALL" | "UNCATEGORIZED">("ALL");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalOccurredAt, setWithdrawalOccurredAt] = useState("");
   const [withdrawalDescription, setWithdrawalDescription] = useState("");
@@ -85,9 +86,12 @@ export const ActiveMonthPage = () => {
   const [structureOpen, setStructureOpen] = useState(false);
   const [secondaryForm, setSecondaryForm] = useState<"income" | "withdrawal" | "deposit" | null>(null);
 
-  const refreshExpenseHistory = async (monthId: string, creditCardId = historyCreditCardId) => {
+  const refreshExpenseHistory = async (monthId: string, creditCardId = historyCreditCardId, classification = historyClassification) => {
     const currentRequest = ++historyRequestId.current;
-    const expenses = creditCardId ? await api.getExpenseHistory(monthId, { creditCardId }) : await api.getExpenseHistory(monthId);
+    const expenses = await api.getExpenseHistory(monthId, {
+      ...(creditCardId ? { creditCardId } : {}),
+      ...(classification === "UNCATEGORIZED" ? { classification: "UNCATEGORIZED" as const } : {}),
+    });
     if (currentRequest === historyRequestId.current) {
       setExpenseHistory(expenses);
       setExpenseHistoryMonthId(monthId);
@@ -309,7 +313,7 @@ export const ActiveMonthPage = () => {
 
   const startEditingExpense = (expense: ExpenseHistoryItem) => {
     setExpenseFeedback(null);
-    setExpenseSubcategoryId(expense.subcategory.id);
+    setExpenseSubcategoryId(expense.subcategory?.id ?? "");
     setExpenseAmount(String(expense.amount));
     setExpenseDescription(expense.description ?? "");
     setExpenseOccurredAt(expense.occurredAt.slice(0, 10));
@@ -342,6 +346,12 @@ export const ActiveMonthPage = () => {
     if (activeMonth) void refreshExpenseHistory(activeMonth.id, creditCardId);
   };
 
+  const handleHistoryClassificationChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const classification = event.target.value as "ALL" | "UNCATEGORIZED";
+    setHistoryClassification(classification);
+    if (activeMonth) void refreshExpenseHistory(activeMonth.id, historyCreditCardId, classification);
+  };
+
   const startEditingCategory = (category: MonthCategory) => {
     setStructureOpen(true);
     setEditingCategoryId(category.id);
@@ -361,7 +371,7 @@ export const ActiveMonthPage = () => {
     if (!activeMonth || !canMutateActiveMonth) return;
     const input = {
       monthId: activeMonth.id,
-      sourceSubcategoryId: expenseSubcategoryId,
+      sourceSubcategoryId: expenseSubcategoryId || null,
       amount: Number(expenseAmount),
       description: expenseDescription,
       occurredAt: expenseOccurredAt || formatMonthDate(activeMonth),
@@ -650,7 +660,7 @@ export const ActiveMonthPage = () => {
       formId="expense-form"
       mode={editingExpenseId ? "edit" : "create"}
       onSubmit={handleExpense}
-      primaryFields={<><label className="field expense-amount-field"><span>Monto</span><input min="0.01" ref={expenseAmountInputRef} step="0.01" type="number" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} required /></label><label className="field expense-subcategory-field"><span>Subcategoría del gasto</span><select value={expenseSubcategoryId} onChange={(event) => setExpenseSubcategoryId(event.target.value)} required><option value="">Selecciona una subcategoría</option>{subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label></>}
+      primaryFields={<><label className="field expense-amount-field"><span>Monto</span><input min="0.01" ref={expenseAmountInputRef} step="0.01" type="number" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} required /></label><label className="field expense-subcategory-field"><span>Subcategoría del gasto</span><select value={expenseSubcategoryId} onChange={(event) => setExpenseSubcategoryId(event.target.value)}><option value="">Uncategorized</option>{subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label></>}
       purpose="Movimiento del mes"
       slipRef={expenseSlipRef}
       supportingFields={<><label className="field"><span>Fecha del gasto</span><input type="date" value={expenseOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setExpenseOccurredAt(event.target.value)} required /></label><label className="field"><span>Método de pago</span><select value={expensePaymentMethod} onChange={handleExpensePaymentMethodChange} required><option value="NON_CASH">No efectivo</option><option value="CASH">Efectivo</option></select></label><label className="field"><span>Tarjeta de crédito (opcional)</span><select value={expenseCreditCardId} onChange={handleExpenseCreditCardChange}><option value="">Sin tarjeta / efectivo</option>{activeCreditCards.map((card) => <option key={card.id} value={card.id}>{formatCreditCardLabel(card)}</option>)}</select></label><label className="field expense-description-field"><span>Descripción (opcional)</span><input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} /></label></>}
@@ -670,7 +680,7 @@ export const ActiveMonthPage = () => {
           <MonthlyLedger
             days={ledger.monthId === activeMonth.id ? buildMonthlyLedgerViewModel({ monthId: activeMonth.id, status: activeMonth.status, entries: ledger.entries }).days : []}
             actionLabel={(entry) => { const income = activeMonth.incomes.find((item) => item.id === entry.entryKey); return income ? `ingreso ${income.sourceName}` : `gasto ${entry.metadata.description ?? "sin descripción"}`; }}
-            identityLabel={(entry) => { const income = activeMonth.incomes.find((item) => item.id === entry.entryKey); return income ? `Fuente: ${income.sourceName}` : undefined; }}
+            identityLabel={(entry) => { const income = activeMonth.incomes.find((item) => item.id === entry.entryKey); if (income) return `Fuente: ${income.sourceName}`; const expense = monthlyExpenseHistory.find((item) => item.id === entry.entryKey); return expense ? expense.category && expense.subcategory ? `Categoría: ${expense.category.name} / ${expense.subcategory.name}` : "Categoría: Uncategorized" : undefined; }}
             isActionable={(entry) => entry.eventType === "MONTHLY_INCOME"
               ? activeMonth.incomes.some((item) => item.id === entry.entryKey)
               : hasCurrentMonthlyExpenseHistory && monthlyExpenseHistory.some((item) => item.id === entry.entryKey)}
@@ -692,6 +702,10 @@ export const ActiveMonthPage = () => {
               ? "No se puede editar ni eliminar este gasto hasta que se actualice el historial de gastos del mes."
               : undefined}
           />
+          <section aria-label="Filtros del historial" className="stack-sm">
+            <label className="field"><span>Clasificación del gasto</span><select value={historyClassification} onChange={handleHistoryClassificationChange}><option value="ALL">Todos los gastos</option><option value="UNCATEGORIZED">Uncategorized</option></select></label>
+            {expenseHistory.map((expense) => <p key={expense.id}>{expense.description ?? "Gasto sin descripción"} · {expense.category && expense.subcategory ? `${expense.category.name} / ${expense.subcategory.name}` : "Uncategorized"}</p>)}
+          </section>
           {creditCardLoadError ? <p className="error" role="alert">{creditCardLoadError}</p> : null}
           <section aria-label="Acciones secundarias" className="secondary-action-strip">
             <Button disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("income")} type="button" variant="secondary">Registrar ingreso</Button>

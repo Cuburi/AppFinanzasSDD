@@ -10,7 +10,7 @@ This is AppFinanzas' canonical, Git-owned product roadmap. It describes product 
 | Published from | `openspec/changes/create-product-roadmap/priority-horizon-proposal.md` |
 | Initial approved source commit/version | `e5bbe3d` (PR #179 merge into `dev`) |
 | Approved source SHA-256 | `31138F924F0FDB6DDC1E5D6DF2C50BAF694D167161E3AF5348E7012F93DAA3F5` |
-| Current canonical source commit/version | `b1acbc1` (`docs/product/roadmap.md`; RM-012-first reprioritization merged into `dev`) |
+| Current canonical source commit/version | Working-tree SDD change `uncategorized-expense-recording`; RM-026-first ordering pending normal Git review and publication. |
 | Approved review snapshot | 29 IDs (`RM-001`–`RM-029`); Notion revision `UNAVAILABLE`; digest `8118B4702EC650B42CF2FB7CD9A0F3EE90580DCAADEF6A8D287EF66C0BA3CE52` |
 | Publication rule | Fail closed: publication is invalid unless the current source bytes match the approved SHA-256 exactly. |
 
@@ -27,8 +27,8 @@ The approved source was re-read before publication. Any source/hash, review row-
 
 | ID | Outcome | Scope / non-goals | Status / horizon | Dependencies and rationale | Completion evidence / provenance |
 |---|---|---|---|---|---|
-| RM-012 | Prevent retried financial CREATE requests from producing duplicate movements. | Request-level CREATE protection only; excludes transactions and blanket PATCH/DELETE idempotency. | `unfinished` / `Now` (1) | A bounded integrity safeguard for safe daily use; protects existing and future money-moving workflows. No hard technical dependency on RM-026 has been established. | Duplicate-risk evidence only; no completion claim. `C-12`; `engram:#2404`; `maintainer:2026-08-30`. |
-| RM-026 | Record an expense without category or subcategory while preserving truthful monthly totals and an `Uncategorized` display. | Category/subcategory are optional; later categorization is optional; an expense may remain uncategorized indefinitely, including after close. Budget and broader analytics treatment require focused design. | `unfinished` / `Now` (2) | Depends on RM-001 and maintainer-accepted accounting semantics. It removes a daily recording barrier after the minimum integrity safeguard. | No implementation completion claim. `C-29`; `maintainer:2026-08-23,2026-08-25`; reconciled review evidence. Publication does **not** authorize application code. |
+| RM-026 | Record an expense without category or subcategory while preserving truthful monthly totals and an `Uncategorized` display. | Category/subcategory are optional; later categorization is optional; an expense may remain uncategorized indefinitely, including after close. Budget and broader analytics treatment require focused design. | `unfinished` / `Now` (1) | Depends on RM-001 and maintainer-accepted accounting semantics. It removes a daily recording barrier before RM-012 retry protection. | No implementation completion claim. `C-29`; `maintainer:2026-08-23,2026-08-25`; reconciled review evidence. Publication does **not** authorize application code. |
+| RM-012 | Prevent retried financial CREATE requests from producing duplicate movements. | Request-level CREATE protection only; excludes transactions and blanket PATCH/DELETE idempotency. | `unfinished` / `Now` (2) | A bounded integrity safeguard for safe daily use; protects existing and future money-moving workflows. No hard technical dependency on RM-026 has been established. | Duplicate-risk evidence only; no completion claim. `C-12`; `engram:#2404`; `maintainer:2026-08-30`. |
 
 RM-026 publication does **not** authorize application code. Its focused implementation remains a separate future SDD.
 
@@ -126,3 +126,4 @@ Manual reconciliation is maintainer-requested. No automatic synchronization is p
 | 2026-08-26 | Published this Git-canonical roadmap from the exact approved source hash. | `publication-verification.md`; merge commit `e5bbe3d`; this document. |
 | 2026-08-29 | Archived the Review Draft, then created the separate refresher-owned Mirror from this Git roadmap and the separate manual Proposed Roadmap Changes queue. | `post-publication-verification.md`; recorded Notion surface IDs. |
 | 2026-08-30 | Reprioritized RM-012 to `unfinished` / `Now` sequence 1 and RM-026 to sequence 2. RM-012 has no established hard technical dependency on RM-026; duplicate-mutation protection is the minimum safeguard for safe daily use. | Approved proposal `3cc9940c-26cb-814f-b183-ee5a59fbbd7b`; Git-canonical commit `b1acbc1` merged into `dev`; maintainer rationale. |
+| 2026-09-13 | Restored RM-026 to `unfinished` / `Now` sequence 1 and RM-012 to sequence 2 as part of RM-026 delivery. The ordering preserves RM-026 as the immediate daily-recording barrier and does not create a hard technical dependency between the initiatives. | `openspec/changes/uncategorized-expense-recording/{proposal,tasks}.md`; normal Git review and publication remain required. |

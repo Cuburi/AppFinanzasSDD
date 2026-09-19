@@ -157,6 +157,9 @@ const createDbStub = ({
     async $transaction<T>(callback: (tx: typeof db) => Promise<T>) {
       return callback(db);
     },
+    async $queryRaw() {
+      return [];
+    },
     async $queryRawUnsafe() {
       return [{ exists: false }];
     },
@@ -575,7 +578,7 @@ test("depositToPocket rejects inactive or nonexistent target pockets", async () 
   );
 });
 
-test("applyClosureAction rejects inactive default pockets for new surplus actions", async () => {
+test("applyClosureAction rejects surplus transfers before checking default pockets", async () => {
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const subcategory = month.categories[0]?.subcategories[0];
 
@@ -583,9 +586,7 @@ test("applyClosureAction rejects inactive default pockets for new surplus action
     throw new Error("Missing subcategory fixture.");
   }
 
-  const service = createMonthlyCycleTestService(
-    createDbStub({ monthById: month, targetPockets: { "pocket-home": { id: "pocket-home", active: false } } }).db,
-  );
+  const service = createMonthlyCycleTestService(createDbStub({ monthById: month }).db);
 
   await assert.rejects(
     () =>
@@ -596,8 +597,8 @@ test("applyClosureAction rejects inactive default pockets for new surplus action
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
-      assert.equal(error.statusCode, 400);
-      assert.match(error.message, /target pocket must exist and be active/i);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /budget variance is informational and cannot be transferred/i);
       return true;
     },
   );
@@ -1496,7 +1497,7 @@ test("getClosureReview blocks close when available money is positive or negative
   assert.equal(deficitReview.canClose, false);
 });
 
-test("applyClosureAction persists surplus transfer using the default pocket", async () => {
+test("applyClosureAction rejects surplus transfer as non-transferable budget variance", async () => {
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   month.incomes.push({
     id: "income-1",
@@ -1517,23 +1518,15 @@ test("applyClosureAction persists surplus transfer using the default pocket", as
   const dbStub = createDbStub({ monthById: month });
   const service = createMonthlyCycleTestService(dbStub.db);
 
-  const review = await service.applyClosureAction({
-    monthId: month.id,
-    type: "SURPLUS_TO_POCKET_ON_CLOSE",
-    sourceSubcategoryId: subcategory.id,
-  });
-  const movement = dbStub.getCapturedMovements()[0] as {
-    data: { type: MovementType; sourceSubcategoryId: string; targetPocketId: string; amount: Prisma.Decimal };
-  };
+  await assert.rejects(
+    () => service.applyClosureAction({ monthId: month.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategory.id }),
+    { message: "Budget variance is informational and cannot be transferred." },
+  );
 
-  assert.equal(movement.data.type, MovementType.SURPLUS_TO_POCKET_ON_CLOSE);
-  assert.equal(movement.data.sourceSubcategoryId, subcategory.id);
-  assert.equal(movement.data.targetPocketId, "pocket-home");
-  assert.equal(Number(movement.data.amount.toString()), 250);
-  assert.equal(review.canClose, true);
+  assert.equal(dbStub.getCapturedMovements().length, 0);
 });
 
-test("applyClosureAction requires explicit target pocket when surplus has no default pocket", async () => {
+test("applyClosureAction keeps surplus transfers non-transferable without a default pocket", async () => {
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
   const subcategory = month.categories[0]?.subcategories[0];
 
@@ -1554,47 +1547,17 @@ test("applyClosureAction requires explicit target pocket when surplus has no def
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
-      assert.equal(error.statusCode, 400);
-      assert.match(error.message, /target pocket is required/i);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /budget variance is informational and cannot be transferred/i);
       return true;
     },
   );
 });
 
-test("closeMonth rejects pending closure balances and closes after explicit movements", async () => {
+test("closeMonth permits informational surplus variance when month money is reconciled", async () => {
   const month = buildCreatedMonth(templateFixture(), 2026, 5);
-  const subcategory = month.categories[0]?.subcategories[0];
-
-  if (!subcategory) {
-    throw new Error("Missing subcategory fixture.");
-  }
-
   const dbStub = createDbStub({ monthById: month });
   const service = createMonthlyCycleTestService(dbStub.db);
-
-  await assert.rejects(() => service.closeMonth(month.id), (error: unknown) => {
-    assert.ok(error instanceof DomainError);
-    assert.equal(error.statusCode, 409);
-    assert.match(error.message, /pending subcategory balances or available money/i);
-    return true;
-  });
-
-  month.incomes.push({
-    id: "income-1",
-    monthId: month.id,
-    sourceName: "Salary",
-    amount: amount(250),
-    receivedAt: new Date("2026-05-10T00:00:00.000Z"),
-    notes: null,
-    createdAt: new Date("2026-05-10T00:00:00.000Z"),
-    updatedAt: new Date("2026-05-10T00:00:00.000Z"),
-  });
-
-  await service.applyClosureAction({
-    monthId: month.id,
-    type: "SURPLUS_TO_POCKET_ON_CLOSE",
-    sourceSubcategoryId: subcategory.id,
-  });
 
   const closedMonth = await service.closeMonth(month.id);
 

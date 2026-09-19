@@ -16,8 +16,8 @@ const mapMovement = (movement: Movement): Entry | null => {
   switch (movement.type) {
     case MovementType.EXPENSE:
       return movement.paymentMethod === PaymentMethod.CASH
-        ? { ...base, eventType: "CASH_EXPENSE", direction: "OUTFLOW", source: entity("CASH", null), destination: entity("EXPENSE", movement.sourceSubcategoryId), balanceEffects: effects(0, -amount, -amount, 0) }
-        : { ...base, eventType: "NON_CASH_EXPENSE", direction: "OUTFLOW", source: entity("SUBCATEGORY", movement.sourceSubcategoryId), destination: entity("EXPENSE", null), balanceEffects: effects(-amount, 0, -amount, 0) };
+        ? { ...base, eventType: "CASH_EXPENSE", direction: "OUTFLOW", source: entity("CASH", null), destination: entity("EXPENSE", movement.sourceSubcategoryId), balanceEffects: effects(0, -amount, movement.sourceSubcategoryId ? -amount : 0, 0) }
+        : { ...base, eventType: "NON_CASH_EXPENSE", direction: "OUTFLOW", source: entity("SUBCATEGORY", movement.sourceSubcategoryId), destination: entity("EXPENSE", null), balanceEffects: effects(-amount, 0, movement.sourceSubcategoryId ? -amount : 0, 0) };
     case MovementType.CASH_WITHDRAWAL:
       return { ...base, eventType: "CASH_WITHDRAWAL", direction: "TRANSFER", source: entity("MONTH", movement.monthId ?? null), destination: entity("CASH", null), balanceEffects: effects(-amount, amount, 0, 0) };
     case MovementType.POCKET_DEPOSIT_FROM_SUBCATEGORY:

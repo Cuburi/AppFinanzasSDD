@@ -24,6 +24,7 @@ const report: BasicMonthlyReportView = {
   topSpendingSubcategories: [
     { subcategoryId: "sub-food", subcategoryName: "Food", categoryId: "cat-living", categoryName: "Living", amount: 300 },
   ],
+  uncategorizedSpending: { label: "Uncategorized", amount: 0, cashAmount: 0, nonCashAmount: 0 },
   surplusSubcategories: [
     { subcategoryId: "sub-rent", subcategoryName: "Rent", categoryId: "cat-living", categoryName: "Living", amount: 100 },
   ],

@@ -43,3 +43,32 @@ test("expense DTO parsing accepts optional credit-card references on record, upd
   assert.equal(updateInput.creditCardId, null);
   assert.equal(historyInput.creditCardId, "card-1");
 });
+
+test("expense DTO parsing accepts an absent classification and preserves explicit null", () => {
+  const omittedClassification = parseRecordExpenseInput("month-1", {
+    amount: 42,
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+  });
+  const explicitNullClassification = parseUpdateExpenseInput("month-1", "expense-1", {
+    sourceSubcategoryId: null,
+    amount: 50,
+    occurredAt: "2026-05-11T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+  });
+
+  assert.equal(omittedClassification.sourceSubcategoryId, null);
+  assert.equal(explicitNullClassification.sourceSubcategoryId, null);
+});
+
+test("expense DTO parsing accepts only the explicit uncategorized history filter", () => {
+  assert.deepEqual(parseExpenseHistoryQueryInput("month-1", { classification: "UNCATEGORIZED" }), {
+    monthId: "month-1",
+    from: undefined,
+    to: undefined,
+    paymentMethod: undefined,
+    subcategoryId: undefined,
+    classification: "UNCATEGORIZED",
+  });
+  assert.throws(() => parseExpenseHistoryQueryInput("month-1", { classification: "uncategorized" }), /classification must be uncategorized/i);
+});
