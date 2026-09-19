@@ -1,6 +1,6 @@
 import { MovementType, PaymentMethod } from "../application/monthly-cycle-types.js";
 
-import type { BasicMonthlyReportView, BasicReportSubcategoryView } from "../dto/index.js";
+import type { BasicMonthlyReportView, BasicReportSubcategoryView, BasicReportUncategorizedView } from "../dto/index.js";
 import { calculateMonthBalances } from "../balance-calculator.js";
 import { calculateCashBalance } from "../shared/cash-ledger.js";
 import { decimalToNumber, roundMoney } from "../shared/money.js";
@@ -31,17 +31,23 @@ const buildSpendingBySubcategory = (month: MonthRecord, contexts: Map<string, Su
   const totals = new Map<string, number>();
   let totalSpentCash = 0;
   let totalSpentNonCash = 0;
+  let uncategorizedCashAmount = 0;
+  let uncategorizedNonCashAmount = 0;
 
   for (const movement of month.movements) {
-    if (movement.type !== MovementType.EXPENSE || !movement.sourceSubcategoryId) continue;
+    if (movement.type !== MovementType.EXPENSE) continue;
 
     const amount = decimalToNumber(movement.amount);
-    totals.set(movement.sourceSubcategoryId, roundMoney((totals.get(movement.sourceSubcategoryId) ?? 0) + amount));
+    if (movement.sourceSubcategoryId) {
+      totals.set(movement.sourceSubcategoryId, roundMoney((totals.get(movement.sourceSubcategoryId) ?? 0) + amount));
+    }
 
     if (movement.paymentMethod === PaymentMethod.CASH) {
       totalSpentCash = roundMoney(totalSpentCash + amount);
+      if (!movement.sourceSubcategoryId) uncategorizedCashAmount = roundMoney(uncategorizedCashAmount + amount);
     } else {
       totalSpentNonCash = roundMoney(totalSpentNonCash + amount);
+      if (!movement.sourceSubcategoryId) uncategorizedNonCashAmount = roundMoney(uncategorizedNonCashAmount + amount);
     }
   }
 
@@ -55,7 +61,14 @@ const buildSpendingBySubcategory = (month: MonthRecord, contexts: Map<string, Su
     .filter((item): item is BasicReportSubcategoryView => Boolean(item))
     .sort(compareReportAmountsDescending);
 
-  return { totalSpentCash, totalSpentNonCash, topSpendingSubcategories };
+  const uncategorizedSpending: BasicReportUncategorizedView = {
+    label: "Uncategorized",
+    amount: roundMoney(uncategorizedCashAmount + uncategorizedNonCashAmount),
+    cashAmount: uncategorizedCashAmount,
+    nonCashAmount: uncategorizedNonCashAmount,
+  };
+
+  return { totalSpentCash, totalSpentNonCash, topSpendingSubcategories, uncategorizedSpending };
 };
 
 export const mapBasicReport = (month: MonthRecord): BasicMonthlyReportView => {
@@ -88,6 +101,7 @@ export const mapBasicReport = (month: MonthRecord): BasicMonthlyReportView => {
       totalSpentNonCash: spending.totalSpentNonCash,
     },
     topSpendingSubcategories: spending.topSpendingSubcategories,
+    uncategorizedSpending: spending.uncategorizedSpending,
     surplusSubcategories: balanceItems.filter((item) => item.amount > 0).sort(compareReportAmountsDescending),
     deficitSubcategories: balanceItems.filter((item) => item.amount < 0).sort(compareReportAmountsAscending),
   };

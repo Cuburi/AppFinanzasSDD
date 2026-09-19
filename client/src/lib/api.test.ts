@@ -291,6 +291,14 @@ describe("monthly cash and expense api", () => {
     expect(fetch).toHaveBeenCalledWith("/api/months/month-1/expenses?from=2026-05-01&to=2026-05-31&paymentMethod=NON_CASH&subcategoryId=sub-grocery&creditCardId=card-1");
   });
 
+  it("serializes an explicit uncategorized history filter", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ expenses: [] }), { status: 200 }));
+
+    await expect(api.getExpenseHistory("month-1", { classification: "UNCATEGORIZED" })).resolves.toEqual([]);
+
+    expect(fetch).toHaveBeenCalledWith("/api/months/month-1/expenses?classification=UNCATEGORIZED");
+  });
+
   it("updates and deletes active-month expenses through correction endpoints", async () => {
     const monthPayload = { id: "month-1", availableMoney: 425, cashBalance: 95 };
     vi.mocked(fetch)

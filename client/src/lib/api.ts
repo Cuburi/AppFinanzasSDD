@@ -232,6 +232,7 @@ export const api = {
     if (filters.paymentMethod) params.set("paymentMethod", filters.paymentMethod);
     if (filters.subcategoryId) params.set("subcategoryId", filters.subcategoryId);
     if (filters.creditCardId) params.set("creditCardId", filters.creditCardId);
+    if (filters.classification) params.set("classification", filters.classification);
 
     const query = params.toString();
     const response = await fetch(`/api/months/${monthId}/expenses${query ? `?${query}` : ""}`);

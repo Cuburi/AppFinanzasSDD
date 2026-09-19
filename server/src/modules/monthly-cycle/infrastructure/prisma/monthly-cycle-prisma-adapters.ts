@@ -63,6 +63,10 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
     findById(monthId) {
       return readMonthById(db, monthId);
     },
+    async lockForMutation(monthId) {
+      await db.$queryRaw(Prisma.sql`SELECT "id" FROM "Month" WHERE "id" = ${monthId} FOR UPDATE`);
+      return readMonthById(db, monthId);
+    },
     async findByYearMonth(year, month) {
       return (await db.month.findUnique({
         where: { year_month: { year, month } },
@@ -158,7 +162,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       externalSourceLabel?: string | null;
       creditCardId?: string | null;
     }) {
-      await db.movement.create({ data: { ...args, amount: toPrismaDecimal(args.amount) } });
+      await db.movement.create({ data: { ...args, amount: toPrismaDecimal(args.amount), sourceSubcategoryId: args.sourceSubcategoryId ?? null } });
     },
     async updateExpense(input) {
       await db.movement.update({
@@ -182,7 +186,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
           monthId: input.monthId,
           type: MovementType.EXPENSE,
           ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
-          ...(input.subcategoryId ? { sourceSubcategoryId: input.subcategoryId } : {}),
+          ...(input.classification === "UNCATEGORIZED" ? { sourceSubcategoryId: null } : input.subcategoryId ? { sourceSubcategoryId: input.subcategoryId } : {}),
           ...(input.creditCardId ? { creditCardId: input.creditCardId } : {}),
           ...(input.from || input.to
             ? {

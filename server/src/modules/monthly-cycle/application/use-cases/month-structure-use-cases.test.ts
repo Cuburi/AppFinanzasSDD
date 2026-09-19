@@ -42,9 +42,15 @@ const templateCategories = [
 
 const createStructurePorts = () => {
   const calls: unknown[] = [];
+  let lockCalls = 0;
   const txPorts = {
     months: {
       async findById(monthId: string) {
+        calls.push(["tx.months.findById", monthId]);
+        return month;
+      },
+      async lockForMutation(monthId: string) {
+        lockCalls += 1;
         calls.push(["tx.months.findById", monthId]);
         return month;
       },
@@ -112,8 +118,22 @@ const createStructurePorts = () => {
     },
   } as unknown as MonthlyCyclePorts;
 
-  return { calls, ports };
+  return { calls, ports, getLockCalls: () => lockCalls };
 };
+
+test("month structure mutations lock the owning month before evaluating mutable state", async () => {
+  const { ports, getLockCalls } = createStructurePorts();
+  const useCases = createMonthStructureUseCases(ports);
+
+  await useCases.createMonthCategory({ monthId: "month-1", name: "Fun", addToTemplate: false });
+  await useCases.updateMonthCategory({ monthId: "month-1", categoryId: "cat-food", name: "Food" });
+  await useCases.deleteMonthCategory("month-1", "cat-food").catch(() => undefined);
+  await useCases.createMonthSubcategory({ monthId: "month-1", categoryId: "cat-food", name: "Restaurants", plannedAmount: 80, addToTemplate: false });
+  await useCases.updateMonthSubcategory({ monthId: "month-1", subcategoryId: "sub-market", name: "Market", plannedAmount: 100 });
+  await useCases.deleteMonthSubcategory("month-1", "sub-market");
+
+  assert.equal(getLockCalls(), 6);
+});
 
 test("month-structure use cases expose only the category and subcategory public surface", () => {
   assert.deepEqual(MONTH_STRUCTURE_USE_CASE_NAMES, ["createMonthCategory", "updateMonthCategory", "deleteMonthCategory", "createMonthSubcategory", "updateMonthSubcategory", "deleteMonthSubcategory"]);

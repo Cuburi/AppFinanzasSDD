@@ -51,9 +51,15 @@ const month = {
 
 const createMovementPorts = () => {
   const calls: unknown[] = [], created: unknown[] = [];
+  let lockCalls = 0;
   const txPorts = {
     months: {
       async findById(monthId: string) {
+        calls.push(["tx.months.findById", monthId]);
+        return month;
+      },
+      async lockForMutation(monthId: string) {
+        lockCalls += 1;
         calls.push(["tx.months.findById", monthId]);
         return month;
       },
@@ -109,8 +115,20 @@ const createMovementPorts = () => {
     },
   } as unknown as MonthlyCyclePorts;
 
-  return { calls, created, ports };
+  return { calls, created, ports, getLockCalls: () => lockCalls };
 };
+
+test("movement mutations lock the owning month before evaluating mutable state", async () => {
+  const { ports, getLockCalls } = createMovementPorts();
+  const useCases = createMovementUseCases(ports);
+
+  await useCases.recordExpense({ monthId: "month-1", sourceSubcategoryId: "sub-market", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH });
+  await useCases.updateExpense({ monthId: "month-1", expenseId: "expense-1", sourceSubcategoryId: "sub-market", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH });
+  await useCases.deleteExpense("month-1", "expense-1");
+  await useCases.depositToPocket({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" });
+
+  assert.equal(getLockCalls(), 4);
+});
 
 test("movement use cases expose only the expense and pocket-deposit public surface", () => {
   assert.deepEqual(MOVEMENT_USE_CASE_NAMES, ["recordExpense", "updateExpense", "deleteExpense", "depositToPocket"]);
@@ -137,6 +155,50 @@ test("recordExpense persists an expense inside the transaction runner and return
     ["tx.movements.create", "EXPENSE", "75", null, null],
     ["tx.months.findById", "month-1"],
   ]);
+});
+
+test("recordExpense and updateExpense allow an active expense to be uncategorized or categorized", async () => {
+  const { created, ports } = createMovementPorts();
+  const useCases = createMovementUseCases(ports);
+
+  await useCases.recordExpense({
+    monthId: "month-1",
+    sourceSubcategoryId: null,
+    amount: 75,
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+  });
+  await useCases.updateExpense({
+    monthId: "month-1",
+    expenseId: "expense-1",
+    sourceSubcategoryId: "sub-market",
+    amount: 75,
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+  });
+
+  assert.equal((created[0] as { sourceSubcategoryId?: string | null }).sourceSubcategoryId, null);
+});
+
+test("updateExpense rejects recategorization of an uncategorized expense after closure", async () => {
+  const { ports } = createMovementPorts();
+  month.status = MonthStatus.CLOSED as never;
+
+  try {
+    await assert.rejects(
+      () => createMovementUseCases(ports).updateExpense({
+        monthId: "month-1",
+        expenseId: "expense-1",
+        sourceSubcategoryId: "sub-market",
+        amount: 75,
+        occurredAt: "2026-05-10T00:00:00.000Z",
+        paymentMethod: PaymentMethod.NON_CASH,
+      }),
+      { code: "MONTH_NOT_ACTIVE" },
+    );
+  } finally {
+    month.status = MonthStatus.ACTIVE;
+  }
 });
 
 test("recordExpense validates an active owned credit card before persisting the linked expense", async () => {

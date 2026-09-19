@@ -26,6 +26,7 @@ export interface MonthRepositoryPort {
   findActive(): Promise<MonthRecord | null>;
   findActiveSummary(status: MonthlyCycleMonthStatus): Promise<ActiveMonthSummary | null>;
   findById(monthId: string): Promise<MonthRecord>;
+  lockForMutation(monthId: string): Promise<MonthRecord>;
   findByYearMonth(year: number, month: number): Promise<{ id: string } | null>;
   findPriorClosedBefore(year: number, month: number): Promise<MonthRecord | null>;
   createFromTemplate(input: {
@@ -66,7 +67,7 @@ export interface MovementRepositoryPort {
     description?: string | null;
     occurredAt: Date;
     paymentMethod: MonthlyCyclePaymentMethod;
-    sourceSubcategoryId: string;
+    sourceSubcategoryId: string | null;
     creditCardId?: string | null;
   }): Promise<void>;
   delete(movementId: string): Promise<void>;

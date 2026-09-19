@@ -89,6 +89,32 @@ test("monthly-cycle Prisma ledger adapter isolates two month reads", async () =>
   assert.deepEqual(calls, [{ where: { id: "month-1" }, include: monthInclude }, { where: { id: "month-2" }, include: monthInclude }]);
 });
 
+test("monthly-cycle Prisma month adapter locks then rereads the complete month aggregate", async () => {
+  const calls: unknown[] = [];
+  const lockedMonth = { id: "month-1" };
+  const aggregate = { id: "month-1", categories: [], incomes: [], movements: [] };
+  const db: any = {
+    async $queryRaw(query: unknown) {
+      calls.push(["$queryRaw", query]);
+      return [lockedMonth];
+    },
+    month: {
+      async findUnique(args: unknown) {
+        calls.push(["month.findUnique", args]);
+        return aggregate;
+      },
+    },
+  };
+
+  const result = await createMonthlyCyclePrismaAdapters(db).months.lockForMutation("month-1");
+
+  assert.equal(result, aggregate);
+  assert.deepEqual(calls, [
+    ["$queryRaw", Prisma.sql`SELECT "id" FROM "Month" WHERE "id" = ${"month-1"} FOR UPDATE`],
+    ["month.findUnique", { where: { id: "month-1" }, include: monthInclude }],
+  ]);
+});
+
 test("monthly-cycle Prisma credit-card validation rejects missing inactive or unowned cards", async () => {
   const db: any = {
     creditCard: {
@@ -106,7 +132,7 @@ test("monthly-cycle Prisma credit-card validation rejects missing inactive or un
   } as DomainError);
 });
 
-test("monthly-cycle Prisma movements persist and filter nullable credit-card references", async () => {
+test("monthly-cycle Prisma movements persist null classifications and filter uncategorized history", async () => {
   const calls: unknown[] = [];
   const db: any = {
     movement: {
@@ -124,14 +150,14 @@ test("monthly-cycle Prisma movements persist and filter nullable credit-card ref
   };
   const ports = createMonthlyCyclePrismaAdapters(db);
 
-  await ports.movements.create({ type: "EXPENSE", amount: amount(75), monthId: "month-1", sourceSubcategoryId: "sub-1", creditCardId: "card-1" });
-  await ports.movements.updateExpense({ expenseId: "expense-1", amount: amount(90), occurredAt: new Date("2026-05-11T00:00:00.000Z"), paymentMethod: "NON_CASH", sourceSubcategoryId: "sub-1", creditCardId: null });
-  await ports.movements.findExpenseHistory({ monthId: "month-1", creditCardId: "card-1" });
+  await ports.movements.create({ type: "EXPENSE", amount: amount(75), monthId: "month-1", sourceSubcategoryId: null, creditCardId: "card-1" });
+  await ports.movements.updateExpense({ expenseId: "expense-1", amount: amount(90), occurredAt: new Date("2026-05-11T00:00:00.000Z"), paymentMethod: "NON_CASH", sourceSubcategoryId: null, creditCardId: null });
+  await ports.movements.findExpenseHistory({ monthId: "month-1", classification: "UNCATEGORIZED" });
 
   assert.deepEqual(calls, [
-    ["create", { data: { type: "EXPENSE", amount: amount(75), monthId: "month-1", sourceSubcategoryId: "sub-1", creditCardId: "card-1" } }],
-    ["update", { where: { id: "expense-1" }, data: { amount: amount(90), description: undefined, occurredAt: new Date("2026-05-11T00:00:00.000Z"), paymentMethod: "NON_CASH", sourceSubcategoryId: "sub-1", creditCardId: null } }],
-    ["findMany", { where: { monthId: "month-1", type: "EXPENSE", creditCardId: "card-1" }, orderBy: { occurredAt: "desc" } }],
+    ["create", { data: { type: "EXPENSE", amount: amount(75), monthId: "month-1", sourceSubcategoryId: null, creditCardId: "card-1" } }],
+    ["update", { where: { id: "expense-1" }, data: { amount: amount(90), description: undefined, occurredAt: new Date("2026-05-11T00:00:00.000Z"), paymentMethod: "NON_CASH", sourceSubcategoryId: null, creditCardId: null } }],
+    ["findMany", { where: { monthId: "month-1", type: "EXPENSE", sourceSubcategoryId: null }, orderBy: { occurredAt: "desc" } }],
   ]);
 });
 
