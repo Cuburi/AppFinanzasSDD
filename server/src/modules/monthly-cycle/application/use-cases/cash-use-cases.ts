@@ -1,7 +1,7 @@
 import type { CashSummaryView, MonthView, WithdrawCashInput } from "../../dto/index.js";
 import { mapCashSummary, mapMonth } from "../../mappers/monthly-cycle-mappers.js";
 import { assertOccurredAtWithinMonth } from "../../shared/cash-ledger.js";
-import { assertMonthIsMutable } from "../../shared/month-queries.js";
+import { lockMutableMonthForMutation } from "../../shared/month-queries.js";
 import { decimal } from "../../shared/money.js";
 import { DomainError } from "../../shared/service-errors.js";
 import { calculateMonthBalances } from "../../balance-calculator.js";
@@ -30,8 +30,7 @@ const assertDateInsideMonth = (occurredAt: Date, month: Pick<MonthRecord, "year"
 export const createCashUseCases = (ports: MonthlyCyclePorts): CashUseCases => ({
   async withdrawCash(input) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
-      const existingMonth = await txPorts.months.findById(input.monthId);
-      assertMonthIsMutable(existingMonth);
+      const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
       const occurredAt = new Date(input.occurredAt);
       assertDateInsideMonth(occurredAt, existingMonth);
 

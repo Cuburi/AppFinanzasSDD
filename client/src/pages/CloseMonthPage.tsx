@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
 import { Button, Card, SectionHeader, StatusPill } from "../components/ui";
-import type { ClosurePendingSurplus, ClosureReview, Month, SavingsPocket } from "../types";
+import type { ClosureReview, Month } from "../types";
 import { ClosedMonthDashboard } from "../features/monthly-cycle/closed-month-dashboard/components/ClosedMonthDashboard";
 
 type TextById = Record<string, string>;
@@ -32,11 +32,8 @@ export const CloseMonthPage = () => {
   const [review, setReview] = useState<ClosureReview | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [activePockets, setActivePockets] = useState<SavingsPocket[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [surplusPocketIds, setSurplusPocketIds] = useState<TextById>({});
-  const [surplusAmounts, setSurplusAmounts] = useState<TextById>({});
   const [deficitSourceIds, setDeficitSourceIds] = useState<TextById>({});
   const [deficitAmounts, setDeficitAmounts] = useState<TextById>({});
 
@@ -51,22 +48,14 @@ export const CloseMonthPage = () => {
 
     const closureReview = await api.getClosureReview(month.id);
     setReview(closureReview);
-    setSurplusPocketIds((current) => ({
-      ...closureReview.pendingSurpluses.reduce<TextById>((defaults, surplus) => {
-        defaults[surplus.subcategoryId] = current[surplus.subcategoryId] ?? surplus.defaultPocketId ?? "";
-        return defaults;
-      }, {}),
-    }));
   };
 
   useEffect(() => {
     const load = async () => {
       try {
-        const pockets = await api.getPockets("active");
-        setActivePockets(pockets);
         await refresh();
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "No se pudo cargar la revisión de cierre y los bolsillos activos.");
+        setError(loadError instanceof Error ? loadError.message : "No se pudo cargar la revisión de cierre.");
       } finally {
         setLoading(false);
       }
@@ -74,37 +63,6 @@ export const CloseMonthPage = () => {
 
     void load();
   }, []);
-
-  const applySurplusTransfer = async (event: React.FormEvent<HTMLFormElement>, subcategoryId: string) => {
-    event.preventDefault();
-    if (!activeMonth || !review) return;
-
-    const pendingSurplus = review.pendingSurpluses.find((surplus) => surplus.subcategoryId === subcategoryId);
-    if (!pendingSurplus) return;
-
-    setSubmitting(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      await api.applyClosureAction({
-        monthId: activeMonth.id,
-        type: "SURPLUS_TO_POCKET_ON_CLOSE",
-        sourceSubcategoryId: subcategoryId,
-        targetPocketId: surplusPocketIds[subcategoryId] || pendingSurplus.defaultPocketId || undefined,
-        amount: surplusAmounts[subcategoryId] ? Number(surplusAmounts[subcategoryId]) : undefined,
-        description: "Transferencia de sobrante al cierre",
-      });
-      await refresh();
-      setSurplusAmounts((current) => ({ ...current, [subcategoryId]: "" }));
-      setSurplusPocketIds((current) => ({ ...current, [subcategoryId]: "" }));
-      setMessage(`Sobrante de ${pendingSurplus.subcategoryName} transferido a bolsillo.`);
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "No se pudo transferir el sobrante.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const applyDeficitCoverage = async (event: React.FormEvent<HTMLFormElement>, targetSubcategoryId: string) => {
     event.preventDefault();
@@ -192,24 +150,6 @@ export const CloseMonthPage = () => {
     return <p>Cargando revisión de cierre...</p>;
   }
 
-  const renderPocketOptions = (surplus: ClosurePendingSurplus) => {
-    const missingDefaultId = surplus.defaultPocketId && !activePockets.some((pocket) => pocket.id === surplus.defaultPocketId)
-      ? surplus.defaultPocketId
-      : null;
-
-    return (
-      <>
-        <option value="">Elegí un bolsillo activo</option>
-        {missingDefaultId ? <option value={missingDefaultId}>{missingDefaultId}</option> : null}
-        {activePockets.map((pocket) => (
-          <option key={pocket.id} value={pocket.id}>
-            {pocket.name} (${pocket.balance.toFixed(2)})
-          </option>
-        ))}
-      </>
-    );
-  };
-
   if (activeMonth?.status === "CLOSED") {
     return (
       <section className="page stack-lg">
@@ -267,57 +207,19 @@ export const CloseMonthPage = () => {
             {renderAvailableMoneyBlocker(review)}
           </Card>
 
-          <Card aria-label="Sobrantes pendientes" className="stack-md">
-            <h2>Sobrantes pendientes</h2>
-            {review.pendingSurpluses.length === 0 ? <p>No hay sobrantes pendientes.</p> : null}
-
-            <div className="stack-sm">
-              {review.pendingSurpluses.map((surplus) => (
-                <form className="budget-line align-start" key={surplus.subcategoryId} onSubmit={(event) => applySurplusTransfer(event, surplus.subcategoryId)}>
-                  <div className="stack-sm grow">
-                    <strong>{surplus.subcategoryName}</strong>
-                    <StatusPill tone="success" aria-label={`Success: Sobrante $${surplus.amount.toFixed(2)}`}>
-                      Sobrante: ${surplus.amount.toFixed(2)}
-                    </StatusPill>
-                    {surplus.defaultPocketId ? (
-                      <p>Se preseleccionó el bolsillo por defecto. Podés elegir otro bolsillo activo antes de transferir.</p>
-                    ) : (
-                      <StatusPill tone="warning" className="status-message">
-                        Esta subcategoría no tiene bolsillo por defecto: elegí un bolsillo activo antes de transferir el sobrante.
-                      </StatusPill>
-                    )}
-                  </div>
-
-                  <label className="field">
-                    <span>Bolsillo destino</span>
-                    <select
-                      required={surplus.requiresPocketSelection}
-                      value={surplusPocketIds[surplus.subcategoryId] ?? ""}
-                      onChange={(event) => setSurplusPocketIds((current) => ({ ...current, [surplus.subcategoryId]: event.target.value }))}
-                    >
-                      {renderPocketOptions(surplus)}
-                    </select>
-                  </label>
-
-                  <label className="field small-field">
-                    <span>Monto</span>
-                    <input
-                      max={surplus.amount}
-                      min="0.01"
-                      placeholder={surplus.amount.toFixed(2)}
-                      step="0.01"
-                      type="number"
-                      value={surplusAmounts[surplus.subcategoryId] ?? ""}
-                      onChange={(event) => setSurplusAmounts((current) => ({ ...current, [surplus.subcategoryId]: event.target.value }))}
-                    />
-                  </label>
-
-                  <Button disabled={submitting} type="submit">
-                    Transferir sobrante
-                  </Button>
-                </form>
-              ))}
-            </div>
+          <Card aria-label="Variaciones presupuestarias" className="stack-md">
+            <h2>Variaciones presupuestarias</h2>
+            {review.budgetVariances.length === 0 ? <p>No hay variaciones presupuestarias.</p> : null}
+            {review.budgetVariances.map((variance) => (
+              <div className="budget-line align-start" key={variance.subcategoryId}>
+                <div>
+                  <strong>{variance.subcategoryName}</strong>
+                  <p>Variación presupuestaria: ${variance.amount.toFixed(2)}</p>
+                  <p>Esta variación es informativa y no representa dinero transferible.</p>
+                </div>
+                <StatusPill tone={variance.kind === "DEFICIT" ? "danger" : "warning"}>{variance.kind === "DEFICIT" ? "Desfalco presupuestario" : "Sobrante presupuestario"}</StatusPill>
+              </div>
+            ))}
           </Card>
 
           <Card aria-label="Desfalcos pendientes" className="stack-md">

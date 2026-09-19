@@ -7,6 +7,14 @@ import { DomainError } from "./shared/service-errors.js";
 
 const money = (value: number) => new Prisma.Decimal(value.toFixed(2));
 const createMonthlyCycleTestService = (db: unknown) => createMonthlyCycleModule({ db: db as never }).service;
+const recordUncategorizedExpense = (service: ReturnType<typeof createMonthlyCycleTestService>, monthId: string, amount: number) =>
+  service.recordExpense({
+    monthId,
+    sourceSubcategoryId: null,
+    amount,
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+  });
 
 type TemplateCategoryState = {
   id: string;
@@ -152,6 +160,9 @@ const createIntegrationDb = (
     },
     async $queryRawUnsafe() {
       return [{ exists: false }];
+    },
+    async $queryRaw() {
+      return [];
     },
     templateCategory: {
       async findMany() {
@@ -648,12 +659,8 @@ test("service integration: closed months are immutable", async () => {
     amount: 300,
     receivedAt: "2026-05-05T00:00:00.000Z",
   });
+  await recordUncategorizedExpense(service, month.id, 300);
 
-  await service.applyClosureAction({
-    monthId: month.id,
-    type: "SURPLUS_TO_POCKET_ON_CLOSE",
-    sourceSubcategoryId: subcategoryId,
-  });
   await service.closeMonth(month.id);
 
   await assert.rejects(
@@ -686,11 +693,7 @@ test("service integration: rejects cash withdrawal for closed months", async () 
     amount: 300,
     receivedAt: "2026-05-05T00:00:00.000Z",
   });
-  await service.applyClosureAction({
-    monthId: month.id,
-    type: "SURPLUS_TO_POCKET_ON_CLOSE",
-    sourceSubcategoryId: subcategoryId,
-  });
+  await recordUncategorizedExpense(service, month.id, 300);
   await service.closeMonth(month.id);
 
   await assert.rejects(
@@ -716,11 +719,7 @@ test("service integration: rejects reopening a previously closed month", async (
     amount: 300,
     receivedAt: "2026-05-05T00:00:00.000Z",
   });
-  await service.applyClosureAction({
-    monthId: month.id,
-    type: "SURPLUS_TO_POCKET_ON_CLOSE",
-    sourceSubcategoryId: subcategoryId,
-  });
+  await recordUncategorizedExpense(service, month.id, 300);
   await service.closeMonth(month.id);
 
   await assert.rejects(() => service.openMonth({ year: 2026, month: 5 }), (error: unknown) => {
@@ -778,6 +777,14 @@ test("service integration: closing is rejected while closure review has pending 
   const { db } = createIntegrationDb();
   const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
+
+  await service.recordExpense({
+    monthId: month.id,
+    sourceSubcategoryId: month.categories[0]?.subcategories[0]?.id ?? "",
+    amount: 350,
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    paymentMethod: PaymentMethod.NON_CASH,
+  });
 
   await assert.rejects(() => service.closeMonth(month.id), (error: unknown) => {
     assert.ok(error instanceof DomainError);
@@ -870,7 +877,7 @@ test("service integration: income CRUD rejects closed month mutations", async ()
     receivedAt: "2026-05-05T00:00:00.000Z",
   });
   const incomeId = withIncome.incomes[0]?.id ?? "";
-  await service.applyClosureAction({ monthId: month.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategoryId });
+  await recordUncategorizedExpense(service, month.id, 300);
   const closed = await service.closeMonth(month.id);
 
   await assert.rejects(
@@ -916,7 +923,7 @@ test("service integration: opening next month does not carry forward prior incom
     amount: 300,
     receivedAt: "2026-05-05T00:00:00.000Z",
   });
-  await service.applyClosureAction({ monthId: may.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategoryId });
+  await recordUncategorizedExpense(service, may.id, 300);
   await service.closeMonth(may.id);
 
   const june = await service.openMonth({ year: 2026, month: 6 });
@@ -1232,7 +1239,7 @@ test("service integration: rejects expense corrections for expenses that belong 
   });
   const expenseId = getCapturedMovements()[0]?.id ?? "";
   await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01T00:00:00.000Z" });
-  await service.applyClosureAction({ monthId: may.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategoryId });
+  await recordUncategorizedExpense(service, may.id, 250);
   await service.closeMonth(may.id);
 
   await assert.rejects(
@@ -1275,7 +1282,7 @@ test("service integration: rejects foreign expense ids from another month", asyn
   });
   const expenseId = getCapturedMovements()[0]?.id ?? "";
   await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01T00:00:00.000Z" });
-  await service.applyClosureAction({ monthId: may.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategoryId });
+  await recordUncategorizedExpense(service, may.id, 250);
   await service.closeMonth(may.id);
   const june = await service.openMonth({ year: 2026, month: 6 });
   const juneSubcategoryId = june.categories[0]?.subcategories[0]?.id ?? "";
@@ -1455,7 +1462,7 @@ test("service integration: month structure corrections reject closed months and 
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
   await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01T00:00:00.000Z" });
-  await service.applyClosureAction({ monthId: month.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategoryId });
+  await recordUncategorizedExpense(service, month.id, 300);
   await service.closeMonth(month.id);
 
   await assert.rejects(
@@ -1500,8 +1507,8 @@ test("service integration: filters expense history by payment method, date range
   assert.equal(history.expenses.length, 1);
   assert.equal(history.expenses[0]?.description, "Feria");
   assert.equal(history.expenses[0]?.paymentMethod, PaymentMethod.CASH);
-  assert.equal(history.expenses[0]?.subcategory.id, foodId);
-  assert.equal(history.expenses[0]?.category.name, "Base");
+  assert.equal(history.expenses[0]?.subcategory?.id, foodId);
+  assert.equal(history.expenses[0]?.category?.name, "Base");
 });
 
 test("service integration: opening next month creates cash carryover from latest prior closed month", async () => {

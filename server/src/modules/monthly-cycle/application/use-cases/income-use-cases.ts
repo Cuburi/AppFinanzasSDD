@@ -1,6 +1,6 @@
 import type { CreateMonthlyIncomeInput, MonthView, UpdateMonthlyIncomeInput } from "../../dto/index.js";
 import { mapMonth } from "../../mappers/monthly-cycle-mappers.js";
-import { assertMonthIsMutable } from "../../shared/month-queries.js";
+import { lockMutableMonthForMutation } from "../../shared/month-queries.js";
 import { decimal } from "../../shared/money.js";
 import { DomainError } from "../../shared/service-errors.js";
 import type { MonthRecord, MonthlyIncomeRecord } from "../../shared/service-types.js";
@@ -44,8 +44,7 @@ const assertIncomeBelongsToMonth = (income: MonthlyIncomeRecord | null, monthId:
 export const createIncomeUseCases = (ports: MonthlyCyclePorts): IncomeUseCases => ({
   async createMonthlyIncome(input) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
-      const existingMonth = await txPorts.months.findById(input.monthId);
-      assertMonthIsMutable(existingMonth);
+      const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
       const receivedAt = parseReceivedAt(input.receivedAt);
       assertReceivedAtBelongsToMonth(existingMonth, receivedAt);
 
@@ -65,8 +64,7 @@ export const createIncomeUseCases = (ports: MonthlyCyclePorts): IncomeUseCases =
 
   async updateMonthlyIncome(input) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
-      const existingMonth = await txPorts.months.findById(input.monthId);
-      assertMonthIsMutable(existingMonth);
+      const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
       assertIncomeBelongsToMonth(await txPorts.incomes.findById(input.incomeId), input.monthId);
 
       const updateInput: Parameters<typeof txPorts.incomes.update>[0] = { incomeId: input.incomeId };
@@ -90,8 +88,7 @@ export const createIncomeUseCases = (ports: MonthlyCyclePorts): IncomeUseCases =
 
   async deleteMonthlyIncome(monthId, incomeId) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
-      const existingMonth = await txPorts.months.findById(monthId);
-      assertMonthIsMutable(existingMonth);
+      const existingMonth = await lockMutableMonthForMutation(txPorts.months, monthId);
       assertIncomeBelongsToMonth(await txPorts.incomes.findById(incomeId), monthId);
 
       await txPorts.incomes.delete(incomeId);

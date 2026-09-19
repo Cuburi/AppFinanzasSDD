@@ -4,7 +4,7 @@ import type { DepositToPocketInput, MonthView, RecordExpenseInput, UpdateExpense
 import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
 import { assertOccurredAtWithinMonth, calculateCashBalance } from "../shared/cash-ledger.js";
 import { decimal } from "../shared/money.js";
-import { assertMonthIsMutable, findMonthSubcategory } from "../shared/month-queries.js";
+import { findMonthSubcategory, lockMutableMonthForMutation } from "../shared/month-queries.js";
 import { DomainError } from "../shared/service-errors.js";
 import type { MovementRecord } from "../application/ports/monthly-cycle-ports.js";
 import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflow-dependencies.js";
@@ -40,10 +40,9 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
   return {
     async recordExpense(input: RecordExpenseInput): Promise<MonthView> {
       const month = await ports.transactionRunner.run(async (txPorts) => {
-        const existingMonth = await txPorts.months.findById(input.monthId);
-        assertMonthIsMutable(existingMonth);
+        const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
 
-        if (!findMonthSubcategory(existingMonth, input.sourceSubcategoryId)) {
+        if (input.sourceSubcategoryId && !findMonthSubcategory(existingMonth, input.sourceSubcategoryId)) {
           throw new DomainError(404, "Subcategory was not found in this month.");
         }
 
@@ -77,12 +76,11 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
 
     async updateExpense(input: UpdateExpenseInput): Promise<MonthView> {
       const month = await ports.transactionRunner.run(async (txPorts) => {
-        const existingMonth = await txPorts.months.findById(input.monthId);
-        assertMonthIsMutable(existingMonth);
+        const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
 
         const existingExpense = assertExpenseBelongsToMonth(await txPorts.movements.findById(input.expenseId), input.monthId);
 
-        if (!findMonthSubcategory(existingMonth, input.sourceSubcategoryId)) {
+        if (input.sourceSubcategoryId && !findMonthSubcategory(existingMonth, input.sourceSubcategoryId)) {
           throw new DomainError(404, "Subcategory was not found in this month.");
         }
 
@@ -116,8 +114,7 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
 
     async deleteExpense(monthId: string, expenseId: string): Promise<MonthView> {
       const month = await ports.transactionRunner.run(async (txPorts) => {
-        const existingMonth = await txPorts.months.findById(monthId);
-        assertMonthIsMutable(existingMonth);
+        const existingMonth = await lockMutableMonthForMutation(txPorts.months, monthId);
 
         assertExpenseBelongsToMonth(await txPorts.movements.findById(expenseId), monthId);
 
@@ -136,11 +133,7 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
         }
         await txPorts.pockets.ensurePocketIsActive(input.targetPocketId, "Target pocket");
 
-        const existingMonth = input.monthId ? await txPorts.months.findById(input.monthId) : null;
-
-        if (existingMonth) {
-          assertMonthIsMutable(existingMonth);
-        }
+        const existingMonth = input.monthId ? await lockMutableMonthForMutation(txPorts.months, input.monthId) : null;
 
         if (input.sourceSubcategoryId) {
           if (!existingMonth) {

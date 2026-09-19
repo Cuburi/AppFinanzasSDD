@@ -4,7 +4,7 @@ import { readIsoDateString, readNonEmptyString, readOptionalString, readPositive
 
 export type RecordExpenseInput = {
   monthId: string;
-  sourceSubcategoryId: string;
+  sourceSubcategoryId: string | null;
   amount: number;
   description?: string | null;
   occurredAt: string;
@@ -28,6 +28,7 @@ export type ExpenseHistoryQueryInput = {
   paymentMethod?: PaymentMethod;
   subcategoryId?: string;
   creditCardId?: string;
+  classification?: "UNCATEGORIZED";
 };
 
 const readPaymentMethod = (value: unknown): PaymentMethod => {
@@ -36,6 +37,14 @@ const readPaymentMethod = (value: unknown): PaymentMethod => {
   }
 
   throw new Error("Payment method must be CASH or NON_CASH.");
+};
+
+const readExpenseSubcategoryId = (value: unknown): string | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  return readNonEmptyString(value, "Source subcategory");
 };
 
 export const parseRecordExpenseInput = (monthId: string, payload: unknown): RecordExpenseInput => {
@@ -47,7 +56,7 @@ export const parseRecordExpenseInput = (monthId: string, payload: unknown): Reco
 
   return {
     monthId: readNonEmptyString(monthId, "Month id"),
-    sourceSubcategoryId: readNonEmptyString(rawPayload.sourceSubcategoryId, "Source subcategory"),
+    sourceSubcategoryId: readExpenseSubcategoryId(rawPayload.sourceSubcategoryId),
     amount: readPositiveAmount(rawPayload.amount, "Expense amount"),
     description: readOptionalString(rawPayload.description),
     occurredAt: readIsoDateString(rawPayload.occurredAt, "Expense date"),
@@ -80,6 +89,12 @@ export const parseExpenseHistoryQueryInput = (monthId: string, query: unknown): 
     to: rawQuery.to === undefined ? undefined : readIsoDateString(rawQuery.to, "To date"),
     paymentMethod,
     subcategoryId: rawQuery.subcategoryId === undefined ? undefined : readNonEmptyString(rawQuery.subcategoryId, "Subcategory"),
+    classification: rawQuery.classification === undefined ? undefined : readUncategorizedClassification(rawQuery.classification),
     ...(rawQuery.creditCardId === undefined ? {} : { creditCardId: readNonEmptyString(rawQuery.creditCardId, "Credit card") }),
   };
+};
+
+const readUncategorizedClassification = (value: unknown): "UNCATEGORIZED" => {
+  if (value === "UNCATEGORIZED") return value;
+  throw new Error("Classification must be UNCATEGORIZED.");
 };
