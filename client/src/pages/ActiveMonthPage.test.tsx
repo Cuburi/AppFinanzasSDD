@@ -705,6 +705,20 @@ describe("ActiveMonthPage", () => {
     );
   });
 
+  it("records an uncategorized expense without a synthetic subcategory", async () => {
+    const user = userEvent.setup();
+    render(<ActiveMonthPage />);
+
+    const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
+    if (!expenseForm) throw new Error("Missing expense form.");
+
+    expect(within(expenseForm).getByRole("option", { name: "Uncategorized" })).toBeInTheDocument();
+    await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
+    await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
+
+    await waitFor(() => expect(apiMock.recordExpense).toHaveBeenCalledWith(expect.objectContaining({ sourceSubcategoryId: null })));
+  });
+
   it("keeps a successful expense mutation separate from a failed history refresh", async () => {
     const user = userEvent.setup();
     apiMock.getExpenseHistory.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error("No se pudo consultar el historial."));

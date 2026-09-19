@@ -14,11 +14,20 @@ export type ClosurePendingDeficitView = {
   amount: number;
 };
 
+export type ClosureCategoryVarianceView = {
+  subcategoryId: string;
+  subcategoryName: string;
+  amount: number;
+  kind: "SURPLUS" | "DEFICIT";
+  informational: true;
+};
+
 export type ClosureReviewView = {
   monthId: string;
   status: "ACTIVE" | "CLOSED";
   pendingSurpluses: ClosurePendingSurplusView[];
   pendingDeficits: ClosurePendingDeficitView[];
+  budgetVariances: ClosureCategoryVarianceView[];
   availableMoney: number;
   availableMoneyBlocker: "SURPLUS" | "DEFICIT" | null;
   canClose: boolean;

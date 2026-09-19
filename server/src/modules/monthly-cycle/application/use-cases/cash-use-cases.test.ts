@@ -35,9 +35,15 @@ const month = {
 
 const createCashPorts = () => {
   const calls: unknown[] = [];
+  let lockCalls = 0;
   const txPorts = {
     months: {
       async findById(monthId: string) {
+        calls.push(["tx.months.findById", monthId]);
+        return month;
+      },
+      async lockForMutation(monthId: string) {
+        lockCalls += 1;
         calls.push(["tx.months.findById", monthId]);
         return month;
       },
@@ -77,8 +83,16 @@ const createCashPorts = () => {
     },
   } as unknown as MonthlyCyclePorts;
 
-  return { calls, ports };
+  return { calls, ports, getLockCalls: () => lockCalls };
 };
+
+test("cash withdrawal locks the owning month before evaluating mutable state", async () => {
+  const { ports, getLockCalls } = createCashPorts();
+
+  await createCashUseCases(ports).withdrawCash({ monthId: "month-1", amount: 75, occurredAt: "2026-05-12T00:00:00.000Z" });
+
+  assert.equal(getLockCalls(), 1);
+});
 
 test("cash use cases expose only the cash public surface", () => {
   assert.deepEqual(CASH_USE_CASE_NAMES, ["withdrawCash", "getCashSummary"]);

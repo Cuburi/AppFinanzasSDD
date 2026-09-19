@@ -21,6 +21,7 @@ const report: BasicMonthlyReportView = {
     totalSpentNonCash: 350,
   },
   topSpendingSubcategories: [],
+  uncategorizedSpending: { label: "Uncategorized", amount: 0, cashAmount: 0, nonCashAmount: 0 },
   surplusSubcategories: [],
   deficitSubcategories: [],
 };

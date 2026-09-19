@@ -5,7 +5,7 @@ import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
 import { calculateCashBalance } from "../shared/cash-ledger.js";
 import { decimal } from "../shared/money.js";
 import { decimalToNumber } from "../shared/money.js";
-import { assertMonthIsMutable } from "../shared/month-queries.js";
+import { lockMutableMonthForMutation } from "../shared/month-queries.js";
 import { DomainError } from "../shared/service-errors.js";
 import type { MonthRecord } from "../shared/service-types.js";
 import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflow-dependencies.js";
@@ -92,8 +92,7 @@ export const createMonthLifecycleService = (dependencies: MonthlyCycleWorkflowDe
 
     async closeMonth(monthId: string, buildClosureReview: (month: MonthRecord) => ClosureReviewView): Promise<MonthView> {
       const month = await ports.transactionRunner.run(async (txPorts) => {
-        const existingMonth = await txPorts.months.findById(monthId);
-        assertMonthIsMutable(existingMonth);
+        const existingMonth = await lockMutableMonthForMutation(txPorts.months, monthId);
 
         const review = buildClosureReview(existingMonth);
 
