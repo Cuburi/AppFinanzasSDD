@@ -4,6 +4,7 @@ import express from "express";
 
 import { DebtNotFoundError } from "../application/errors/debt-application-errors.js";
 import { DomainError } from "../domain/debt-errors.js";
+import { createMemoryIdempotencyStore } from "../../../lib/idempotency.js";
 import { createDebtsRouter } from "./debts.routes.js";
 import type { DebtView } from "../shared/types.js";
 
@@ -20,10 +21,10 @@ const openDebt: DebtView = {
   payments: [{ id: "payment-1", amount: 30, paidAt: "2026-05-03T00:00:00.000Z", notes: "Abono" }],
 };
 
-const createTestServer = (service: Parameters<typeof createDebtsRouter>[0]) => {
+const createTestServer = (service: Parameters<typeof createDebtsRouter>[0], idempotencyStore?: ReturnType<typeof createMemoryIdempotencyStore>) => {
   const app = express();
   app.use(express.json());
-  app.use("/api", createDebtsRouter(service));
+  app.use("/api", createDebtsRouter(service, { idempotencyStore }));
 
   return app.listen(0);
 };
@@ -242,6 +243,81 @@ test("createDebtsRouter rejects invalid payment shapes before application execut
     assert.equal(dateResponse.status, 400);
     assert.deepEqual(await dateResponse.json(), { message: "Payment date must be a valid date." });
     assert.equal(paymentCalls, 0);
+  } finally {
+    server.close();
+  }
+});
+
+
+test("createDebtsRouter replays idempotent debt payments without registering twice", async () => {
+  let calls = 0;
+  const paidDebt = { ...openDebt, remainingBalance: 0, status: "PAID" as const };
+  const service = {
+    async listDebts() {
+      throw new Error("Not used in this test.");
+    },
+    async createDebt() {
+      throw new Error("Not used in this test.");
+    },
+    async registerPayment() {
+      calls += 1;
+      return paidDebt;
+    },
+  };
+  const server = createTestServer(service, createMemoryIdempotencyStore());
+
+  try {
+    const init = {
+      method: "POST",
+      headers: { "Idempotency-Key": "payment-key-1" },
+      body: JSON.stringify({ amount: 70, paidAt: "2026-05-04T00:00:00.000Z" }),
+    };
+
+    const first = await request(server, "/api/debts/debt-1/payments", init);
+    const replay = await request(server, "/api/debts/debt-1/payments", init);
+
+    assert.equal(first.status, 201);
+    assert.equal(replay.status, 201);
+    assert.deepEqual(await replay.json(), await first.json());
+    assert.equal(calls, 1);
+  } finally {
+    server.close();
+  }
+});
+
+test("createDebtsRouter rejects reused payment keys with a different body before service execution", async () => {
+  let calls = 0;
+  const service = {
+    async listDebts() {
+      throw new Error("Not used in this test.");
+    },
+    async createDebt() {
+      throw new Error("Not used in this test.");
+    },
+    async registerPayment() {
+      calls += 1;
+      return openDebt;
+    },
+  };
+  const server = createTestServer(service, createMemoryIdempotencyStore());
+
+  try {
+    const headers = { "Idempotency-Key": "payment-key-2" };
+    const first = await request(server, "/api/debts/debt-1/payments", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ amount: 20, paidAt: "2026-05-04T00:00:00.000Z" }),
+    });
+    const conflict = await request(server, "/api/debts/debt-1/payments", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ amount: 25, paidAt: "2026-05-04T00:00:00.000Z" }),
+    });
+
+    assert.equal(first.status, 201);
+    assert.equal(conflict.status, 409);
+    assert.deepEqual(await conflict.json(), { message: "Idempotency-Key was already used for a different request." });
+    assert.equal(calls, 1);
   } finally {
     server.close();
   }

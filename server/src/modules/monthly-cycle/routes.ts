@@ -1,4 +1,6 @@
-import { Router } from "express";
+import { type Request, Router } from "express";
+
+import { runIdempotentCreate, type IdempotencyStore, type StoredIdempotencyResponse } from "../../lib/idempotency.js";
 
 import {
   type BasicMonthlyReportView,
@@ -66,9 +68,16 @@ export type LedgerRouteService = LedgerUseCases;
 
 export type MonthlyCycleRouteService = TemplateRouteService & IncomeRouteService & CashRouteService & ClosureRouteService & ReportsRouteService & ExpenseHistoryRouteService & LifecycleRouteService & MovementRouteService & MonthStructureRouteService & LedgerRouteService;
 
-export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRouteService>) => {
+type CreateMonthlyCycleRouterOptions = {
+  idempotencyStore?: IdempotencyStore;
+};
+
+export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRouteService>, options: CreateMonthlyCycleRouterOptions = {}) => {
   const service = routeService as MonthlyCycleRouteService;
   const router = Router();
+
+  const runCreate = async (request: Request, scope: string, execute: () => Promise<StoredIdempotencyResponse>) =>
+    runIdempotentCreate({ request, scope, store: options.idempotencyStore, execute });
 
   router.get("/template", async (_request, response) => {
     const template = await service.getTemplate();
@@ -111,18 +120,18 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
   });
 
   router.post("/months/:id/expenses", async (request, response) => {
-    try {
-      const payload = parseRecordExpenseInput(request.params.id, request.body);
-      const month = await service.recordExpense(payload);
-      response.status(201).json(month);
-    } catch (error) {
-      if (isDomainError(error)) {
-        response.status(error.statusCode).json({ message: error.message });
-        return;
-      }
+    const result = await runCreate(request, "POST /api/months/:id/expenses", async () => {
+      try {
+        const payload = parseRecordExpenseInput(request.params.id, request.body);
+        const month = await service.recordExpense(payload);
+        return { statusCode: 201, body: month };
+      } catch (error) {
+        if (isDomainError(error)) return { statusCode: error.statusCode, body: { message: error.message } };
 
-      response.status(400).json({ message: readMessage(error) });
-    }
+        return { statusCode: 400, body: { message: readMessage(error) } };
+      }
+    });
+    response.status(result.statusCode).json(result.body);
   });
 
   router.patch("/months/:id/expenses/:expenseId", async (request, response) => {
@@ -293,18 +302,18 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
   });
 
   router.post("/months/:id/cash-withdrawals", async (request, response) => {
-    try {
-      const payload = parseWithdrawCashInput(request.params.id, request.body);
-      const result = await service.withdrawCash(payload);
-      response.status(201).json(result);
-    } catch (error) {
-      if (isDomainError(error)) {
-        response.status(error.statusCode).json({ message: error.message });
-        return;
-      }
+    const result = await runCreate(request, "POST /api/months/:id/cash-withdrawals", async () => {
+      try {
+        const payload = parseWithdrawCashInput(request.params.id, request.body);
+        const body = await service.withdrawCash(payload);
+        return { statusCode: 201, body };
+      } catch (error) {
+        if (isDomainError(error)) return { statusCode: error.statusCode, body: { message: error.message } };
 
-      response.status(400).json({ message: readMessage(error) });
-    }
+        return { statusCode: 400, body: { message: readMessage(error) } };
+      }
+    });
+    response.status(result.statusCode).json(result.body);
   });
 
   router.get("/months/:id/cash", async (request, response) => {
@@ -323,18 +332,18 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
   });
 
   router.post("/months/:id/incomes", async (request, response) => {
-    try {
-      const payload = parseCreateMonthlyIncomeInput(request.params.id, request.body);
-      const month = await service.createMonthlyIncome(payload);
-      response.status(201).json(month);
-    } catch (error) {
-      if (isDomainError(error)) {
-        response.status(error.statusCode).json({ message: error.message });
-        return;
-      }
+    const result = await runCreate(request, "POST /api/months/:id/incomes", async () => {
+      try {
+        const payload = parseCreateMonthlyIncomeInput(request.params.id, request.body);
+        const month = await service.createMonthlyIncome(payload);
+        return { statusCode: 201, body: month };
+      } catch (error) {
+        if (isDomainError(error)) return { statusCode: error.statusCode, body: { message: error.message } };
 
-      response.status(400).json({ message: readMessage(error) });
-    }
+        return { statusCode: 400, body: { message: readMessage(error) } };
+      }
+    });
+    response.status(result.statusCode).json(result.body);
   });
 
   router.patch("/months/:id/incomes/:incomeId", async (request, response) => {
@@ -367,22 +376,19 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
   });
 
   router.post("/pockets/deposits", async (request, response) => {
-    try {
-      const payload = parseDepositToPocketInput(request.body);
-      const month = await service.depositToPocket(payload);
-      response.status(201).json({ month });
-    } catch (error) {
-      if (error instanceof SemanticError) {
-        response.status(error.statusCode).json({ code: error.code, message: error.message });
-        return;
-      }
-      if (isDomainError(error)) {
-        response.status(error.statusCode).json({ message: error.message });
-        return;
-      }
+    const result = await runCreate(request, "POST /api/pockets/deposits", async () => {
+      try {
+        const payload = parseDepositToPocketInput(request.body);
+        const month = await service.depositToPocket(payload);
+        return { statusCode: 201, body: { month } };
+      } catch (error) {
+        if (error instanceof SemanticError) return { statusCode: error.statusCode, body: { code: error.code, message: error.message } };
+        if (isDomainError(error)) return { statusCode: error.statusCode, body: { message: error.message } };
 
-      response.status(400).json({ message: readMessage(error) });
-    }
+        return { statusCode: 400, body: { message: readMessage(error) } };
+      }
+    });
+    response.status(result.statusCode).json(result.body);
   });
 
   router.get("/months/:id/closure-review", async (request, response) => {
@@ -400,18 +406,18 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
   });
 
   router.post("/months/:id/closure-actions", async (request, response) => {
-    try {
-      const payload = parseClosureActionInput(request.params.id, request.body);
-      const review = await service.applyClosureAction(payload);
-      response.status(201).json(review);
-    } catch (error) {
-      if (isDomainError(error)) {
-        response.status(error.statusCode).json({ message: error.message });
-        return;
-      }
+    const result = await runCreate(request, "POST /api/months/:id/closure-actions", async () => {
+      try {
+        const payload = parseClosureActionInput(request.params.id, request.body);
+        const review = await service.applyClosureAction(payload);
+        return { statusCode: 201, body: review };
+      } catch (error) {
+        if (isDomainError(error)) return { statusCode: error.statusCode, body: { message: error.message } };
 
-      response.status(400).json({ message: readMessage(error) });
-    }
+        return { statusCode: 400, body: { message: readMessage(error) } };
+      }
+    });
+    response.status(result.statusCode).json(result.body);
   });
 
   router.post("/months/:id/close", async (request, response) => {

@@ -1,3 +1,4 @@
+import { createPrismaIdempotencyStore, type PrismaIdempotencyDb } from "../../lib/idempotency.js";
 import { prisma } from "../../lib/prisma.js";
 import { createCreateDebtUseCase } from "./application/use-cases/create-debt-use-case.js";
 import { createListDebtsUseCase } from "./application/use-cases/list-debts-use-case.js";
@@ -19,7 +20,7 @@ export const createDebtsModule = (db: PrismaDebtModuleDb = prisma) => {
   };
 
   return {
-    router: createDebtsRouter(service),
+    router: createDebtsRouter(service, { idempotencyStore: createPrismaIdempotencyStore(db as unknown as PrismaIdempotencyDb) }),
     service,
   };
 };
