@@ -1,3 +1,4 @@
+import { createPrismaIdempotencyStore, type PrismaIdempotencyDb } from "../../lib/idempotency.js";
 import { prisma } from "../../lib/prisma.js";
 import { createCashUseCases } from "./application/use-cases/cash-use-cases.js";
 import { createClosureUseCases } from "./application/use-cases/closure-use-cases.js";
@@ -54,7 +55,7 @@ export const createMonthlyCycleModule = (options: CreateMonthlyCycleModuleOption
   };
 
   return {
-    router: createMonthlyCycleRouter(service),
+    router: createMonthlyCycleRouter(service, { idempotencyStore: createPrismaIdempotencyStore((options.db ?? prisma) as unknown as PrismaIdempotencyDb) }),
     service,
   };
 };

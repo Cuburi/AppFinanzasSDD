@@ -87,14 +87,17 @@ describe("pockets api", () => {
 
     expect(fetch).toHaveBeenNthCalledWith(1, "/api/pockets/deposits", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
       body: JSON.stringify({ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-bonus", targetPocketId: "pocket-emergency", amount: 125, occurredAt: "2026-05-12" }),
     });
     expect(fetch).toHaveBeenNthCalledWith(2, "/api/pockets/deposits", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
       body: JSON.stringify({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-emergency", amount: 75, occurredAt: "2026-05-13" }),
     });
+    const firstHeaders = vi.mocked(fetch).mock.calls[0]?.[1]?.headers as Record<string, string>;
+    const secondHeaders = vi.mocked(fetch).mock.calls[1]?.[1]?.headers as Record<string, string>;
+    expect(firstHeaders["Idempotency-Key"]).not.toEqual(secondHeaders["Idempotency-Key"]);
   });
 
   it("serializes a Pockets-only external deposit without month or subcategory fields", async () => {
@@ -112,7 +115,7 @@ describe("pockets api", () => {
 
     expect(fetch).toHaveBeenCalledWith("/api/pockets/deposits", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
       body: JSON.stringify({
         sourceKind: "EXTERNAL",
         targetPocketId: "pocket-emergency",
@@ -219,7 +222,7 @@ describe("monthly cash and expense api", () => {
 
     expect(fetch).toHaveBeenCalledWith("/api/months/month-1/expenses", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
       body: JSON.stringify({
         sourceSubcategoryId: "sub-food",
         amount: 25,
@@ -249,7 +252,7 @@ describe("monthly cash and expense api", () => {
 
     expect(fetch).toHaveBeenCalledWith("/api/months/month-1/expenses", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
       body: JSON.stringify({
         sourceSubcategoryId: "sub-food",
         amount: 25,
@@ -434,7 +437,7 @@ describe("monthly cash and expense api", () => {
 
     expect(fetch).toHaveBeenNthCalledWith(1, "/api/months/month-1/cash-withdrawals", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
       body: JSON.stringify({ amount: 125, occurredAt: "2026-05-10", description: "ATM" }),
     });
     expect(fetch).toHaveBeenNthCalledWith(2, "/api/months/month-1/cash");
@@ -508,5 +511,79 @@ describe("active month api contract", () => {
     await expect(api.getActiveMonth()).resolves.toEqual(expected);
 
     expect(fetch).toHaveBeenCalledWith("/api/months/active");
+  });
+});
+
+
+describe("idempotent financial create headers", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+
+
+  it("uses caller-supplied idempotency keys for scoped financial creates", async () => {
+    const monthPayload = { id: "month-1" };
+    const closurePayload = { monthId: "month-1", status: "ACTIVE", pendingSurpluses: [], pendingDeficits: [], budgetVariances: [], availableMoney: 0, availableMoneyBlocker: null, canClose: true };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ month: monthPayload }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ month: monthPayload }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(closurePayload), { status: 201 }));
+
+    await api.recordExpense({ monthId: "month-1", sourceSubcategoryId: "sub-food", amount: 25, occurredAt: "2026-05-12", paymentMethod: "CASH" }, { idempotencyKey: "expense-retry-key" });
+    await api.withdrawCash({ monthId: "month-1", amount: 50, occurredAt: "2026-05-12" }, { idempotencyKey: "cash-retry-key" });
+    await api.createMonthlyIncome({ monthId: "month-1", sourceName: "Salary", amount: 1000, receivedAt: "2026-05-01" }, { idempotencyKey: "income-retry-key" });
+    await api.depositToPocket({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-1", amount: 25, occurredAt: "2026-05-13" }, { idempotencyKey: "deposit-retry-key" });
+    await api.applyClosureAction({ monthId: "month-1", type: "SURPLUS_TO_POCKET_ON_CLOSE", targetPocketId: "pocket-1", amount: 25 }, { idempotencyKey: "closure-retry-key" });
+
+    expect(vi.mocked(fetch).mock.calls.map(([, init]) => (init?.headers as Record<string, string>)["Idempotency-Key"])).toEqual([
+      "expense-retry-key",
+      "cash-retry-key",
+      "income-retry-key",
+      "deposit-retry-key",
+      "closure-retry-key",
+    ]);
+  });
+
+  it("lets callers reuse the same supplied key after an ambiguous expense failure", async () => {
+    const monthPayload = { id: "month-1" };
+    const input = { monthId: "month-1", sourceSubcategoryId: "sub-food", amount: 25, occurredAt: "2026-05-12", paymentMethod: "CASH" as const };
+    vi.mocked(fetch)
+      .mockRejectedValueOnce(new TypeError("network lost"))
+      .mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 201 }));
+
+    await expect(api.recordExpense(input, { idempotencyKey: "retryable-expense-key" })).rejects.toThrow("network lost");
+    await expect(api.recordExpense(input, { idempotencyKey: "retryable-expense-key" })).resolves.toEqual(monthPayload);
+
+    expect(vi.mocked(fetch).mock.calls.map(([, init]) => (init?.headers as Record<string, string>)["Idempotency-Key"])).toEqual([
+      "retryable-expense-key",
+      "retryable-expense-key",
+    ]);
+  });
+
+  it("sends Idempotency-Key on monthly income and closure action creates", async () => {
+    const monthPayload = { id: "month-1" };
+    const closurePayload = { monthId: "month-1", status: "ACTIVE", pendingSurpluses: [], pendingDeficits: [], budgetVariances: [], availableMoney: 0, availableMoneyBlocker: null, canClose: true };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(monthPayload), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(closurePayload), { status: 201 }));
+
+    await expect(api.createMonthlyIncome({ monthId: "month-1", sourceName: "Salary", amount: 1000, receivedAt: "2026-05-01" })).resolves.toEqual(monthPayload);
+    await expect(api.applyClosureAction({ monthId: "month-1", type: "SURPLUS_TO_POCKET_ON_CLOSE", targetPocketId: "pocket-1", amount: 25 })).resolves.toEqual(closurePayload);
+
+    expect(fetch).toHaveBeenNthCalledWith(1, "/api/months/month-1/incomes", expect.objectContaining({
+      method: "POST",
+      headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
+    }));
+    expect(fetch).toHaveBeenNthCalledWith(2, "/api/months/month-1/closure-actions", expect.objectContaining({
+      method: "POST",
+      headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
+    }));
   });
 });

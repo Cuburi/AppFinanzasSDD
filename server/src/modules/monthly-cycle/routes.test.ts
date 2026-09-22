@@ -4,7 +4,8 @@ import express from "express";
 import type { ErrorRequestHandler } from "express";
 import { PaymentMethod } from "../../lib/prisma-client.js";
 
-import { monthlyCycleRouter } from "./routes.js";
+import { createMemoryIdempotencyStore } from "../../lib/idempotency.js";
+import { createMonthlyCycleRouter, monthlyCycleRouter } from "./routes.js";
 import { DomainError, SemanticError } from "./shared/service-errors.js";
 import type { BasicMonthlyReportView, MonthView, MonthlyLedgerView } from "./dto/index.js";
 
@@ -65,10 +66,10 @@ const month: MonthView = {
   incomes: [],
 };
 
-const createTestServer = (service: Parameters<typeof monthlyCycleRouter>[0]) => {
+const createTestServer = (service: Parameters<typeof monthlyCycleRouter>[0], idempotencyStore?: ReturnType<typeof createMemoryIdempotencyStore>) => {
   const app = express();
   app.use(express.json());
-  app.use("/api", monthlyCycleRouter(service));
+  app.use("/api", createMonthlyCycleRouter(service, { idempotencyStore }));
   const jsonErrorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
     response.status(400).json({ message: error instanceof Error ? error.message : "Invalid request body." });
   };
@@ -1081,6 +1082,101 @@ test("monthlyCycleRouter rejects malformed month structure payloads and blank id
     assert.equal(blankDelete.status, 400);
     assert.deepEqual(await blankDelete.json(), { message: "Month id is required." });
     assert.equal(calls, 0);
+  } finally {
+    server.close();
+  }
+});
+
+
+test("monthlyCycleRouter replays idempotent expense creates without calling the service again", async () => {
+  const calls: unknown[] = [];
+  const server = createTestServer({
+    async recordExpense(input: unknown) {
+      calls.push(input);
+      return { ...month, id: `month-${calls.length}` };
+    },
+  }, createMemoryIdempotencyStore());
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+    const url = `http://127.0.0.1:${address.port}/api/months/month-1/expenses`;
+    const init = {
+      method: "POST",
+      headers: { "content-type": "application/json", "Idempotency-Key": "expense-key-1" },
+      body: JSON.stringify({ sourceSubcategoryId: "sub-market", amount: 125, occurredAt: "2026-05-12T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH }),
+    };
+
+    const first = await fetch(url, init);
+    const replay = await fetch(url, init);
+
+    assert.equal(first.status, 201);
+    assert.equal(replay.status, 201);
+    assert.deepEqual(await replay.json(), await first.json());
+    assert.equal(calls.length, 1);
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter rejects same-key financial creates with a different fingerprint before service execution", async () => {
+  let calls = 0;
+  const server = createTestServer({
+    async depositToPocket() {
+      calls += 1;
+      return month;
+    },
+  }, createMemoryIdempotencyStore());
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+    const url = `http://127.0.0.1:${address.port}/api/pockets/deposits`;
+    const headers = { "content-type": "application/json", "Idempotency-Key": "deposit-key-1" };
+    const first = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    });
+    const conflict = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 80, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    });
+
+    assert.equal(first.status, 201);
+    assert.equal(conflict.status, 409);
+    assert.deepEqual(await conflict.json(), { message: "Idempotency-Key was already used for a different request." });
+    assert.equal(calls, 1);
+  } finally {
+    server.close();
+  }
+});
+
+test("monthlyCycleRouter keeps missing Idempotency-Key compatible for selected creates", async () => {
+  let calls = 0;
+  const server = createTestServer({
+    async createMonthlyIncome() {
+      calls += 1;
+      return { ...month, id: `month-${calls}` };
+    },
+  }, createMemoryIdempotencyStore());
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+    const init = {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sourceName: "Salary", amount: 1000, receivedAt: "2026-05-01T00:00:00.000Z" }),
+    };
+
+    const first = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/incomes`, init);
+    const second = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/incomes`, init);
+
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
+    assert.equal(calls, 2);
   } finally {
     server.close();
   }

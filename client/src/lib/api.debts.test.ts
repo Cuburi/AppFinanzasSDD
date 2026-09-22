@@ -70,9 +70,26 @@ describe("debts api", () => {
     });
     expect(fetch).toHaveBeenNthCalledWith(2, "/api/debts/debt-rent/payments", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
       body: JSON.stringify({ amount: 200000, paidAt: "2026-05-22", notes: "Final payment" }),
     });
+  });
+
+
+
+  it("uses and reuses a caller-supplied idempotency key for debt payments", async () => {
+    const paidDebt = { ...openDebt, remainingBalance: 0, status: "PAID" as const };
+    vi.mocked(fetch)
+      .mockRejectedValueOnce(new TypeError("network lost"))
+      .mockResolvedValueOnce(new Response(JSON.stringify(paidDebt), { status: 201 }));
+
+    await expect(api.registerDebtPayment("debt-rent", { amount: 200000, paidAt: "2026-05-22", notes: "Final payment" }, { idempotencyKey: "debt-payment-retry-key" })).rejects.toThrow("network lost");
+    await expect(api.registerDebtPayment("debt-rent", { amount: 200000, paidAt: "2026-05-22", notes: "Final payment" }, { idempotencyKey: "debt-payment-retry-key" })).resolves.toEqual(paidDebt);
+
+    expect(vi.mocked(fetch).mock.calls.map(([, init]) => (init?.headers as Record<string, string>)["Idempotency-Key"])).toEqual([
+      "debt-payment-retry-key",
+      "debt-payment-retry-key",
+    ]);
   });
 
   it("propagates backend debt validation errors", async () => {
