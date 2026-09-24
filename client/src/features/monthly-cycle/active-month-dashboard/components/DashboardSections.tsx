@@ -47,22 +47,24 @@ export function DashboardOperationalSection({ activityContent, expenseContent, f
     <section aria-label="Panel del mes activo" className="active-month-dashboard dashboard-operational stack-lg">
       <section aria-label="Estado del mes" className="dashboard-context">
         <div>
-          <h1 id="active-month-dashboard-title">{title}</h1>
-          <p className="section-description">Resumen operativo de tus finanzas personales.</p>
+          <p className="eyebrow">Tu dinero, en contexto</p>
+          <h1 id="active-month-dashboard-title">Mes activo</h1>
         </div>
         <div className="dashboard-context-actions">
+          <p className="dashboard-month-selector">{title}</p>
           <StatusPill aria-label={isClosed ? "Mes cerrado" : "Mes abierto"} tone={isClosed ? "neutral" : "success"}>{isClosed ? "Mes cerrado" : "Mes abierto"}</StatusPill>
-          <p className="dashboard-context-meta">Información actual del mes</p>
           {quickActions ? <section aria-label="Acciones rápidas" className="dashboard-quick-actions">{quickActions}</section> : null}
         </div>
       </section>
-      <section aria-label="Tesorería del mes" className="dashboard-runway">
-        {financialContent ? <section aria-label="Resumen financiero">{financialContent}</section> : null}
-        {expenseContent ? <div className="dashboard-expense-slip">{expenseContent}</div> : null}
+      <section aria-label="Tesorería del mes" className="dashboard-runway dashboard-top-grid">
+        {financialContent ? <section aria-label="Resumen financiero" className="dashboard-availability-hero">{financialContent}</section> : null}
         {primaryAction ? <section aria-label="Próxima acción" className="dashboard-actions dashboard-primary-action"><p className="eyebrow">Próxima acción</p>{primaryAction}</section> : null}
       </section>
       {warnings}
-      {activityContent ? <section aria-label="Actividad y contexto" className="dashboard-activity">{activityContent}</section> : null}
+      <section aria-label="Espacio de trabajo del mes" className="dashboard-workspace">
+        {expenseContent ? <div className="dashboard-expense-slip dashboard-expense-capture">{expenseContent}</div> : null}
+        {activityContent ? <section aria-label="Actividad y contexto" className="dashboard-activity">{activityContent}</section> : null}
+      </section>
     </section>
   );
 }

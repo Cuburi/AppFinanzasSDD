@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 
 import { api } from "../lib/api";
 import { Button, Card, StatusPill } from "../components/ui";
@@ -622,14 +623,69 @@ export const ActiveMonthPage = () => {
     }
   };
 
+  const availabilityState = activeMonth?.availableMoney && activeMonth.availableMoney > 0
+    ? { label: "Mes seguro", tone: "success" as const }
+    : activeMonth?.availableMoney && activeMonth.availableMoney < 0
+      ? { label: "Disponible en negativo", tone: "danger" as const }
+      : { label: "Sin disponible", tone: "neutral" as const };
+  const [heroMotionStyle, setHeroMotionStyle] = useState<CSSProperties>({});
+  const handleHeroPointerMove = (event: PointerEvent<HTMLElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - bounds.left) / bounds.width) * 100;
+    const y = ((event.clientY - bounds.top) / bounds.height) * 100;
+    const tiltY = ((x - 50) / 50) * 5;
+    const tiltX = -((y - 50) / 50) * 4;
+
+    setHeroMotionStyle({
+      "--hero-x": `${x}%`,
+      "--hero-y": `${y}%`,
+      "--tilt-x": `${tiltX}deg`,
+      "--tilt-y": `${tiltY}deg`,
+      "--parallax-near-x": `${(x - 50) * 0.18}px`,
+      "--parallax-near-y": `${(y - 50) * 0.18}px`,
+      "--parallax-mid-x": `${(x - 50) * 0.11}px`,
+      "--parallax-mid-y": `${(y - 50) * 0.11}px`,
+      "--parallax-far-x": `${(x - 50) * 0.06}px`,
+      "--parallax-far-y": `${(y - 50) * 0.06}px`,
+    } as CSSProperties);
+  };
+  const resetHeroMotion = () => setHeroMotionStyle({});
+
   const financialSummary = activeMonth ? (
-    <Card aria-label="Resumen financiero del mes" className="financial-summary stack-md">
-      <div aria-label="Disponible del mes" className="financial-primary" role="region">
+    <Card
+      aria-label="Resumen financiero del mes"
+      className="financial-summary hero active-month-hero"
+      onPointerLeave={resetHeroMotion}
+      onPointerMove={handleHeroPointerMove}
+      style={heroMotionStyle}
+    >
+      <span aria-hidden="true" className="financial-hero-depth hero-depth">
+        <svg aria-hidden="true" className="financial-month-pulse hero-pulse" focusable="false" viewBox="0 0 520 220">
+          <defs>
+            <linearGradient id="pulseGradient" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="#6de1c3" stopOpacity="0.18" />
+              <stop offset="48%" stopColor="#6de1c3" stopOpacity="0.88" />
+              <stop offset="100%" stopColor="#d5f576" stopOpacity="0.78" />
+            </linearGradient>
+          </defs>
+          <path className="financial-month-pulse-area pulse-zone" d="M54 150 C126 82 186 176 252 110 C313 50 356 120 438 64 L482 48 L482 190 L54 190 Z" />
+          <path className="financial-month-pulse-track pulse-track" d="M44 150 C112 82 186 176 252 110 C313 50 356 120 438 64 C456 53 470 48 488 44" />
+          <path className="financial-month-pulse-line pulse-line" d="M44 150 C112 82 186 176 252 110 C313 50 356 120 438 64 C456 53 470 48 488 44" />
+          <circle className="financial-month-pulse-dot pulse-dot" cx="252" cy="110" r="5" />
+          <circle className="financial-month-pulse-dot pulse-dot" cx="438" cy="64" r="4" />
+        </svg>
+      </span>
+      <span aria-hidden="true" className="financial-hero-orb financial-hero-orb-a hero-shape hero-shape-a" />
+      <span aria-hidden="true" className="financial-hero-orb financial-hero-orb-b hero-shape hero-shape-b" />
+      <span aria-hidden="true" className="financial-hero-ring hero-shape hero-shape-c" />
+      <div aria-label="Disponible del mes" className="financial-primary hero-copy" role="region">
+        <StatusPill tone={availabilityState.tone}>{availabilityState.label}</StatusPill>
         <p className="eyebrow">Disponible del mes</p>
         <p className="financial-primary-value">{formatCop(activeMonth.availableMoney)}</p>
+        <p className="financial-primary-description">Lo que queda para decidir y mover durante este mes.</p>
         <p className="sr-only">{activeMonth.availableMoney < 0 ? "Tendencia negativa" : "Tendencia positiva"}</p>
       </div>
-      <div className="financial-secondary-metrics">
+      <div className="financial-secondary-metrics hero-metrics">
         <p><span>Ingresos</span><strong>{formatCop(activeMonth.monthlyIncomeTotal)}</strong></p>
         <p>
           <span>Gastado</span>
@@ -643,11 +699,6 @@ export const ActiveMonthPage = () => {
           ) : null}
         </p>
         <p aria-label="Efectivo físico" role="region"><span>Efectivo disponible</span><strong>{formatCop(activeMonth.cashBalance)}</strong><span className="sr-only">{activeMonth.cashBalance < 0 ? "Tendencia negativa" : "Tendencia positiva"}</span></p>
-      </div>
-      <div className="financial-budget">
-        <div className="row between wrap"><span>Presupuesto utilizado</span><strong>{budgetPercent}%</strong></div>
-        <progress aria-label="Presupuesto utilizado" aria-valuemax={100} aria-valuemin={0} aria-valuenow={budgetPercent} max="100" value={budgetPercent}>{budgetPercent}%</progress>
-        <p>{formatCop(spentBudget)} de {formatCop(plannedBudget)}</p>
       </div>
     </Card>
   ) : null;
@@ -702,15 +753,11 @@ export const ActiveMonthPage = () => {
               ? "No se puede editar ni eliminar este gasto hasta que se actualice el historial de gastos del mes."
               : undefined}
           />
-          <section aria-label="Filtros del historial" className="stack-sm">
-            <label className="field"><span>Clasificación del gasto</span><select value={historyClassification} onChange={handleHistoryClassificationChange}><option value="ALL">Todos los gastos</option><option value="UNCATEGORIZED">Uncategorized</option></select></label>
-            {expenseHistory.map((expense) => <p key={expense.id}>{expense.description ?? "Gasto sin descripción"} · {expense.category && expense.subcategory ? `${expense.category.name} / ${expense.subcategory.name}` : "Uncategorized"}</p>)}
-          </section>
           {creditCardLoadError ? <p className="error" role="alert">{creditCardLoadError}</p> : null}
           <section aria-label="Acciones secundarias" className="secondary-action-strip">
             <Button disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("income")} type="button" variant="secondary">Registrar ingreso</Button>
             <Button disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("withdrawal")} type="button" variant="secondary">Retirar efectivo</Button>
-            <Button disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("deposit")} type="button" variant="secondary">Depositar en bolsillo</Button>
+            <Button aria-label="Depositar en bolsillo" disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("deposit")} type="button" variant="secondary">Depositar bolsillo</Button>
           </section>
           {incomeFeedback && secondaryForm !== "income" ? <p className={incomeFeedback.kind} role={incomeFeedback.kind === "error" ? "alert" : "status"}>{incomeFeedback.text}</p> : null}
           {!canMutateActiveMonth ? <p className="error">El mes está cerrado: los movimientos son de solo lectura.</p> : null}

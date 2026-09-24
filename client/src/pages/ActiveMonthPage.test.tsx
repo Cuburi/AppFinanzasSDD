@@ -537,11 +537,20 @@ describe("ActiveMonthPage", () => {
     const financialSurface = await screen.findByRole("region", { name: "Resumen financiero del mes" });
     expect(financialSurface).toHaveTextContent("Disponible del mes");
     expect(financialSurface).toHaveTextContent("$375 COP");
+    expect(financialSurface).toHaveTextContent("Lo que queda para decidir y mover durante este mes.");
+    expect(financialSurface.closest(".active-month-dashboard")).toContainElement(screen.getByRole("region", { name: "Registrar gasto" }));
+    expect(financialSurface.compareDocumentPosition(screen.getByRole("region", { name: "Registrar gasto" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(financialSurface).toHaveTextContent("Ingresos");
     expect(financialSurface).toHaveTextContent("Gastado");
     expect(financialSurface).toHaveTextContent("Efectivo disponible");
-    expect(financialSurface).toHaveTextContent("Presupuesto utilizado");
-    expect(within(financialSurface).getByRole("progressbar", { name: "Presupuesto utilizado" })).toHaveAttribute("aria-valuenow", "0");
+    expect(financialSurface).not.toHaveTextContent("Presupuesto utilizado");
+    expect(within(financialSurface).getByRole("region", { name: "Disponible del mes" })).toHaveClass("financial-primary");
+    expect(within(financialSurface).getByRole("status", { name: "Success: Mes seguro" })).toBeInTheDocument();
+    const heroDepth = financialSurface.querySelector(".financial-hero-depth");
+    expect(heroDepth).toHaveAttribute("aria-hidden", "true");
+    expect(heroDepth?.querySelector(".financial-month-pulse-line")).toBeInTheDocument();
+    expect(heroDepth?.querySelectorAll(".financial-month-pulse-dot")).toHaveLength(2);
+    expect(within(financialSurface).queryByRole("progressbar", { name: "Presupuesto utilizado" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
     expect(screen.getByText("Sueldo")).toBeInTheDocument();
   });
@@ -557,8 +566,8 @@ describe("ActiveMonthPage", () => {
     await screen.findByText("Café");
     const financialSurface = await screen.findByRole("region", { name: "Resumen financiero del mes" });
     expect(financialSurface).toHaveTextContent("Gastado$55 COP");
-    expect(financialSurface).toHaveTextContent("50%");
-    expect(within(financialSurface).getByRole("progressbar", { name: "Presupuesto utilizado" })).toHaveAttribute("aria-valuenow", "50");
+    expect(financialSurface).not.toHaveTextContent("50%");
+    expect(within(financialSurface).queryByRole("progressbar", { name: "Presupuesto utilizado" })).not.toBeInTheDocument();
   });
 
   it("exposes negative monthly balances as semantic risk instead of color-only pills", async () => {
@@ -566,7 +575,9 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    expect(await screen.findByRole("region", { name: "Disponible del mes" })).toHaveTextContent("$-125 COP");
+    const availableBalance = await screen.findByRole("region", { name: "Disponible del mes" });
+    expect(availableBalance).toHaveTextContent("$-125 COP");
+    expect(within(availableBalance).getByRole("status", { name: "Danger: Disponible en negativo" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Efectivo físico" })).toHaveTextContent("$-15 COP");
     expect(screen.getAllByText("Tendencia negativa")).toHaveLength(2);
   });
