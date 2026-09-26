@@ -101,8 +101,8 @@ const activeCreditCards: CreditCardView[] = [
 ];
 
 async function openMonthStructure() {
-  const disclosure = (await screen.findByRole("region", { name: "Estructura del mes" })).querySelector("details");
-  if (!disclosure) throw new Error("Missing month structure disclosure.");
+  const disclosure = (await screen.findByRole("region", { name: "Ajustes del mes" })).querySelector("details");
+  if (!disclosure) throw new Error("Missing month settings disclosure.");
   disclosure.open = true;
   fireEvent(disclosure, new Event("toggle", { bubbles: true }));
   return disclosure;
@@ -227,18 +227,18 @@ describe("ActiveMonthPage", () => {
     expect(screen.queryByText("No se pudo registrar el gasto.")).not.toBeInTheDocument();
   });
 
-  it("keeps Estructura del mes closed by default and exposes the month-only versus template-promotion guidance when expanded", async () => {
+  it("keeps Ajustes del mes closed by default and exposes the month-only versus template-promotion guidance when expanded", async () => {
     render(<ActiveMonthPage />);
 
     await screen.findByRole("region", { name: "Resumen financiero" });
-    const disclosure = screen.getByRole("region", { name: "Estructura del mes" }).querySelector("details");
+    const disclosure = screen.getByRole("region", { name: "Ajustes del mes" }).querySelector("details");
     expect(disclosure).not.toBeNull();
     expect(disclosure).not.toHaveAttribute("open");
-    expect(screen.getByText("Corrige categorías y subcategorías de este mes sin perder de vista la plantilla global.")).toBeInTheDocument();
+    expect(screen.getByText("Mantenimiento puntual de categorías y subcategorías de este mes; no hace parte del registro diario ni cambia la plantilla global.")).toBeInTheDocument();
 
     await openMonthStructure();
     expect(disclosure).toHaveAttribute("open");
-    expect(screen.getByText("Estos cambios corrigen solo la estructura de este mes; no modifican la plantilla global.")).toBeInTheDocument();
+    expect(screen.getByText("Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro.")).toBeInTheDocument();
     expect(screen.getByText(/Antes de promoverlas, marca la copia a plantilla/i)).toBeInTheDocument();
   });
 
@@ -248,8 +248,8 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await screen.findByRole("region", { name: "Resumen financiero" });
-    const disclosure = screen.getByRole("region", { name: "Estructura del mes" }).querySelector("details");
-    if (!disclosure) throw new Error("Missing month structure disclosure.");
+    const disclosure = screen.getByRole("region", { name: "Ajustes del mes" }).querySelector("details");
+    if (!disclosure) throw new Error("Missing month settings disclosure.");
 
     await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos", hidden: true }));
     expect(disclosure).toHaveAttribute("open");
@@ -972,7 +972,7 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await openMonthStructure();
-    expect(await screen.findByText("Estos cambios corrigen solo la estructura de este mes; no modifican la plantilla global.")).toBeInTheDocument();
+    expect(await screen.findByText("Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
     await user.clear(screen.getByLabelText("Nombre categoría"));
@@ -1023,7 +1023,7 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await openMonthStructure();
-    expect(await screen.findByText(/Crea categorías y subcategorías solo en este mes/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Crea categorías y subcategorías solo para este mes/i)).toBeInTheDocument();
     expect(screen.getByText(/Copiar a plantilla también/i)).toBeInTheDocument();
 
     const categoryForm = screen.getByRole("form", { name: "Crear categoría del mes activo" });

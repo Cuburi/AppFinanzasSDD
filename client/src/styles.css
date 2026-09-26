@@ -1759,3 +1759,13 @@ body {
     grid-column: 1;
   }
 }
+
+
+/* Prototype D correction: month settings is maintenance, so it spans the workspace below the daily loop. */
+.month-structure-card {
+  grid-column: 1 / -1;
+}
+
+.month-structure-card .month-structure-disclosure > summary {
+  min-height: 56px;
+}

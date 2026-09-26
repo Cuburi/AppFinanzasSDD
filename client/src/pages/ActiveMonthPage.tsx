@@ -776,17 +776,17 @@ export const ActiveMonthPage = () => {
         </>
       ) : null}
 
-      <Card aria-label="Estructura del mes" className="month-structure-card">
+      <Card aria-label="Ajustes del mes" className="month-structure-card">
         <details className="month-structure-disclosure" onToggle={(event) => setStructureOpen(event.currentTarget.open)} open={structureOpen}>
           <summary>
             <span>
-              <strong>Estructura del mes</strong>
-              <span>Corrige categorías y subcategorías de este mes sin perder de vista la plantilla global.</span>
+              <strong>Ajustes del mes</strong>
+              <span>Mantenimiento puntual de categorías y subcategorías de este mes; no hace parte del registro diario ni cambia la plantilla global.</span>
             </span>
           </summary>
           <div className="month-structure-content stack-md">
             <div className="row between wrap">
-              <h2>Estructura del mes</h2>
+              <h2>Ajustes del mes</h2>
               <Button variant="secondary" onClick={() => void refresh()} type="button">
                 Refrescar
               </Button>
@@ -800,11 +800,11 @@ export const ActiveMonthPage = () => {
               </strong>{" "}
               · estado {activeMonth.status}
             </p>
-            <p>Estos cambios corrigen solo la estructura de este mes; no modifican la plantilla global.</p>
+            <p>Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro.</p>
 
             {canMutateActiveMonth ? (
               <div className="stack-md">
-                <p>Crea categorías y subcategorías solo en este mes. Antes de promoverlas, marca la copia a plantilla únicamente si quieres que aparezcan en próximos meses.</p>
+                <p>Crea categorías y subcategorías solo para este mes. Antes de promoverlas, marca la copia a plantilla únicamente si quieres que aparezcan en próximos meses.</p>
 
                 <form aria-label="Crear categoría del mes activo" className="row gap-sm wrap" onSubmit={handleCreateCategory}>
                   <label className="field">
