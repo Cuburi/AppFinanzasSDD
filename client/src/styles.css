@@ -1769,3 +1769,38 @@ body {
 .month-structure-card .month-structure-disclosure > summary {
   min-height: 56px;
 }
+
+/* RM-027: future-month template is a budget structure, not a flat settings form. */
+.template-structure-page { gap: 28px; max-width: 1160px; }
+.template-structure-header { align-items: end; background: linear-gradient(125deg, rgba(12, 75, 66, .52), rgba(19, 34, 33, .58)); border: 1px solid rgba(109, 225, 195, .24); border-radius: 22px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(15rem, .4fr); overflow: hidden; padding: clamp(24px, 4vw, 36px); position: relative; }
+.template-structure-header::after { background: radial-gradient(circle, rgba(213, 245, 118, .18), transparent 68%); content: ""; height: 22rem; pointer-events: none; position: absolute; right: -8rem; top: -12rem; width: 22rem; }
+.template-structure-header > * { position: relative; z-index: 1; }
+.template-structure-header h1 { color: var(--ww-text); font-size: clamp(29px, 4vw, 44px); letter-spacing: -.05em; line-height: 1.02; margin: 0; }
+.template-structure-header p:not(.eyebrow) { color: #c5d8d1; margin: 10px 0 0; max-width: 46rem; }
+.template-structure-header .template-structure-note { color: var(--ww-lime); font-size: 13px; font-weight: 750; }
+.template-total-kpi { backdrop-filter: blur(10px); background: rgba(8, 24, 23, .34); border: 1px solid rgba(222, 255, 242, .16); border-radius: 15px; display: grid; gap: 4px; padding: 18px; }
+.template-total-kpi span, .template-total-kpi small { color: #b8c9c2; font-size: 12px; }
+.template-total-kpi strong, .template-category-summary strong { color: var(--ww-text); font-size: 25px; font-variant-numeric: tabular-nums lining-nums; letter-spacing: -.04em; line-height: 1.1; }
+.template-structure-form { gap: 18px; }
+.template-category-card { display: grid; gap: 18px; padding: 0; }
+.template-category-header { align-items: end; border-bottom: 1px solid var(--ww-line); display: grid; gap: 14px; grid-template-columns: minmax(14rem, 1fr) auto auto; padding: 20px 22px 17px; }
+.template-category-summary { display: grid; gap: 3px; min-width: 9rem; }
+.template-category-summary span, .template-subcategory-columns { color: var(--ww-muted); font-size: 12px; font-weight: 750; }
+.template-subcategory-list { display: grid; gap: 6px; padding: 0 22px; }
+.template-subcategory-columns, .template-subcategory-row { align-items: center; display: grid; gap: 12px; grid-template-columns: minmax(0, 1.25fr) minmax(10rem, .5fr) minmax(13rem, .8fr) auto; }
+.template-subcategory-columns { letter-spacing: .03em; padding: 0 1px; text-transform: uppercase; }
+.template-subcategory-row { background: rgba(8, 24, 23, .18); border: 1px solid var(--ww-line); border-radius: 12px; padding: 8px; }
+.template-subcategory-row .field { min-width: 0; }
+.template-subcategory-row .field input, .template-subcategory-row .field select { background: #141f1e; min-width: 0; width: 100%; }
+.template-subcategory-row .field-amount input { font-variant-numeric: tabular-nums lining-nums; font-weight: 750; }
+.template-remove-subcategory { min-height: 44px; }
+.template-add-subcategory { justify-self: start; margin: 0 22px 20px; }
+.template-structure-actions { border-top: 1px solid var(--ww-line); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .template-structure-header, .template-category-header { grid-template-columns: 1fr; }
+  .template-total-kpi { width: 100%; }
+  .template-subcategory-columns { display: none; }
+  .template-subcategory-row { gap: 8px; grid-template-columns: 1fr; padding: 12px; }
+  .template-remove-subcategory { justify-self: start; }
+}
