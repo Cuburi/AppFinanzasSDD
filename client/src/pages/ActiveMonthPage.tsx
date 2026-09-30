@@ -705,17 +705,17 @@ export const ActiveMonthPage = () => {
 
   const expenseCapture = activeMonth ? (
     <RegistrationSlip
-      actions={<><Button disabled={submitting || !canMutateActiveMonth} type="submit">{expenseSubmitting ? editingExpenseId ? "Actualizando gasto..." : "Guardando gasto..." : editingExpenseId ? "Actualizar gasto" : "Registrar gasto"}</Button>{editingExpenseId ? <Button variant="secondary" disabled={submitting} onClick={() => resetExpenseForm()} type="button">Cancelar edición de gasto</Button> : null}</>}
+      actions={<><Button disabled={submitting || !canMutateActiveMonth} type="submit">{expenseSubmitting ? editingExpenseId ? "Guardando corrección..." : "Guardando gasto..." : editingExpenseId ? "Guardar corrección" : "Registrar gasto"}</Button>{editingExpenseId ? <Button variant="secondary" disabled={submitting} onClick={() => resetExpenseForm()} type="button">Cancelar corrección</Button> : null}</>}
       feedback={<>{expenseFeedback ? <p className={expenseFeedback.kind} role={expenseFeedback.kind === "error" ? "alert" : "status"}>{expenseFeedback.text}</p> : null}{!canMutateActiveMonth ? <p className="error">El mes está cerrado: los gastos son de solo lectura.</p> : null}</>}
       formClassName="expense-capture-form"
       formId="expense-form"
       mode={editingExpenseId ? "edit" : "create"}
       onSubmit={handleExpense}
       primaryFields={<><label className="field expense-amount-field"><span>Monto</span><input min="0.01" ref={expenseAmountInputRef} step="0.01" type="number" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} required /></label><label className="field expense-subcategory-field"><span>Subcategoría del gasto</span><select value={expenseSubcategoryId} onChange={(event) => setExpenseSubcategoryId(event.target.value)}><option value="">Uncategorized</option>{subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label></>}
-      purpose="Movimiento del mes"
+      purpose={editingExpenseId ? "Corrección del mes" : "Movimiento del mes"}
       slipRef={expenseSlipRef}
       supportingFields={<><label className="field"><span>Fecha del gasto</span><input type="date" value={expenseOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setExpenseOccurredAt(event.target.value)} required /></label><label className="field"><span>Método de pago</span><select value={expensePaymentMethod} onChange={handleExpensePaymentMethodChange} required><option value="NON_CASH">No efectivo</option><option value="CASH">Efectivo</option></select></label><label className="field"><span>Tarjeta de crédito (opcional)</span><select value={expenseCreditCardId} onChange={handleExpenseCreditCardChange}><option value="">Sin tarjeta / efectivo</option>{activeCreditCards.map((card) => <option key={card.id} value={card.id}>{formatCreditCardLabel(card)}</option>)}</select></label><label className="field expense-description-field"><span>Descripción (opcional)</span><input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} /></label></>}
-      title={editingExpenseId ? "Editar gasto" : "Registrar gasto"}
+      title={editingExpenseId ? "Corregir gasto registrado" : "Registrar gasto"}
       variant="primary"
     />
   ) : null;

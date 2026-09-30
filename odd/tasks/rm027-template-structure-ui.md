@@ -37,3 +37,4 @@ Out of scope:
 - `cd client && pnpm exec vitest run src/pages/TemplatePage.test.tsx`: passed after implementation (3 tests).
 - `cd client && pnpm typecheck`: passed.
 - 2026-09-26 parent verification after removing page-to-page formatter coupling: `pnpm --dir client test -- TemplatePage.test.tsx` passed (24 files / 207 tests); `pnpm --dir client typecheck` passed; `git diff --check -- client/src/pages/TemplatePage.tsx client/src/pages/TemplatePage.test.tsx client/src/styles.css odd/tasks/rm027-template-structure-ui.md` passed.
+- 2026-09-30: User validation rejected the experimental Template header 3D treatment, so the header returned to the stable static composition while keeping `max-width: none` so Plantilla expands like Mes activo when zooming out. Verification passed: `pnpm --dir client test -- TemplatePage.test.tsx` (24 files / 207 tests), `pnpm --dir client typecheck`, and `git diff --check -- client/src/styles.css`.

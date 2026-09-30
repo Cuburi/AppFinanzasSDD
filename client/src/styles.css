@@ -1726,7 +1726,7 @@ body {
 
 /* Prototype D correction: workspace cards share the first row; secondary actions span the full width below them. */
 .dashboard-workspace {
-  align-items: stretch;
+  align-items: start;
 }
 
 .dashboard-activity,
@@ -1739,7 +1739,11 @@ body {
   grid-column: 1;
 }
 
-.dashboard-expense-slip > .registration-slip,
+.dashboard-expense-slip > .registration-slip {
+  align-self: start;
+  height: auto;
+}
+
 .monthly-ledger {
   height: 100%;
 }
@@ -1771,7 +1775,7 @@ body {
 }
 
 /* RM-027: future-month template is a budget structure, not a flat settings form. */
-.template-structure-page { gap: 28px; max-width: 1160px; }
+.template-structure-page { gap: 28px; max-width: none; }
 .template-structure-header { align-items: end; background: linear-gradient(125deg, rgba(12, 75, 66, .52), rgba(19, 34, 33, .58)); border: 1px solid rgba(109, 225, 195, .24); border-radius: 22px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(15rem, .4fr); overflow: hidden; padding: clamp(24px, 4vw, 36px); position: relative; }
 .template-structure-header::after { background: radial-gradient(circle, rgba(213, 245, 118, .18), transparent 68%); content: ""; height: 22rem; pointer-events: none; position: absolute; right: -8rem; top: -12rem; width: 22rem; }
 .template-structure-header > * { position: relative; z-index: 1; }

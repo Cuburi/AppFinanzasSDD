@@ -284,7 +284,7 @@ describe("ActiveMonthPage", () => {
     expect(await within(expenseSlip).findByRole("alert")).toHaveTextContent("El monto supera el disponible.");
 
     await user.click(screen.getByRole("button", { name: "Editar gasto Café" }));
-    expect(within(screen.getByRole("region", { name: "Editar gasto" })).getByLabelText("Monto", { selector: "input" })).toHaveFocus();
+    expect(within(screen.getByRole("region", { name: "Corregir gasto registrado" })).getByLabelText("Monto", { selector: "input" })).toHaveFocus();
   });
 
   it("opens the income slip from its secondary action and focuses its first field on edit", async () => {
@@ -811,14 +811,14 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await user.click(await screen.findByRole("button", { name: "Editar gasto Café" }));
-    const expenseForm = screen.getByRole("button", { name: "Actualizar gasto" }).closest("form");
+    const expenseForm = screen.getByRole("button", { name: "Guardar corrección" }).closest("form");
     if (!expenseForm) throw new Error("Missing expense edit form.");
 
     await user.clear(within(expenseForm).getByLabelText("Monto", { selector: "input" }));
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "30");
     await user.clear(within(expenseForm).getByLabelText(/Descripción/));
     await user.type(within(expenseForm).getByLabelText(/Descripción/), "Café corregido");
-    await user.click(within(expenseForm).getByRole("button", { name: "Actualizar gasto" }));
+    await user.click(within(expenseForm).getByRole("button", { name: "Guardar corrección" }));
 
     await waitFor(() =>
       expect(apiMock.updateExpense).toHaveBeenCalledWith({
@@ -853,9 +853,9 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    await user.click(await screen.findByRole("button", { name: "Editar gasto Café" })); const expenseForm = screen.getByRole("button", { name: "Actualizar gasto" }).closest("form");
+    await user.click(await screen.findByRole("button", { name: "Editar gasto Café" })); const expenseForm = screen.getByRole("button", { name: "Guardar corrección" }).closest("form");
     if (!expenseForm) throw new Error("Missing expense edit form.");
-    await user.clear(within(expenseForm).getByLabelText("Monto", { selector: "input" })); await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "30"); await user.click(within(expenseForm).getByRole("button", { name: "Actualizar gasto" }));
+    await user.clear(within(expenseForm).getByLabelText("Monto", { selector: "input" })); await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "30"); await user.click(within(expenseForm).getByRole("button", { name: "Guardar corrección" }));
 
     const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
     expect(await within(ledger).findByText("Café corregido")).toBeInTheDocument();
@@ -1121,8 +1121,8 @@ describe("ActiveMonthPage", () => {
 
     await openMonthStructure();
     await user.click(await screen.findByRole("button", { name: "Editar gasto Café" }));
-    expect(screen.getByRole("button", { name: "Actualizar gasto" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Cancelar edición de gasto" }));
+    expect(screen.getByRole("button", { name: "Guardar corrección" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancelar corrección" }));
     expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
