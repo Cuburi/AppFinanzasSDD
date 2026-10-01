@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import type { EditableTemplate, EditableTemplateCategory, SavingsPocket } from "../types";
 
+const formatCop = (amount: number) => `$${amount < 0 ? "-" : ""}${new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 }).format(Math.abs(amount))} COP`;
+
 const emptyCategory = (): EditableTemplateCategory => ({
   name: "",
   subcategories: [{ name: "", plannedAmount: 0, defaultPocketId: null }],
@@ -154,89 +156,116 @@ export const TemplatePage = () => {
   }
 
   return (
-    <section className="page">
-      <header className="page-header">
+    <section className="page template-structure-page">
+      <header className="template-structure-header">
         <div>
-          <h1>Plantilla presupuestaria</h1>
-          <p>Editás la base que se copia al abrir meses futuros. Los meses ya creados NO cambian.</p>
+          <p className="eyebrow">Base de presupuesto</p>
+          <h1>Estructura para meses futuros</h1>
+          <p>Definí las categorías y montos que se copiarán al abrir cada mes nuevo.</p>
+          <p className="template-structure-note">Los meses ya abiertos no cambian.</p>
         </div>
-        <strong>Total planificado: ${totalPlanned.toFixed(2)}</strong>
+        <section aria-label="Plan total de próximos meses" className="template-total-kpi">
+          <span>Plan total</span>
+          <strong>{formatCop(totalPlanned)}</strong>
+          <small>Distribuido entre tus categorías</small>
+        </section>
       </header>
 
-      <form className="stack-lg" onSubmit={handleSubmit}>
-        {template.categories.map((category, categoryIndex) => (
-          <article className="card stack-md" key={`category-${categoryIndex}`}>
-            <div className="row between align-start">
-              <label className="field grow">
-                <span>Categoría</span>
-                <input
-                  value={category.name}
-                  onChange={(event) => updateCategoryName(categoryIndex, event.target.value)}
-                  placeholder="Ej: Hogar"
-                />
-              </label>
+      <form className="stack-lg template-structure-form" onSubmit={handleSubmit}>
+        {template.categories.map((category, categoryIndex) => {
+          const categoryTotal = category.subcategories.reduce(
+            (subtotal, subcategory) => subtotal + Number(subcategory.plannedAmount || 0),
+            0,
+          );
 
-              <button className="button secondary" type="button" onClick={() => removeCategory(categoryIndex)}>
-                Eliminar categoría
-              </button>
-            </div>
+          return (
+            <article aria-label={`Categoría ${category.name || categoryIndex + 1}`} className="card template-category-card" key={`category-${categoryIndex}`}>
+              <header className="template-category-header">
+                <label className="field grow">
+                  <span>Categoría</span>
+                  <input
+                    value={category.name}
+                    onChange={(event) => updateCategoryName(categoryIndex, event.target.value)}
+                    placeholder="Ej: Hogar"
+                  />
+                </label>
 
-            <div className="stack-sm">
-              {category.subcategories.map((subcategory, subcategoryIndex) => (
-                <div className="grid-subcategory" key={`subcategory-${categoryIndex}-${subcategoryIndex}`}>
-                  <label className="field">
-                    <span>Subcategoría</span>
-                    <input
-                      value={subcategory.name}
-                      onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "name", event.target.value)}
-                      placeholder="Ej: Supermercado"
-                    />
-                  </label>
-
-                  <label className="field field-amount">
-                    <span>Monto planificado</span>
-                    <input
-                      min="0"
-                      step="0.01"
-                      type="number"
-                      value={subcategory.plannedAmount}
-                      onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "plannedAmount", event.target.value)}
-                    />
-                  </label>
-
-                  <label className="field">
-                    <span>Bolsillo por defecto (opcional)</span>
-                    <select
-                      value={subcategory.defaultPocketId ?? ""}
-                      onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "defaultPocketId", event.target.value)}
-                    >
-                      <option value="">Sin bolsillo por defecto</option>
-                      {activePockets.map((pocket) => (
-                        <option key={pocket.id} value={pocket.id}>
-                          {pocket.name} (${pocket.balance.toFixed(2)})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <button
-                    className="button tertiary"
-                    type="button"
-                    onClick={() => removeSubcategory(categoryIndex, subcategoryIndex)}
-                  >
-                    Quitar
-                  </button>
+                <div className="template-category-summary">
+                  <span>Subtotal de {category.name || "la categoría"}</span>
+                  <strong>{formatCop(categoryTotal)}</strong>
                 </div>
-              ))}
-            </div>
 
-            <button className="button tertiary" type="button" onClick={() => addSubcategory(categoryIndex)}>
-              Agregar subcategoría
-            </button>
-          </article>
-        ))}
+                <button className="button tertiary" type="button" onClick={() => removeCategory(categoryIndex)}>
+                  Eliminar categoría
+                </button>
+              </header>
 
-        <div className="row gap-sm">
+              <div className="template-subcategory-list">
+                <div aria-hidden="true" className="template-subcategory-columns">
+                  <span>Subcategoría</span>
+                  <span>Monto planificado</span>
+                  <span>Bolsillo por defecto</span>
+                </div>
+                {category.subcategories.map((subcategory, subcategoryIndex) => (
+                  <div className="template-subcategory-row" key={`subcategory-${categoryIndex}-${subcategoryIndex}`}>
+                    <label className="field">
+                      <span className="sr-only">Subcategoría</span>
+                      <input
+                        aria-label={`Subcategoría ${subcategory.name || subcategoryIndex + 1}`}
+                        value={subcategory.name}
+                        onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "name", event.target.value)}
+                        placeholder="Ej: Supermercado"
+                      />
+                    </label>
+
+                    <label className="field field-amount">
+                      <span className="sr-only">Monto planificado</span>
+                      <input
+                        aria-label={`Monto planificado de ${subcategory.name || subcategoryIndex + 1}`}
+                        min="0"
+                        step="0.01"
+                        type="number"
+                        value={subcategory.plannedAmount}
+                        onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "plannedAmount", event.target.value)}
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span className="sr-only">Bolsillo por defecto (opcional)</span>
+                      <select
+                        aria-label="Bolsillo por defecto (opcional)"
+                        value={subcategory.defaultPocketId ?? ""}
+                        onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "defaultPocketId", event.target.value)}
+                      >
+                        <option value="">Sin bolsillo por defecto</option>
+                        {activePockets.map((pocket) => (
+                          <option key={pocket.id} value={pocket.id}>
+                            {pocket.name} ({formatCop(pocket.balance)})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <button
+                      aria-label={`Quitar subcategoría ${subcategory.name || subcategoryIndex + 1}`}
+                      className="button tertiary template-remove-subcategory"
+                      type="button"
+                      onClick={() => removeSubcategory(categoryIndex, subcategoryIndex)}
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button className="button tertiary template-add-subcategory" type="button" onClick={() => addSubcategory(categoryIndex)}>
+                Agregar subcategoría
+              </button>
+            </article>
+          );
+        })}
+
+        <div className="row gap-sm template-structure-actions">
           <button className="button secondary" type="button" onClick={addCategory}>
             Agregar categoría
           </button>

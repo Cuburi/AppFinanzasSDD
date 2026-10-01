@@ -66,6 +66,16 @@ describe("TemplatePage", () => {
     }));
   });
 
+  it("presents the template as a future-month budget hierarchy with planned totals", async () => {
+    render(<TemplatePage />);
+
+    expect(await screen.findByRole("heading", { name: "Estructura para meses futuros" })).toBeInTheDocument();
+    expect(screen.getByText("Los meses ya abiertos no cambian.")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Plan total de próximos meses" })).toHaveTextContent("$300 COP");
+    expect(screen.getByRole("article", { name: "Categoría Hogar" })).toHaveTextContent("Subtotal de Hogar$300 COP");
+    expect(screen.getByLabelText("Subcategoría Supermercado")).toHaveValue("Supermercado");
+  });
+
   it("keeps the default pocket optional and saves an empty selection as no default", async () => {
     const user = userEvent.setup();
 
@@ -97,7 +107,7 @@ describe("TemplatePage", () => {
 
     await user.selectOptions(await screen.findByLabelText("Bolsillo por defecto (opcional)"), "pocket-food");
 
-    expect(screen.getByRole("option", { name: "Comida ($75.00)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Comida ($75 COP)" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Guardar plantilla" }));
 
