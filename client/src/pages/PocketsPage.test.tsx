@@ -233,6 +233,7 @@ describe("PocketsPage", () => {
         goalAmount: 500,
       }),
     );
+    expect(apiMock.depositExternalToPocket).not.toHaveBeenCalled();
 
     const emergencyCard = screen.getByText("Emergencias").closest("article");
     if (!emergencyCard) throw new Error("Missing pocket card.");
@@ -254,6 +255,56 @@ describe("PocketsPage", () => {
 
     await waitFor(() => expect(apiMock.deactivatePocket).toHaveBeenCalledWith("pocket-emergency"));
     expect(await screen.findByText("Bolsillo desactivado; queda disponible para historial."));
+  });
+
+  it("creates a pocket with an initial balance, deposits it, and refreshes the displayed balance", async () => {
+    const user = userEvent.setup();
+    const createdPocket = { ...emergencyPocket, id: "pocket-new", name: "Impuestos", balance: 0 };
+    const refreshedPocket = { ...createdPocket, balance: 125 };
+    apiMock.createPocket.mockResolvedValue(createdPocket);
+    apiMock.depositExternalToPocket.mockResolvedValue(null);
+    apiMock.getPockets.mockResolvedValueOnce([emergencyPocket]).mockResolvedValueOnce([refreshedPocket, emergencyPocket]);
+
+    render(<PocketsPage />);
+
+    await screen.findByText("Emergencias");
+    await user.type(screen.getByLabelText("Nombre del bolsillo"), "Impuestos");
+    await user.type(screen.getByLabelText("Saldo inicial"), "125");
+    await user.click(screen.getByRole("button", { name: "Crear bolsillo" }));
+
+    await waitFor(() =>
+      expect(apiMock.depositExternalToPocket).toHaveBeenCalledWith({
+        sourceKind: "EXTERNAL",
+        targetPocketId: "pocket-new",
+        amount: 125,
+        occurredAt: localCalendarDate(new Date()),
+        externalSourceLabel: "Saldo inicial",
+      }),
+    );
+    expect(apiMock.createPocket.mock.invocationCallOrder[0]).toBeLessThan(apiMock.depositExternalToPocket.mock.invocationCallOrder[0]);
+    expect(apiMock.depositExternalToPocket.mock.invocationCallOrder[0]).toBeLessThan(apiMock.getPockets.mock.invocationCallOrder[1]);
+    expect(await screen.findByText("Balance: $125.00")).toBeInTheDocument();
+    expect(screen.getByText("Bolsillo creado con saldo inicial.")).toBeInTheDocument();
+  });
+
+  it("reports partial success when the initial balance deposit fails", async () => {
+    const user = userEvent.setup();
+    apiMock.createPocket.mockResolvedValue({ ...emergencyPocket, id: "pocket-new", name: "Impuestos", balance: 0 });
+    apiMock.depositExternalToPocket.mockRejectedValue(new Error("Deposit unavailable."));
+
+    render(<PocketsPage />);
+
+    await screen.findByText("Emergencias");
+    await user.type(screen.getByLabelText("Nombre del bolsillo"), "Impuestos");
+    await user.type(screen.getByLabelText("Saldo inicial"), "125");
+    await user.click(screen.getByRole("button", { name: "Crear bolsillo" }));
+
+    expect(await screen.findByText("Bolsillo creado como activo, pero no se pudo registrar el saldo inicial.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("El bolsillo fue creado, pero no se pudo registrar el saldo inicial.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Deposit unavailable.");
+    expect(apiMock.getPockets).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Nombre del bolsillo")).toHaveValue("");
+    expect(screen.getByLabelText("Saldo inicial")).toHaveValue(null);
   });
 
   it("removes a deactivated pocket from the active-only list immediately", async () => {
