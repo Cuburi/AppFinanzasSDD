@@ -48,6 +48,7 @@ export const PocketsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [newPocketName, setNewPocketName] = useState("");
   const [newPocketGoal, setNewPocketGoal] = useState("");
+  const [newPocketInitialBalance, setNewPocketInitialBalance] = useState("");
   const [editNames, setEditNames] = useState<Record<string, string>>({});
   const [editGoals, setEditGoals] = useState<Record<string, string>>({});
   const [externalPocketId, setExternalPocketId] = useState("");
@@ -105,6 +106,13 @@ export const PocketsPage = () => {
 
   const createPocket = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const initialBalance = parseOptionalAmount(newPocketInitialBalance);
+
+    if (initialBalance !== null && (!Number.isFinite(initialBalance) || initialBalance < 0)) {
+      setError("El saldo inicial debe ser un número mayor o igual a cero.");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     setMessage(null);
@@ -119,7 +127,36 @@ export const PocketsPage = () => {
       setEditGoals((current) => ({ ...current, [createdPocket.id]: createdPocket.goalAmount?.toString() ?? "" }));
       setNewPocketName("");
       setNewPocketGoal("");
-      setMessage("Bolsillo creado como activo.");
+      setNewPocketInitialBalance("");
+
+      if (!initialBalance) {
+        setMessage("Bolsillo creado como activo.");
+        return;
+      }
+
+      try {
+        await api.depositExternalToPocket({
+          sourceKind: "EXTERNAL",
+          targetPocketId: createdPocket.id,
+          amount: initialBalance,
+          occurredAt: localCalendarDate(),
+          externalSourceLabel: "Saldo inicial",
+        });
+      } catch (depositError) {
+        const detail = depositError instanceof Error ? ` ${depositError.message}` : "";
+        setMessage("Bolsillo creado como activo, pero no se pudo registrar el saldo inicial.");
+        setError(`El bolsillo fue creado, pero no se pudo registrar el saldo inicial.${detail}`);
+        return;
+      }
+
+      try {
+        await loadPockets(filter);
+        setMessage("Bolsillo creado con saldo inicial.");
+      } catch (refreshError) {
+        const detail = refreshError instanceof Error ? ` ${refreshError.message}` : "";
+        setMessage("Bolsillo creado y saldo inicial registrado.");
+        setError(`El bolsillo fue creado y el saldo inicial se registró, pero no se pudieron actualizar los bolsillos.${detail}`);
+      }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo crear el bolsillo.");
     } finally {
@@ -217,6 +254,10 @@ export const PocketsPage = () => {
           <label className="field small-field">
             <span>Meta opcional</span>
             <input min="0" step="0.01" type="number" value={newPocketGoal} onChange={(event) => setNewPocketGoal(event.target.value)} />
+          </label>
+          <label className="field small-field">
+            <span>Saldo inicial</span>
+            <input min="0" step="0.01" type="number" value={newPocketInitialBalance} onChange={(event) => setNewPocketInitialBalance(event.target.value)} />
           </label>
           <Button disabled={submitting} type="submit">
             Crear bolsillo
