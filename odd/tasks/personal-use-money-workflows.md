@@ -32,7 +32,7 @@ Stabilize the highest-impact personal production frictions in one PR while keepi
 - [x] Fix Active Month registration/recent-movements layout and commit it.
 - [x] Normalize affected money/number inputs and COP formatting and commit it.
 - [x] Add pocket external deposit and withdrawal/spend flow and commit it.
-- [ ] Run full focused checks, native review/fallback if needed, and prepare PR.
+- [x] Run full focused checks, native review/fallback if needed, and prepare PR.
 
 ## Acceptance checks
 
@@ -60,3 +60,7 @@ Stabilize the highest-impact personal production frictions in one PR while keepi
 - First independent verifier found a production blocker: `withdrawFromPocket` was missing from service composition; fixed in `monthly-cycle-service-contract.ts` and covered by `monthly-cycle-service-contract.test.ts`.
 - Focused pocket checks passed: server movement/routes/service-contract tests (48 tests), client API/Pockets/recent-movements tests (43 tests), server/client typecheck, and `git diff --check`.
 - Native assessment was unassessable after adding the new service-contract test file; independent verifier rechecked the blocker fix and passed static review.
+- Commit `c0dcd39` — `feat(pockets): add withdrawal movements`.
+- Final verification passed conditionally: clean branch, client tests (25 files, 224 tests), client typecheck, server typecheck, focused server tests (48 tests), and `git diff --check` passed.
+- Full `pnpm --dir server test` is environment-blocked: 308 passed, 19 integration tests failed because the dev PostgreSQL profile is required.
+- Native review inspect found an empty workspace candidate because the work is committed; explicit committed-range START failed with `schema-incompatible`, so native review was unavailable for this candidate and fallback independent verification was used.
