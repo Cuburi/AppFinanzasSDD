@@ -156,6 +156,42 @@ describe("credit cards api", () => {
     expect(fetch).toHaveBeenCalledWith("/api/credit-cards?active=all");
   });
 
+  it("serializes credit-card management mutations with explicit endpoint contracts", async () => {
+    const card = {
+      id: "card-1",
+      ownerId: "owner-1",
+      issuer: "Visa",
+      name: "Main",
+      limit: 2500,
+      closingDay: 20,
+      dueDay: 28,
+      active: true,
+    };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(card), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...card, name: "Primary" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...card, active: false }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...card, active: true }), { status: 200 }));
+
+    await expect(api.createCreditCard({ issuer: "Visa", name: "Main", limit: 2500, closingDay: 20, dueDay: 28 })).resolves.toEqual(card);
+    await expect(api.updateCreditCard("card-1", { name: "Primary", limit: null })).resolves.toMatchObject({ name: "Primary" });
+    await expect(api.inactivateCreditCard("card-1")).resolves.toMatchObject({ active: false });
+    await expect(api.activateCreditCard("card-1")).resolves.toMatchObject({ active: true });
+
+    expect(fetch).toHaveBeenNthCalledWith(1, "/api/credit-cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ issuer: "Visa", name: "Main", limit: 2500, closingDay: 20, dueDay: 28 }),
+    });
+    expect(fetch).toHaveBeenNthCalledWith(2, "/api/credit-cards/card-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Primary", limit: null }),
+    });
+    expect(fetch).toHaveBeenNthCalledWith(3, "/api/credit-cards/card-1/inactivate", { method: "PATCH" });
+    expect(fetch).toHaveBeenNthCalledWith(4, "/api/credit-cards/card-1/activate", { method: "PATCH" });
+  });
+
   it("preserves backend-owned statement buckets without client classification", async () => {
     const statementPayload = {
       estimation: "APP_ESTIMATED",
