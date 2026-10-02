@@ -31,7 +31,7 @@ Stabilize the highest-impact personal production frictions in one PR while keepi
 - [x] Explore current layout, money formatting, and pocket movement contracts.
 - [x] Fix Active Month registration/recent-movements layout and commit it.
 - [x] Normalize affected money/number inputs and COP formatting and commit it.
-- [ ] Add pocket external deposit and withdrawal/spend flow and commit it.
+- [x] Add pocket external deposit and withdrawal/spend flow and commit it.
 - [ ] Run full focused checks, native review/fallback if needed, and prepare PR.
 
 ## Acceptance checks
@@ -55,3 +55,8 @@ Stabilize the highest-impact personal production frictions in one PR while keepi
 - Writer verification: focused money/page tests passed (84 tests), `pnpm --dir client typecheck` passed, `git diff --check` passed.
 - Native assessment was unassessable because current untracked helper/test files require explicit declaration; per ASSESS plan, independent verifier ran.
 - Independent verifier passed: focused tests (84 tests) and `pnpm --dir client typecheck` passed.
+- Commit `5b488bf` — `feat(money): normalize COP inputs`.
+- Pocket movement flow added `POST /api/pockets/withdrawals`, source pocket active/balance validation, client API/UI, and recent movement copy.
+- First independent verifier found a production blocker: `withdrawFromPocket` was missing from service composition; fixed in `monthly-cycle-service-contract.ts` and covered by `monthly-cycle-service-contract.test.ts`.
+- Focused pocket checks passed: server movement/routes/service-contract tests (48 tests), client API/Pockets/recent-movements tests (43 tests), server/client typecheck, and `git diff --check`.
+- Native assessment was unassessable after adding the new service-contract test file; independent verifier rechecked the blocker fix and passed static review.

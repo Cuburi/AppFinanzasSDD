@@ -11,6 +11,7 @@ const apiMock = vi.hoisted(() => ({
   updatePocket: vi.fn(),
   deactivatePocket: vi.fn(),
   depositExternalToPocket: vi.fn(),
+  withdrawFromPocket: vi.fn(),
 }));
 
 vi.mock("../lib/api", () => ({
@@ -155,6 +156,33 @@ describe("PocketsPage", () => {
       }),
     );
     expect(await screen.findByText("Balance: $375 COP")).toBeInTheDocument();
+  });
+
+  it("submits a pocket withdrawal and refreshes the displayed balance", async () => {
+    const user = userEvent.setup();
+    apiMock.withdrawFromPocket.mockResolvedValue(null);
+    apiMock.getPockets
+      .mockResolvedValueOnce([emergencyPocket])
+      .mockResolvedValueOnce([{ ...emergencyPocket, balance: 175 }]);
+
+    render(<PocketsPage />);
+
+    await screen.findByText("Emergencias");
+    await user.selectOptions(screen.getByLabelText("Bolsillo de origen"), "pocket-emergency");
+    await user.type(screen.getByLabelText("Monto del retiro o gasto"), "75");
+    await user.clear(screen.getByLabelText("Fecha del retiro o gasto"));
+    await user.type(screen.getByLabelText("Fecha del retiro o gasto"), "2026-05-14");
+    await user.type(screen.getByLabelText("Descripción (opcional)"), "Groceries");
+    await user.click(screen.getByRole("button", { name: "Registrar retiro o gasto" }));
+
+    await waitFor(() => expect(apiMock.withdrawFromPocket).toHaveBeenCalledWith({
+      sourcePocketId: "pocket-emergency",
+      amount: 75,
+      occurredAt: "2026-05-14",
+      description: "Groceries",
+    }));
+    expect(await screen.findByText("Balance: $175 COP")).toBeInTheDocument();
+    expect(screen.getByText("Retiro o gasto del bolsillo registrado.")).toBeInTheDocument();
   });
 
   it("keeps the persisted external deposit successful when its refresh fails", async () => {

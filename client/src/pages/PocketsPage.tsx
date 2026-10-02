@@ -56,6 +56,10 @@ export const PocketsPage = () => {
   const [externalAmount, setExternalAmount] = useState("");
   const [externalOccurredAt, setExternalOccurredAt] = useState(localCalendarDate);
   const [externalSourceLabel, setExternalSourceLabel] = useState("");
+  const [withdrawalPocketId, setWithdrawalPocketId] = useState("");
+  const [withdrawalAmount, setWithdrawalAmount] = useState("");
+  const [withdrawalOccurredAt, setWithdrawalOccurredAt] = useState(localCalendarDate);
+  const [withdrawalDescription, setWithdrawalDescription] = useState("");
 
   const loadPockets = async (nextFilter: PocketListFilter = filter) => {
     const nextPockets = await api.getPockets(nextFilter);
@@ -241,6 +245,40 @@ export const PocketsPage = () => {
     }
   };
 
+  const registerPocketWithdrawal = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await api.withdrawFromPocket({
+        sourcePocketId: withdrawalPocketId,
+        amount: parseAmountInput(withdrawalAmount),
+        occurredAt: withdrawalOccurredAt,
+        ...(withdrawalDescription.trim() ? { description: withdrawalDescription.trim() } : {}),
+      });
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo registrar el retiro del bolsillo.");
+      setSubmitting(false);
+      return;
+    }
+
+    setWithdrawalPocketId("");
+    setWithdrawalAmount("");
+    setWithdrawalDescription("");
+    setMessage("Retiro o gasto del bolsillo registrado.");
+
+    try {
+      await loadPockets(filter);
+    } catch (refreshError) {
+      const detail = refreshError instanceof Error ? ` ${refreshError.message}` : "";
+      setError(`El retiro o gasto se registró, pero no se pudieron actualizar los bolsillos.${detail}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <section className="page stack-lg">
       <SectionHeader title="Bolsillos" description="Gestioná bolsillos activos e inactivos sin borrar el historial de movimientos." />
@@ -290,6 +328,33 @@ export const PocketsPage = () => {
             <input disabled={submitting} value={externalSourceLabel} onChange={(event) => setExternalSourceLabel(event.target.value)} />
           </label>
           <Button disabled={loading || submitting || pockets.filter((pocket) => pocket.active).length === 0} type="submit">Registrar ingreso externo</Button>
+        </form>
+      </Card>
+
+      <Card aria-label="Registrar retiro o gasto" className="stack-md">
+        <h2>Registrar retiro o gasto</h2>
+        <p>Este movimiento descuenta el saldo del bolsillo sin afectar el mes.</p>
+        <form className="row gap-sm wrap" onSubmit={registerPocketWithdrawal}>
+          <label className="field">
+            <span>Bolsillo de origen</span>
+            <select disabled={loading || submitting} value={withdrawalPocketId} onChange={(event) => setWithdrawalPocketId(event.target.value)} required>
+              <option value="">Seleccioná un bolsillo activo</option>
+              {pockets.filter((pocket) => pocket.active).map((pocket) => <option key={pocket.id} value={pocket.id}>{pocket.name} ({formatMoney(pocket.balance)})</option>)}
+            </select>
+          </label>
+          <label className="field small-field">
+            <span>Monto del retiro o gasto</span>
+            <input disabled={submitting} min="0.01" step="0.01" type="number" value={withdrawalAmount} onChange={(event) => setWithdrawalAmount(normalizeAmountInput(event.target.value))} required />
+          </label>
+          <label className="field small-field">
+            <span>Fecha del retiro o gasto</span>
+            <input disabled={submitting} type="date" value={withdrawalOccurredAt} onChange={(event) => setWithdrawalOccurredAt(event.target.value)} required />
+          </label>
+          <label className="field">
+            <span>Descripción (opcional)</span>
+            <input disabled={submitting} value={withdrawalDescription} onChange={(event) => setWithdrawalDescription(event.target.value)} />
+          </label>
+          <Button disabled={loading || submitting || pockets.filter((pocket) => pocket.active).length === 0} type="submit">Registrar retiro o gasto</Button>
         </form>
       </Card>
 

@@ -1,4 +1,4 @@
-import type { DepositToPocketInput, MonthView, RecordExpenseInput, UpdateExpenseInput } from "../../dto/index.js";
+import type { DepositToPocketInput, MonthView, RecordExpenseInput, UpdateExpenseInput, WithdrawFromPocketInput } from "../../dto/index.js";
 import { calculateMonthBalances } from "../../balance-calculator.js";
 import { mapMonth } from "../../mappers/monthly-cycle-mappers.js";
 import { assertOccurredAtWithinMonth } from "../../shared/cash-ledger.js";
@@ -9,13 +9,14 @@ import { MonthStatus, MovementType } from "../monthly-cycle-types.js";
 import { createMovementService } from "../../workflows/movement-service.js";
 import type { MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 
-export const MOVEMENT_USE_CASE_NAMES = ["recordExpense", "updateExpense", "deleteExpense", "depositToPocket"] as const;
+export const MOVEMENT_USE_CASE_NAMES = ["recordExpense", "updateExpense", "deleteExpense", "depositToPocket", "withdrawFromPocket"] as const;
 
 export type MovementUseCases = {
   recordExpense(input: RecordExpenseInput): Promise<MonthView>;
   updateExpense(input: UpdateExpenseInput): Promise<MonthView>;
   deleteExpense(monthId: string, expenseId: string): Promise<MonthView>;
   depositToPocket(input: DepositToPocketInput): Promise<MonthView | null>;
+  withdrawFromPocket(input: WithdrawFromPocketInput): Promise<null>;
 };
 
 export type StrictDepositToPocketInput = DepositToPocketInput;
@@ -70,7 +71,34 @@ export const createStrictDepositToPocketUseCase = (ports: MonthlyCyclePorts) => 
   return month ? mapMonth(month) : null;
 };
 
+export const createWithdrawFromPocketUseCase = (ports: MonthlyCyclePorts) => async (input: WithdrawFromPocketInput): Promise<null> => {
+  const amount = roundMoney(input.amount);
+  if (!Number.isFinite(amount) || amount <= 0) throw new SemanticError("INVALID_AMOUNT", 400, "Pocket withdrawal amount must be positive.");
+  if (Number.isNaN(new Date(input.occurredAt).getTime())) throw new SemanticError("INVALID_DATE", 400, "Pocket withdrawal date is invalid.");
+
+  await ports.transactionRunner.runSerializable(async (txPorts) => {
+    if (txPorts.pockets.ensureStrictPocketIsActive) {
+      await txPorts.pockets.ensureStrictPocketIsActive(input.sourcePocketId, "Source pocket");
+    } else {
+      await txPorts.pockets.ensurePocketIsActive(input.sourcePocketId, "Source pocket");
+    }
+    const balance = txPorts.pockets.getBalance ? await txPorts.pockets.getBalance(input.sourcePocketId) : 0;
+    if (roundMoney(balance) < amount) throw new SemanticError("INSUFFICIENT_FUNDS", 409, "Insufficient funds for this pocket withdrawal.");
+
+    await txPorts.movements.create({
+      type: MovementType.DEFICIT_COVER_FROM_POCKET,
+      amount: decimal(amount),
+      description: input.description,
+      occurredAt: new Date(input.occurredAt),
+      sourcePocketId: input.sourcePocketId,
+    });
+  });
+
+  return null;
+};
+
 export const createMovementUseCases = (ports: MonthlyCyclePorts): MovementUseCases => ({
   ...createMovementService(ports),
   depositToPocket: createStrictDepositToPocketUseCase(ports),
+  withdrawFromPocket: createWithdrawFromPocketUseCase(ports),
 });
