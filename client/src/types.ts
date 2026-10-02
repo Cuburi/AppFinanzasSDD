@@ -103,6 +103,18 @@ export type CreditCardView = {
   active: boolean;
 };
 
+export type CreateCreditCardInput = {
+  issuer: string;
+  name: string;
+  limit?: number | null;
+  closingDay: number;
+  dueDay: number;
+};
+
+export type UpdateCreditCardInput = Partial<CreateCreditCardInput> & {
+  active?: boolean;
+};
+
 export type CreditCardStatementBucketView = {
   periodStart: string;
   periodEnd: string;

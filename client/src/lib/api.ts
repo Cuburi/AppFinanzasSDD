@@ -4,6 +4,7 @@ import type {
   BasicMonthlyReport,
   CashSummary,
   CreateDebtInput,
+  CreateCreditCardInput,
   CreditCardListFilter,
   CreditCardStatementSummaryListView,
   CreditCardView,
@@ -20,6 +21,7 @@ import type {
   RegisterDebtPaymentInput,
   RecordExpenseInput,
   SavingsPocket,
+  UpdateCreditCardInput,
   UpdateExpenseInput,
   UpdateMonthCategoryInput,
   UpdateMonthlyIncomeInput,
@@ -130,6 +132,32 @@ export const api = {
   async getCurrentCreditCardStatements(): Promise<CreditCardStatementSummaryListView> {
     const response = await fetch("/api/credit-cards/statements/current");
     return readJson<CreditCardStatementSummaryListView>(response);
+  },
+  async createCreditCard(input: CreateCreditCardInput): Promise<CreditCardView> {
+    const response = await fetch("/api/credit-cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+
+    return readJson<CreditCardView>(response);
+  },
+  async updateCreditCard(id: string, input: UpdateCreditCardInput): Promise<CreditCardView> {
+    const response = await fetch(`/api/credit-cards/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+
+    return readJson<CreditCardView>(response);
+  },
+  async activateCreditCard(id: string): Promise<CreditCardView> {
+    const response = await fetch(`/api/credit-cards/${id}/activate`, { method: "PATCH" });
+    return readJson<CreditCardView>(response);
+  },
+  async inactivateCreditCard(id: string): Promise<CreditCardView> {
+    const response = await fetch(`/api/credit-cards/${id}/inactivate`, { method: "PATCH" });
+    return readJson<CreditCardView>(response);
   },
   async getPocket(id: string): Promise<SavingsPocket> {
     const response = await fetch(`/api/pockets/${id}`);

@@ -976,6 +976,9 @@ body {
 .registration-slip form, .registration-slip-primary-fields, .registration-slip-supporting-fields { display: grid; gap: 13px; min-width: 0; }
 .registration-slip-primary-fields, .registration-slip-supporting-fields { border: 0; grid-template-columns: 1.25fr .75fr; padding: 0; }
 .field input, .field select { background: #141f1e; border: 1px solid var(--ww-line); border-radius: 10px; color: #d5dfda; min-height: 44px; padding: 11px 12px; }
+.field select option, .dashboard-month-selector option { background-color: #12201e; color: var(--ww-text); }
+.field select option:checked, .dashboard-month-selector option:checked { background-color: #244941; color: var(--ww-text); }
+.field select option:disabled, .dashboard-month-selector option:disabled { color: var(--ww-muted); }
 .expense-amount-field { align-items: center; background: #12201e; border: 1px solid #46736a; border-radius: 11px; display: grid; gap: 4px; padding: 13px 14px; }
 .expense-amount-field input { background: transparent; border: 0; color: var(--ww-text); font-size: 23px; font-weight: 720; letter-spacing: -.03em; min-height: 0; padding: 0; }
 .expense-description-field { grid-column: 1 / -1; }
