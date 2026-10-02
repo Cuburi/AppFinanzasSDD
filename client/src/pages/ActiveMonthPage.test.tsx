@@ -171,6 +171,15 @@ describe("ActiveMonthPage", () => {
     expect(formatCop(-1_234.5)).toBe("$-1.234,5 COP");
   });
 
+  it("normalizes leading zeros in active-month amount inputs", async () => {
+    render(<ActiveMonthPage />);
+
+    const amount = await screen.findByLabelText("Monto", { selector: "input" });
+    fireEvent.change(amount, { target: { value: "0124" } });
+
+    expect(amount).toHaveValue(124);
+  });
+
   it("keeps financial truth and expense capture before warnings and maintenance", async () => {
     render(<ActiveMonthPage />);
 

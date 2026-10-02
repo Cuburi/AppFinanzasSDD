@@ -29,6 +29,16 @@ describe("PocketRecentMovements", () => {
     expect(screen.queryByRole("link", { name: /view all/i })).not.toBeInTheDocument();
   });
 
+  it("labels a pocket withdrawal as an understandable outgoing spend", () => {
+    render(
+      <PocketRecentMovements
+        movements={[{ id: "withdrawal", type: "DEFICIT_COVER_FROM_POCKET", amount: 25, occurredAt: "2026-05-14T12:00:00.000Z", description: "Groceries", direction: "out" }]}
+      />,
+    );
+
+    expect(screen.getByText(/Retiro o gasto del bolsillo/).closest("li")).toHaveTextContent("Salida $25.00 · Groceries · Retiro o gasto del bolsillo");
+  });
+
   it("explains when the current response has no recent movements", () => {
     render(<PocketRecentMovements movements={[]} />);
 

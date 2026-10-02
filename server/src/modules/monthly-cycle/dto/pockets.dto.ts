@@ -3,6 +3,13 @@ import { readIsoDateString, readNonEmptyString, readOptionalString, readPositive
 
 type StrictDepositBase = { targetPocketId: string; amount: number; occurredAt: string; description?: string | null };
 
+export type WithdrawFromPocketInput = {
+  sourcePocketId: string;
+  amount: number;
+  occurredAt: string;
+  description?: string | null;
+};
+
 export type DepositToPocketInput = StrictDepositBase & (
   | { sourceKind: "SUBCATEGORY"; monthId: string; sourceSubcategoryId: string; externalSourceLabel?: never }
   | { sourceKind: "MONTH_AVAILABLE"; monthId: string; sourceSubcategoryId?: never; externalSourceLabel?: never }
@@ -33,6 +40,20 @@ const readDepositDate = (value: unknown) => {
   } catch (error) {
     throw new SemanticError("INVALID_DATE", 400, error instanceof Error ? error.message : "Pocket deposit date is invalid.");
   }
+};
+
+export const parseWithdrawFromPocketInput = (payload: unknown): WithdrawFromPocketInput => {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Pocket withdrawal payload is required.");
+  }
+
+  const rawPayload = payload as { sourcePocketId?: unknown; amount?: unknown; occurredAt?: unknown; description?: unknown };
+  return {
+    sourcePocketId: readNonEmptyString(rawPayload.sourcePocketId, "Source pocket"),
+    amount: readDepositAmount(rawPayload.amount),
+    occurredAt: readDepositDate(rawPayload.occurredAt),
+    description: readOptionalString(rawPayload.description),
+  };
 };
 
 export const parseDepositToPocketInput = (payload: unknown): DepositToPocketInput => {

@@ -100,6 +100,23 @@ describe("pockets api", () => {
     expect(firstHeaders["Idempotency-Key"]).not.toEqual(secondHeaders["Idempotency-Key"]);
   });
 
+  it("serializes a Pockets-only withdrawal with its required source, amount, and date", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ month: null }), { status: 201 }));
+
+    await expect(api.withdrawFromPocket({
+      sourcePocketId: "pocket-emergency",
+      amount: 75,
+      occurredAt: "2026-05-14",
+      description: "Groceries",
+    })).resolves.toBeNull();
+
+    expect(fetch).toHaveBeenCalledWith("/api/pockets/withdrawals", {
+      method: "POST",
+      headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
+      body: JSON.stringify({ sourcePocketId: "pocket-emergency", amount: 75, occurredAt: "2026-05-14", description: "Groceries" }),
+    });
+  });
+
   it("serializes a Pockets-only external deposit without month or subcategory fields", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ month: null }), { status: 201 }));
 

@@ -147,6 +147,13 @@ export type UpdatePocketInput = {
   active?: boolean;
 };
 
+export type WithdrawFromPocketInput = {
+  sourcePocketId: string;
+  amount: number;
+  occurredAt: string;
+  description?: string;
+};
+
 export type MonthSubcategory = {
   id: string;
   name: string;

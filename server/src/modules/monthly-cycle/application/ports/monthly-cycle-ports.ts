@@ -109,6 +109,8 @@ export interface MonthStructureRepositoryPort {
 export interface PocketValidationPort {
   ensurePocketIsActive(pocketId: string, label: string): Promise<void>;
   ensureStrictDepositTargetPocketIsActive?(pocketId: string): Promise<void>;
+  ensureStrictPocketIsActive?(pocketId: string, label: string): Promise<void>;
+  getBalance?(pocketId: string): Promise<number>;
   ensureTemplateDefaultPocketsAreActive(input: TemplateInput): Promise<void>;
 }
 

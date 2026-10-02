@@ -7,7 +7,6 @@ import {
   type CreateMonthCategoryInput,
   type CreateMonthSubcategoryInput,
   type CreateMonthlyIncomeInput,
-  type DepositToPocketInput,
   type ExpenseHistoryQueryInput,
   type ExpenseHistoryView,
   type MonthlyLedgerView,
@@ -24,6 +23,7 @@ import {
   parseCreateMonthSubcategoryInput,
   parseCashSummaryInput,
   parseDepositToPocketInput,
+  parseWithdrawFromPocketInput,
   parseDeleteExpenseInput,
   parseDeleteMonthCategoryInput,
   parseDeleteMonthSubcategoryInput,
@@ -380,6 +380,22 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
       try {
         const payload = parseDepositToPocketInput(request.body);
         const month = await service.depositToPocket(payload);
+        return { statusCode: 201, body: { month } };
+      } catch (error) {
+        if (error instanceof SemanticError) return { statusCode: error.statusCode, body: { code: error.code, message: error.message } };
+        if (isDomainError(error)) return { statusCode: error.statusCode, body: { message: error.message } };
+
+        return { statusCode: 400, body: { message: readMessage(error) } };
+      }
+    });
+    response.status(result.statusCode).json(result.body);
+  });
+
+  router.post("/pockets/withdrawals", async (request, response) => {
+    const result = await runCreate(request, "POST /api/pockets/withdrawals", async () => {
+      try {
+        const payload = parseWithdrawFromPocketInput(request.body);
+        const month = await service.withdrawFromPocket(payload);
         return { statusCode: 201, body: { month } };
       } catch (error) {
         if (error instanceof SemanticError) return { statusCode: error.statusCode, body: { code: error.code, message: error.message } };

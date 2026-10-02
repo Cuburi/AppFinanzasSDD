@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -74,6 +74,18 @@ describe("TemplatePage", () => {
     expect(screen.getByRole("region", { name: "Plan total de próximos meses" })).toHaveTextContent("$300 COP");
     expect(screen.getByRole("article", { name: "Categoría Hogar" })).toHaveTextContent("Subtotal de Hogar$300 COP");
     expect(screen.getByLabelText("Subcategoría Supermercado")).toHaveValue("Supermercado");
+  });
+
+  it("normalizes leading zeros in planned amounts", async () => {
+    render(<TemplatePage />);
+
+    const amount = await screen.findByLabelText("Monto planificado de Supermercado");
+    fireEvent.change(amount, { target: { value: "0124" } });
+
+    expect(amount).toHaveValue(124);
+
+    fireEvent.change(amount, { target: { value: "000.50" } });
+    expect(amount).toHaveValue(0.5);
   });
 
   it("keeps the default pocket optional and saves an empty selection as no default", async () => {

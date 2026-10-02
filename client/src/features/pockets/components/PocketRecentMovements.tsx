@@ -10,6 +10,7 @@ const movementProvenance = (movement: SavingsPocketMovement) => {
   if (movement.sourceKind === "EXTERNAL") return movement.sourceLabel ? `Externo — ${movement.sourceLabel}` : "Origen externo";
   if (movement.type === "POCKET_DEPOSIT_FROM_AVAILABLE") return "Financiado por mes — Disponible del mes";
   if (movement.type === "POCKET_DEPOSIT_FROM_SUBCATEGORY") return "Financiado por mes — Subcategoría";
+  if (movement.type === "DEFICIT_COVER_FROM_POCKET") return "Retiro o gasto del bolsillo";
   return "Movimiento de bolsillo";
 };
 

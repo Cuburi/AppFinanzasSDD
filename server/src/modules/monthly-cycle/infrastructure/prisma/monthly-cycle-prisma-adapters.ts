@@ -1,6 +1,6 @@
 import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../../lib/prisma-client.js";
 import type { MonthlyCyclePorts } from "../../application/ports/monthly-cycle-ports.js";
-import { decimal } from "../../shared/money.js";
+import { decimal, roundMoney } from "../../shared/money.js";
 import type { MonthlyCycleMoney } from "../../shared/money.js";
 import { DomainError, SemanticError } from "../../shared/service-errors.js";
 import { monthInclude, templateInclude, type MonthRecord, type MonthlyCycleDb } from "../../shared/service-types.js";
@@ -295,6 +295,21 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
     ensureStrictDepositTargetPocketIsActive(pocketId) {
       return ensurePocketIsActive(db, pocketId, "Target pocket", true);
     },
+    ensureStrictPocketIsActive(pocketId, label) {
+      return ensurePocketIsActive(db, pocketId, label, true);
+    },
+    async getBalance(pocketId) {
+      const movements = await db.movement.findMany({
+        where: { OR: [{ targetPocketId: pocketId }, { sourcePocketId: pocketId }] },
+      });
+      const balance = movements.reduce((total, movement) => {
+        const value = Number(movement.amount.toString());
+        if (movement.targetPocketId === pocketId) return total + value;
+        if (movement.sourcePocketId === pocketId) return total - value;
+        return total;
+      }, 0);
+      return roundMoney(balance);
+    },
     async ensureTemplateDefaultPocketsAreActive(input) {
       const defaultPocketIds = new Set(
         input.categories
@@ -387,7 +402,7 @@ export const createMonthlyCyclePrismaTransactionRunner = (
             eventObserver,
             Object.freeze({ attempt, maxAttempts: MAX_SERIALIZABLE_ATTEMPTS, classification, outcome: "exhausted" }),
           );
-          throw new SemanticError("CONCURRENT_MODIFICATION", 409, "Concurrent modification prevented this pocket deposit.");
+          throw new SemanticError("CONCURRENT_MODIFICATION", 409, "Concurrent modification prevented this pocket movement.");
         }
         lastRetryClassification = classification;
         observeSerializableTransactionEvent(

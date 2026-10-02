@@ -1,31 +1,41 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../lib/api";
+import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
 import type { EditableTemplate, EditableTemplateCategory, SavingsPocket } from "../types";
 
-const formatCop = (amount: number) => `$${amount < 0 ? "-" : ""}${new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 }).format(Math.abs(amount))} COP`;
+type TemplateDraftSubcategory = Omit<EditableTemplateCategory["subcategories"][number], "plannedAmount"> & { plannedAmount: string };
+type TemplateDraftCategory = Omit<EditableTemplateCategory, "subcategories"> & { subcategories: TemplateDraftSubcategory[] };
+type TemplateDraft = { categories: TemplateDraftCategory[] };
 
-const emptyCategory = (): EditableTemplateCategory => ({
+const emptyCategory = (): TemplateDraftCategory => ({
   name: "",
-  subcategories: [{ name: "", plannedAmount: 0, defaultPocketId: null }],
+  subcategories: [{ name: "", plannedAmount: "0", defaultPocketId: null }],
 });
 
-const toEditableTemplate = (template: Awaited<ReturnType<typeof api.getTemplate>>): EditableTemplate => ({
+const toTemplateDraft = (template: Awaited<ReturnType<typeof api.getTemplate>>): TemplateDraft => ({
   categories:
     template.categories.length > 0
       ? template.categories.map((category) => ({
           name: category.name,
           subcategories: category.subcategories.map((subcategory) => ({
             name: subcategory.name,
-            plannedAmount: subcategory.plannedAmount,
+            plannedAmount: String(subcategory.plannedAmount),
             defaultPocketId: subcategory.defaultPocketId,
           })),
         }))
       : [emptyCategory()],
 });
 
+const toEditableTemplate = (template: TemplateDraft): EditableTemplate => ({
+  categories: template.categories.map((category) => ({
+    ...category,
+    subcategories: category.subcategories.map((subcategory) => ({ ...subcategory, plannedAmount: parseAmountInput(subcategory.plannedAmount) })),
+  })),
+});
+
 export const TemplatePage = () => {
-  const [template, setTemplate] = useState<EditableTemplate>({ categories: [emptyCategory()] });
+  const [template, setTemplate] = useState<TemplateDraft>({ categories: [emptyCategory()] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activePockets, setActivePockets] = useState<SavingsPocket[]>([]);
@@ -36,7 +46,7 @@ export const TemplatePage = () => {
     const load = async () => {
       try {
         const [currentTemplate, pockets] = await Promise.all([api.getTemplate(), api.getPockets("active")]);
-        setTemplate(toEditableTemplate(currentTemplate));
+        setTemplate(toTemplateDraft(currentTemplate));
         setActivePockets(pockets);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "No se pudo cargar la plantilla y los bolsillos activos.");
@@ -86,7 +96,7 @@ export const TemplatePage = () => {
                 currentSubcategoryIndex === subcategoryIndex
                   ? {
                       ...subcategory,
-                      [field]: field === "plannedAmount" ? Number(value) : field === "defaultPocketId" ? value || null : value,
+                      [field]: field === "plannedAmount" ? value : field === "defaultPocketId" ? value || null : value,
                     }
                   : subcategory,
               ),
@@ -114,7 +124,7 @@ export const TemplatePage = () => {
         index === categoryIndex
           ? {
               ...category,
-              subcategories: [...category.subcategories, { name: "", plannedAmount: 0, defaultPocketId: null }],
+              subcategories: [...category.subcategories, { name: "", plannedAmount: "0", defaultPocketId: null }],
             }
           : category,
       ),
@@ -141,8 +151,8 @@ export const TemplatePage = () => {
     setMessage(null);
 
     try {
-      const savedTemplate = await api.updateTemplate(template);
-      setTemplate(toEditableTemplate(savedTemplate));
+      const savedTemplate = await api.updateTemplate(toEditableTemplate(template));
+      setTemplate(toTemplateDraft(savedTemplate));
       setMessage("Plantilla guardada. Los próximos meses usarán este snapshot.");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo guardar la plantilla.");
@@ -226,7 +236,7 @@ export const TemplatePage = () => {
                         step="0.01"
                         type="number"
                         value={subcategory.plannedAmount}
-                        onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "plannedAmount", event.target.value)}
+                        onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "plannedAmount", normalizeAmountInput(event.target.value))}
                       />
                     </label>
 
