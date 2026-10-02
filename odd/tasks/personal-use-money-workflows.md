@@ -30,7 +30,7 @@ Stabilize the highest-impact personal production frictions in one PR while keepi
 
 - [x] Explore current layout, money formatting, and pocket movement contracts.
 - [x] Fix Active Month registration/recent-movements layout and commit it.
-- [ ] Normalize affected money/number inputs and COP formatting and commit it.
+- [x] Normalize affected money/number inputs and COP formatting and commit it.
 - [ ] Add pocket external deposit and withdrawal/spend flow and commit it.
 - [ ] Run full focused checks, native review/fallback if needed, and prepare PR.
 
@@ -50,4 +50,8 @@ Stabilize the highest-impact personal production frictions in one PR while keepi
 - `pnpm --dir client test -- visual-system.contract.test.ts ActiveMonthPage.test.tsx` — passed (24 files, 215 tests).
 - `pnpm --dir client typecheck` — passed.
 - `git diff --check -- client/src/styles.css client/src/visual-system.contract.test.ts` — passed.
-- Commit `da5336e` — `fix(active-month): stabilize workspace layout`.
+- Commit `e4f1d19` — `fix(active-month): stabilize workspace layout`.
+- Money normalization added shared `client/src/lib/money.ts` helpers for COP display plus leading-zero amount normalization.
+- Writer verification: focused money/page tests passed (84 tests), `pnpm --dir client typecheck` passed, `git diff --check` passed.
+- Native assessment was unassessable because current untracked helper/test files require explicit declaration; per ASSESS plan, independent verifier ran.
+- Independent verifier passed: focused tests (84 tests) and `pnpm --dir client typecheck` passed.

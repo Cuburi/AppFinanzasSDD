@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -82,11 +82,11 @@ describe("PocketsPage", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Cargando bolsillos...");
     resolveActivePockets([emergencyPocket]);
     expect(await screen.findByText("Emergencias")).toBeInTheDocument();
-    expect(screen.getByText("Balance: $250.00")).toBeInTheDocument();
-    expect(screen.getByText("Meta: $1000.00")).toBeInTheDocument();
+    expect(screen.getByText("Balance: $250 COP")).toBeInTheDocument();
+    expect(screen.getByText("Meta: $1.000 COP")).toBeInTheDocument();
     expect(screen.getByText(/Ahorro inicial/)).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Success: Activo" })).toBeInTheDocument();
-    expect(screen.getByRole("status", { name: "Success: Balance $250.00" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Success: Balance $250 COP" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Inactivos" }));
 
@@ -95,6 +95,15 @@ describe("PocketsPage", () => {
     expect(screen.getByText("Sin meta definida")).toBeInTheDocument();
     expect(screen.getByText("No se recibieron movimientos recientes.")).toBeInTheDocument();
     expect(apiMock.getPockets).toHaveBeenLastCalledWith("inactive");
+  });
+
+  it("normalizes leading zeros in pocket amount inputs", async () => {
+    render(<PocketsPage />);
+
+    const amount = await screen.findByLabelText("Meta opcional");
+    fireEvent.change(amount, { target: { value: "0124" } });
+
+    expect(amount).toHaveValue(124);
   });
 
   it("renders backend outgoing pocket movements as Salida", async () => {
@@ -145,7 +154,7 @@ describe("PocketsPage", () => {
         externalSourceLabel: "Employer",
       }),
     );
-    expect(await screen.findByText("Balance: $375.00")).toBeInTheDocument();
+    expect(await screen.findByText("Balance: $375 COP")).toBeInTheDocument();
   });
 
   it("keeps the persisted external deposit successful when its refresh fails", async () => {
@@ -283,7 +292,7 @@ describe("PocketsPage", () => {
     );
     expect(apiMock.createPocket.mock.invocationCallOrder[0]).toBeLessThan(apiMock.depositExternalToPocket.mock.invocationCallOrder[0]);
     expect(apiMock.depositExternalToPocket.mock.invocationCallOrder[0]).toBeLessThan(apiMock.getPockets.mock.invocationCallOrder[1]);
-    expect(await screen.findByText("Balance: $125.00")).toBeInTheDocument();
+    expect(await screen.findByText("Balance: $125 COP")).toBeInTheDocument();
     expect(screen.getByText("Bolsillo creado con saldo inicial.")).toBeInTheDocument();
   });
 

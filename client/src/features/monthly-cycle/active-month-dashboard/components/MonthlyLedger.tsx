@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import { Button, Card, SectionHeader } from "../../../../components/ui";
+import { formatCop } from "../../../../lib/money";
 import type { LedgerDay, LedgerViewEntry } from "../model/monthlyLedger";
 
 type MonthlyLedgerProps = {
@@ -18,7 +19,7 @@ type MonthlyLedgerProps = {
 const eventLabels: Record<string, string> = { MONTHLY_INCOME: "Ingreso", CASH_EXPENSE: "Gasto", NON_CASH_EXPENSE: "Gasto", CASH_WITHDRAWAL: "Retiro de efectivo", POCKET_DEPOSIT_FROM_SUBCATEGORY: "Depósito a bolsillo", POCKET_DEPOSIT_FROM_AVAILABLE: "Depósito a bolsillo", CASH_CARRYOVER: "Arrastre de efectivo", CLOSURE_SURPLUS: "Excedente de cierre", DEFICIT_RESOLUTION: "Resolución de déficit" };
 const entityLabels: Record<string, string> = { MONTH: "Mes", SUBCATEGORY: "Subcategoría", POCKET: "Bolsillo", CASH: "Efectivo", EXTERNAL: "Externo", EXPENSE: "Gasto" };
 const directionLabels = { INFLOW: "Entrada", OUTFLOW: "Salida", TRANSFER: "Transferencia" };
-const money = (value: number) => `$${value < 0 ? "-" : ""}${new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 }).format(Math.abs(value))} COP`;
+const money = formatCop;
 const time = (value: string) => new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit" }).format(new Date(value));
 const day = (value: string) => new Intl.DateTimeFormat("es-CO", { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
 const readOnlyReason = (entry: LedgerViewEntry, actionable: boolean, unavailableActionReason?: string) => {
