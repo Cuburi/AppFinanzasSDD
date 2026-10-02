@@ -101,8 +101,8 @@ const activeCreditCards: CreditCardView[] = [
 ];
 
 async function openMonthStructure() {
-  const disclosure = (await screen.findByRole("region", { name: "Estructura del mes" })).querySelector("details");
-  if (!disclosure) throw new Error("Missing month structure disclosure.");
+  const disclosure = (await screen.findByRole("region", { name: "Ajustes del mes" })).querySelector("details");
+  if (!disclosure) throw new Error("Missing month settings disclosure.");
   disclosure.open = true;
   fireEvent(disclosure, new Event("toggle", { bubbles: true }));
   return disclosure;
@@ -227,18 +227,18 @@ describe("ActiveMonthPage", () => {
     expect(screen.queryByText("No se pudo registrar el gasto.")).not.toBeInTheDocument();
   });
 
-  it("keeps Estructura del mes closed by default and exposes the month-only versus template-promotion guidance when expanded", async () => {
+  it("keeps Ajustes del mes closed by default and exposes the month-only versus template-promotion guidance when expanded", async () => {
     render(<ActiveMonthPage />);
 
     await screen.findByRole("region", { name: "Resumen financiero" });
-    const disclosure = screen.getByRole("region", { name: "Estructura del mes" }).querySelector("details");
+    const disclosure = screen.getByRole("region", { name: "Ajustes del mes" }).querySelector("details");
     expect(disclosure).not.toBeNull();
     expect(disclosure).not.toHaveAttribute("open");
-    expect(screen.getByText("Corrige categorías y subcategorías de este mes sin perder de vista la plantilla global.")).toBeInTheDocument();
+    expect(screen.getByText("Mantenimiento puntual de categorías y subcategorías de este mes; no hace parte del registro diario ni cambia la plantilla global.")).toBeInTheDocument();
 
     await openMonthStructure();
     expect(disclosure).toHaveAttribute("open");
-    expect(screen.getByText("Estos cambios corrigen solo la estructura de este mes; no modifican la plantilla global.")).toBeInTheDocument();
+    expect(screen.getByText("Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro.")).toBeInTheDocument();
     expect(screen.getByText(/Antes de promoverlas, marca la copia a plantilla/i)).toBeInTheDocument();
   });
 
@@ -248,8 +248,8 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await screen.findByRole("region", { name: "Resumen financiero" });
-    const disclosure = screen.getByRole("region", { name: "Estructura del mes" }).querySelector("details");
-    if (!disclosure) throw new Error("Missing month structure disclosure.");
+    const disclosure = screen.getByRole("region", { name: "Ajustes del mes" }).querySelector("details");
+    if (!disclosure) throw new Error("Missing month settings disclosure.");
 
     await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos", hidden: true }));
     expect(disclosure).toHaveAttribute("open");
@@ -284,7 +284,7 @@ describe("ActiveMonthPage", () => {
     expect(await within(expenseSlip).findByRole("alert")).toHaveTextContent("El monto supera el disponible.");
 
     await user.click(screen.getByRole("button", { name: "Editar gasto Café" }));
-    expect(within(screen.getByRole("region", { name: "Editar gasto" })).getByLabelText("Monto", { selector: "input" })).toHaveFocus();
+    expect(within(screen.getByRole("region", { name: "Corregir gasto registrado" })).getByLabelText("Monto", { selector: "input" })).toHaveFocus();
   });
 
   it("opens the income slip from its secondary action and focuses its first field on edit", async () => {
@@ -537,11 +537,20 @@ describe("ActiveMonthPage", () => {
     const financialSurface = await screen.findByRole("region", { name: "Resumen financiero del mes" });
     expect(financialSurface).toHaveTextContent("Disponible del mes");
     expect(financialSurface).toHaveTextContent("$375 COP");
+    expect(financialSurface).toHaveTextContent("Lo que queda para decidir y mover durante este mes.");
+    expect(financialSurface.closest(".active-month-dashboard")).toContainElement(screen.getByRole("region", { name: "Registrar gasto" }));
+    expect(financialSurface.compareDocumentPosition(screen.getByRole("region", { name: "Registrar gasto" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(financialSurface).toHaveTextContent("Ingresos");
     expect(financialSurface).toHaveTextContent("Gastado");
     expect(financialSurface).toHaveTextContent("Efectivo disponible");
-    expect(financialSurface).toHaveTextContent("Presupuesto utilizado");
-    expect(within(financialSurface).getByRole("progressbar", { name: "Presupuesto utilizado" })).toHaveAttribute("aria-valuenow", "0");
+    expect(financialSurface).not.toHaveTextContent("Presupuesto utilizado");
+    expect(within(financialSurface).getByRole("region", { name: "Disponible del mes" })).toHaveClass("financial-primary");
+    expect(within(financialSurface).getByRole("status", { name: "Success: Mes seguro" })).toBeInTheDocument();
+    const heroDepth = financialSurface.querySelector(".financial-hero-depth");
+    expect(heroDepth).toHaveAttribute("aria-hidden", "true");
+    expect(heroDepth?.querySelector(".financial-month-pulse-line")).toBeInTheDocument();
+    expect(heroDepth?.querySelectorAll(".financial-month-pulse-dot")).toHaveLength(2);
+    expect(within(financialSurface).queryByRole("progressbar", { name: "Presupuesto utilizado" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
     expect(screen.getByText("Sueldo")).toBeInTheDocument();
   });
@@ -557,8 +566,8 @@ describe("ActiveMonthPage", () => {
     await screen.findByText("Café");
     const financialSurface = await screen.findByRole("region", { name: "Resumen financiero del mes" });
     expect(financialSurface).toHaveTextContent("Gastado$55 COP");
-    expect(financialSurface).toHaveTextContent("50%");
-    expect(within(financialSurface).getByRole("progressbar", { name: "Presupuesto utilizado" })).toHaveAttribute("aria-valuenow", "50");
+    expect(financialSurface).not.toHaveTextContent("50%");
+    expect(within(financialSurface).queryByRole("progressbar", { name: "Presupuesto utilizado" })).not.toBeInTheDocument();
   });
 
   it("exposes negative monthly balances as semantic risk instead of color-only pills", async () => {
@@ -566,7 +575,9 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    expect(await screen.findByRole("region", { name: "Disponible del mes" })).toHaveTextContent("$-125 COP");
+    const availableBalance = await screen.findByRole("region", { name: "Disponible del mes" });
+    expect(availableBalance).toHaveTextContent("$-125 COP");
+    expect(within(availableBalance).getByRole("status", { name: "Danger: Disponible en negativo" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Efectivo físico" })).toHaveTextContent("$-15 COP");
     expect(screen.getAllByText("Tendencia negativa")).toHaveLength(2);
   });
@@ -705,6 +716,20 @@ describe("ActiveMonthPage", () => {
     );
   });
 
+  it("records an uncategorized expense without a synthetic subcategory", async () => {
+    const user = userEvent.setup();
+    render(<ActiveMonthPage />);
+
+    const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
+    if (!expenseForm) throw new Error("Missing expense form.");
+
+    expect(within(expenseForm).getByRole("option", { name: "Uncategorized" })).toBeInTheDocument();
+    await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
+    await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
+
+    await waitFor(() => expect(apiMock.recordExpense).toHaveBeenCalledWith(expect.objectContaining({ sourceSubcategoryId: null })));
+  });
+
   it("keeps a successful expense mutation separate from a failed history refresh", async () => {
     const user = userEvent.setup();
     apiMock.getExpenseHistory.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error("No se pudo consultar el historial."));
@@ -786,14 +811,14 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await user.click(await screen.findByRole("button", { name: "Editar gasto Café" }));
-    const expenseForm = screen.getByRole("button", { name: "Actualizar gasto" }).closest("form");
+    const expenseForm = screen.getByRole("button", { name: "Guardar corrección" }).closest("form");
     if (!expenseForm) throw new Error("Missing expense edit form.");
 
     await user.clear(within(expenseForm).getByLabelText("Monto", { selector: "input" }));
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "30");
     await user.clear(within(expenseForm).getByLabelText(/Descripción/));
     await user.type(within(expenseForm).getByLabelText(/Descripción/), "Café corregido");
-    await user.click(within(expenseForm).getByRole("button", { name: "Actualizar gasto" }));
+    await user.click(within(expenseForm).getByRole("button", { name: "Guardar corrección" }));
 
     await waitFor(() =>
       expect(apiMock.updateExpense).toHaveBeenCalledWith({
@@ -828,9 +853,9 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    await user.click(await screen.findByRole("button", { name: "Editar gasto Café" })); const expenseForm = screen.getByRole("button", { name: "Actualizar gasto" }).closest("form");
+    await user.click(await screen.findByRole("button", { name: "Editar gasto Café" })); const expenseForm = screen.getByRole("button", { name: "Guardar corrección" }).closest("form");
     if (!expenseForm) throw new Error("Missing expense edit form.");
-    await user.clear(within(expenseForm).getByLabelText("Monto", { selector: "input" })); await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "30"); await user.click(within(expenseForm).getByRole("button", { name: "Actualizar gasto" }));
+    await user.clear(within(expenseForm).getByLabelText("Monto", { selector: "input" })); await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "30"); await user.click(within(expenseForm).getByRole("button", { name: "Guardar corrección" }));
 
     const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
     expect(await within(ledger).findByText("Café corregido")).toBeInTheDocument();
@@ -947,7 +972,7 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await openMonthStructure();
-    expect(await screen.findByText("Estos cambios corrigen solo la estructura de este mes; no modifican la plantilla global.")).toBeInTheDocument();
+    expect(await screen.findByText("Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
     await user.clear(screen.getByLabelText("Nombre categoría"));
@@ -998,7 +1023,7 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await openMonthStructure();
-    expect(await screen.findByText(/Crea categorías y subcategorías solo en este mes/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Crea categorías y subcategorías solo para este mes/i)).toBeInTheDocument();
     expect(screen.getByText(/Copiar a plantilla también/i)).toBeInTheDocument();
 
     const categoryForm = screen.getByRole("form", { name: "Crear categoría del mes activo" });
@@ -1096,8 +1121,8 @@ describe("ActiveMonthPage", () => {
 
     await openMonthStructure();
     await user.click(await screen.findByRole("button", { name: "Editar gasto Café" }));
-    expect(screen.getByRole("button", { name: "Actualizar gasto" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Cancelar edición de gasto" }));
+    expect(screen.getByRole("button", { name: "Guardar corrección" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancelar corrección" }));
     expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));

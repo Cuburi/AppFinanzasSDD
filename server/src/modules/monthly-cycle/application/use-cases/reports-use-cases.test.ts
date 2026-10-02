@@ -31,6 +31,7 @@ const month = {
     { id: "expense-food", type: MovementType.EXPENSE, amount: amount(125), occurredAt: new Date("2026-05-06T00:00:00.000Z"), description: "Market", paymentMethod: PaymentMethod.NON_CASH, sourceSubcategoryId: "sub-food", targetSubcategoryId: null, sourcePocketId: null, targetPocketId: null },
     { id: "cash-withdrawal", type: MovementType.CASH_WITHDRAWAL, amount: amount(100), occurredAt: new Date("2026-05-05T00:00:00.000Z"), description: "ATM", paymentMethod: null, sourceSubcategoryId: null, targetSubcategoryId: null, sourcePocketId: null, targetPocketId: null },
     { id: "cash-food", type: MovementType.EXPENSE, amount: amount(25), occurredAt: new Date("2026-05-07T00:00:00.000Z"), description: "Cash market", paymentMethod: PaymentMethod.CASH, sourceSubcategoryId: "sub-food", targetSubcategoryId: null, sourcePocketId: null, targetPocketId: null },
+    { id: "uncategorized-card", type: MovementType.EXPENSE, amount: amount(80), occurredAt: new Date("2026-05-08T00:00:00.000Z"), description: "One-off", paymentMethod: PaymentMethod.NON_CASH, sourceSubcategoryId: null, targetSubcategoryId: null, sourcePocketId: null, targetPocketId: null },
   ],
 };
 
@@ -68,7 +69,8 @@ test("getBasicReport reads the month through the month repository port and maps 
   assert.equal(report.summary.monthId, "month-1");
   assert.equal(report.summary.monthlyIncomeTotal, 1000);
   assert.equal(report.summary.totalSpentCash, 25);
-  assert.equal(report.summary.totalSpentNonCash, 125);
+  assert.equal(report.summary.totalSpentNonCash, 205);
   assert.deepEqual(report.topSpendingSubcategories.map((item) => [item.subcategoryId, item.amount]), [["sub-food", 150]]);
+  assert.deepEqual(report.uncategorizedSpending, { label: "Uncategorized", amount: 80, cashAmount: 0, nonCashAmount: 80 });
   assert.deepEqual(calls, [["months.findById", "month-1"]]);
 });

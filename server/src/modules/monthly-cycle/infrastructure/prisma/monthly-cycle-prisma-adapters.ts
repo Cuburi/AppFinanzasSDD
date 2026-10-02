@@ -63,6 +63,10 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
     findById(monthId) {
       return readMonthById(db, monthId);
     },
+    async lockForMutation(monthId) {
+      await db.$queryRaw(Prisma.sql`SELECT "id" FROM "Month" WHERE "id" = ${monthId} FOR UPDATE`);
+      return readMonthById(db, monthId);
+    },
     async findByYearMonth(year, month) {
       return (await db.month.findUnique({
         where: { year_month: { year, month } },
@@ -158,7 +162,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       externalSourceLabel?: string | null;
       creditCardId?: string | null;
     }) {
-      await db.movement.create({ data: { ...args, amount: toPrismaDecimal(args.amount) } });
+      await db.movement.create({ data: { ...args, amount: toPrismaDecimal(args.amount), sourceSubcategoryId: args.sourceSubcategoryId ?? null } });
     },
     async updateExpense(input) {
       await db.movement.update({
@@ -182,7 +186,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
           monthId: input.monthId,
           type: MovementType.EXPENSE,
           ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
-          ...(input.subcategoryId ? { sourceSubcategoryId: input.subcategoryId } : {}),
+          ...(input.classification === "UNCATEGORIZED" ? { sourceSubcategoryId: null } : input.subcategoryId ? { sourceSubcategoryId: input.subcategoryId } : {}),
           ...(input.creditCardId ? { creditCardId: input.creditCardId } : {}),
           ...(input.from || input.to
             ? {
@@ -330,22 +334,66 @@ type PrismaClientLike = {
 
 const SERIALIZABLE_TRANSACTION_OPTIONS = { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } as const;
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
-const isPrismaWriteConflict = (error: unknown) =>
-  typeof error === "object" && error !== null && "code" in error && error.code === "P2034";
+type SerializableConflictClassification = "P2034" | "P2010_40001";
+type SerializableTransactionEvent = Readonly<{
+  attempt: number;
+  maxAttempts: number;
+  classification: SerializableConflictClassification;
+  outcome: "retrying" | "recovered" | "exhausted";
+}>;
+type SerializableTransactionEventObserver = (event: SerializableTransactionEvent) => void;
 
-export const createMonthlyCyclePrismaTransactionRunner = (db: PrismaClientLike): MonthlyCyclePorts["transactionRunner"] => ({
+const classifySerializableConflict = (error: unknown): SerializableConflictClassification | null => {
+  if (typeof error !== "object" || error === null || !("code" in error)) return null;
+  if (error.code === "P2034") return "P2034";
+  if (error.code !== "P2010" || !("meta" in error) || typeof error.meta !== "object" || error.meta === null) return null;
+
+  return "code" in error.meta && error.meta.code === "40001" ? "P2010_40001" : null;
+};
+
+const observeSerializableTransactionEvent = (observer: SerializableTransactionEventObserver, event: SerializableTransactionEvent) => {
+  try {
+    observer(event);
+  } catch {
+    // Observability is best-effort and must not affect transaction outcomes.
+  }
+};
+
+export const createMonthlyCyclePrismaTransactionRunner = (
+  db: PrismaClientLike,
+  eventObserver: SerializableTransactionEventObserver = console.warn,
+): MonthlyCyclePorts["transactionRunner"] => ({
   run(work) {
     return db.$transaction((tx) => work(createMonthlyCyclePrismaAdapters(tx)));
   },
   async runSerializable(work) {
+    let lastRetryClassification: SerializableConflictClassification | null = null;
+
     for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
       try {
-        return await db.$transaction((tx) => work(createMonthlyCyclePrismaAdapters(tx)), SERIALIZABLE_TRANSACTION_OPTIONS);
+        const result = await db.$transaction((tx) => work(createMonthlyCyclePrismaAdapters(tx)), SERIALIZABLE_TRANSACTION_OPTIONS);
+        if (lastRetryClassification) {
+          observeSerializableTransactionEvent(
+            eventObserver,
+            Object.freeze({ attempt, maxAttempts: MAX_SERIALIZABLE_ATTEMPTS, classification: lastRetryClassification, outcome: "recovered" }),
+          );
+        }
+        return result;
       } catch (error) {
-        if (!isPrismaWriteConflict(error)) throw error;
+        const classification = classifySerializableConflict(error);
+        if (!classification) throw error;
         if (attempt === MAX_SERIALIZABLE_ATTEMPTS) {
+          observeSerializableTransactionEvent(
+            eventObserver,
+            Object.freeze({ attempt, maxAttempts: MAX_SERIALIZABLE_ATTEMPTS, classification, outcome: "exhausted" }),
+          );
           throw new SemanticError("CONCURRENT_MODIFICATION", 409, "Concurrent modification prevented this pocket deposit.");
         }
+        lastRetryClassification = classification;
+        observeSerializableTransactionEvent(
+          eventObserver,
+          Object.freeze({ attempt, maxAttempts: MAX_SERIALIZABLE_ATTEMPTS, classification, outcome: "retrying" }),
+        );
       }
     }
 

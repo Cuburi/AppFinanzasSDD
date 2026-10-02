@@ -7,8 +7,8 @@ export type ExpenseHistoryItemView = {
   amount: number;
   description: string | null;
   creditCardId: string | null;
-  category: { id: string; name: string };
-  subcategory: { id: string; name: string };
+  category: { id: string; name: string } | null;
+  subcategory: { id: string; name: string } | null;
 };
 
 export type ExpenseHistoryView = {

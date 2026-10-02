@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 
 import { api } from "../lib/api";
 import { Button, Card, StatusPill } from "../components/ui";
@@ -55,6 +56,7 @@ export const ActiveMonthPage = () => {
   const [monthlyExpenseHistoryStatus, setMonthlyExpenseHistoryStatus] = useState<MonthlyExpenseHistoryStatus>("idle");
   const [monthlyExpenseHistoryMonthId, setMonthlyExpenseHistoryMonthId] = useState<string | null>(null);
   const [historyCreditCardId, setHistoryCreditCardId] = useState("");
+  const [historyClassification, setHistoryClassification] = useState<"ALL" | "UNCATEGORIZED">("ALL");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalOccurredAt, setWithdrawalOccurredAt] = useState("");
   const [withdrawalDescription, setWithdrawalDescription] = useState("");
@@ -85,9 +87,12 @@ export const ActiveMonthPage = () => {
   const [structureOpen, setStructureOpen] = useState(false);
   const [secondaryForm, setSecondaryForm] = useState<"income" | "withdrawal" | "deposit" | null>(null);
 
-  const refreshExpenseHistory = async (monthId: string, creditCardId = historyCreditCardId) => {
+  const refreshExpenseHistory = async (monthId: string, creditCardId = historyCreditCardId, classification = historyClassification) => {
     const currentRequest = ++historyRequestId.current;
-    const expenses = creditCardId ? await api.getExpenseHistory(monthId, { creditCardId }) : await api.getExpenseHistory(monthId);
+    const expenses = await api.getExpenseHistory(monthId, {
+      ...(creditCardId ? { creditCardId } : {}),
+      ...(classification === "UNCATEGORIZED" ? { classification: "UNCATEGORIZED" as const } : {}),
+    });
     if (currentRequest === historyRequestId.current) {
       setExpenseHistory(expenses);
       setExpenseHistoryMonthId(monthId);
@@ -309,7 +314,7 @@ export const ActiveMonthPage = () => {
 
   const startEditingExpense = (expense: ExpenseHistoryItem) => {
     setExpenseFeedback(null);
-    setExpenseSubcategoryId(expense.subcategory.id);
+    setExpenseSubcategoryId(expense.subcategory?.id ?? "");
     setExpenseAmount(String(expense.amount));
     setExpenseDescription(expense.description ?? "");
     setExpenseOccurredAt(expense.occurredAt.slice(0, 10));
@@ -342,6 +347,12 @@ export const ActiveMonthPage = () => {
     if (activeMonth) void refreshExpenseHistory(activeMonth.id, creditCardId);
   };
 
+  const handleHistoryClassificationChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const classification = event.target.value as "ALL" | "UNCATEGORIZED";
+    setHistoryClassification(classification);
+    if (activeMonth) void refreshExpenseHistory(activeMonth.id, historyCreditCardId, classification);
+  };
+
   const startEditingCategory = (category: MonthCategory) => {
     setStructureOpen(true);
     setEditingCategoryId(category.id);
@@ -361,7 +372,7 @@ export const ActiveMonthPage = () => {
     if (!activeMonth || !canMutateActiveMonth) return;
     const input = {
       monthId: activeMonth.id,
-      sourceSubcategoryId: expenseSubcategoryId,
+      sourceSubcategoryId: expenseSubcategoryId || null,
       amount: Number(expenseAmount),
       description: expenseDescription,
       occurredAt: expenseOccurredAt || formatMonthDate(activeMonth),
@@ -612,14 +623,69 @@ export const ActiveMonthPage = () => {
     }
   };
 
+  const availabilityState = activeMonth?.availableMoney && activeMonth.availableMoney > 0
+    ? { label: "Mes seguro", tone: "success" as const }
+    : activeMonth?.availableMoney && activeMonth.availableMoney < 0
+      ? { label: "Disponible en negativo", tone: "danger" as const }
+      : { label: "Sin disponible", tone: "neutral" as const };
+  const [heroMotionStyle, setHeroMotionStyle] = useState<CSSProperties>({});
+  const handleHeroPointerMove = (event: PointerEvent<HTMLElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - bounds.left) / bounds.width) * 100;
+    const y = ((event.clientY - bounds.top) / bounds.height) * 100;
+    const tiltY = ((x - 50) / 50) * 5;
+    const tiltX = -((y - 50) / 50) * 4;
+
+    setHeroMotionStyle({
+      "--hero-x": `${x}%`,
+      "--hero-y": `${y}%`,
+      "--tilt-x": `${tiltX}deg`,
+      "--tilt-y": `${tiltY}deg`,
+      "--parallax-near-x": `${(x - 50) * 0.18}px`,
+      "--parallax-near-y": `${(y - 50) * 0.18}px`,
+      "--parallax-mid-x": `${(x - 50) * 0.11}px`,
+      "--parallax-mid-y": `${(y - 50) * 0.11}px`,
+      "--parallax-far-x": `${(x - 50) * 0.06}px`,
+      "--parallax-far-y": `${(y - 50) * 0.06}px`,
+    } as CSSProperties);
+  };
+  const resetHeroMotion = () => setHeroMotionStyle({});
+
   const financialSummary = activeMonth ? (
-    <Card aria-label="Resumen financiero del mes" className="financial-summary stack-md">
-      <div aria-label="Disponible del mes" className="financial-primary" role="region">
+    <Card
+      aria-label="Resumen financiero del mes"
+      className="financial-summary hero active-month-hero"
+      onPointerLeave={resetHeroMotion}
+      onPointerMove={handleHeroPointerMove}
+      style={heroMotionStyle}
+    >
+      <span aria-hidden="true" className="financial-hero-depth hero-depth">
+        <svg aria-hidden="true" className="financial-month-pulse hero-pulse" focusable="false" viewBox="0 0 520 220">
+          <defs>
+            <linearGradient id="pulseGradient" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="#6de1c3" stopOpacity="0.18" />
+              <stop offset="48%" stopColor="#6de1c3" stopOpacity="0.88" />
+              <stop offset="100%" stopColor="#d5f576" stopOpacity="0.78" />
+            </linearGradient>
+          </defs>
+          <path className="financial-month-pulse-area pulse-zone" d="M54 150 C126 82 186 176 252 110 C313 50 356 120 438 64 L482 48 L482 190 L54 190 Z" />
+          <path className="financial-month-pulse-track pulse-track" d="M44 150 C112 82 186 176 252 110 C313 50 356 120 438 64 C456 53 470 48 488 44" />
+          <path className="financial-month-pulse-line pulse-line" d="M44 150 C112 82 186 176 252 110 C313 50 356 120 438 64 C456 53 470 48 488 44" />
+          <circle className="financial-month-pulse-dot pulse-dot" cx="252" cy="110" r="5" />
+          <circle className="financial-month-pulse-dot pulse-dot" cx="438" cy="64" r="4" />
+        </svg>
+      </span>
+      <span aria-hidden="true" className="financial-hero-orb financial-hero-orb-a hero-shape hero-shape-a" />
+      <span aria-hidden="true" className="financial-hero-orb financial-hero-orb-b hero-shape hero-shape-b" />
+      <span aria-hidden="true" className="financial-hero-ring hero-shape hero-shape-c" />
+      <div aria-label="Disponible del mes" className="financial-primary hero-copy" role="region">
+        <StatusPill tone={availabilityState.tone}>{availabilityState.label}</StatusPill>
         <p className="eyebrow">Disponible del mes</p>
         <p className="financial-primary-value">{formatCop(activeMonth.availableMoney)}</p>
+        <p className="financial-primary-description">Lo que queda para decidir y mover durante este mes.</p>
         <p className="sr-only">{activeMonth.availableMoney < 0 ? "Tendencia negativa" : "Tendencia positiva"}</p>
       </div>
-      <div className="financial-secondary-metrics">
+      <div className="financial-secondary-metrics hero-metrics">
         <p><span>Ingresos</span><strong>{formatCop(activeMonth.monthlyIncomeTotal)}</strong></p>
         <p>
           <span>Gastado</span>
@@ -634,27 +700,22 @@ export const ActiveMonthPage = () => {
         </p>
         <p aria-label="Efectivo físico" role="region"><span>Efectivo disponible</span><strong>{formatCop(activeMonth.cashBalance)}</strong><span className="sr-only">{activeMonth.cashBalance < 0 ? "Tendencia negativa" : "Tendencia positiva"}</span></p>
       </div>
-      <div className="financial-budget">
-        <div className="row between wrap"><span>Presupuesto utilizado</span><strong>{budgetPercent}%</strong></div>
-        <progress aria-label="Presupuesto utilizado" aria-valuemax={100} aria-valuemin={0} aria-valuenow={budgetPercent} max="100" value={budgetPercent}>{budgetPercent}%</progress>
-        <p>{formatCop(spentBudget)} de {formatCop(plannedBudget)}</p>
-      </div>
     </Card>
   ) : null;
 
   const expenseCapture = activeMonth ? (
     <RegistrationSlip
-      actions={<><Button disabled={submitting || !canMutateActiveMonth} type="submit">{expenseSubmitting ? editingExpenseId ? "Actualizando gasto..." : "Guardando gasto..." : editingExpenseId ? "Actualizar gasto" : "Registrar gasto"}</Button>{editingExpenseId ? <Button variant="secondary" disabled={submitting} onClick={() => resetExpenseForm()} type="button">Cancelar edición de gasto</Button> : null}</>}
+      actions={<><Button disabled={submitting || !canMutateActiveMonth} type="submit">{expenseSubmitting ? editingExpenseId ? "Guardando corrección..." : "Guardando gasto..." : editingExpenseId ? "Guardar corrección" : "Registrar gasto"}</Button>{editingExpenseId ? <Button variant="secondary" disabled={submitting} onClick={() => resetExpenseForm()} type="button">Cancelar corrección</Button> : null}</>}
       feedback={<>{expenseFeedback ? <p className={expenseFeedback.kind} role={expenseFeedback.kind === "error" ? "alert" : "status"}>{expenseFeedback.text}</p> : null}{!canMutateActiveMonth ? <p className="error">El mes está cerrado: los gastos son de solo lectura.</p> : null}</>}
       formClassName="expense-capture-form"
       formId="expense-form"
       mode={editingExpenseId ? "edit" : "create"}
       onSubmit={handleExpense}
-      primaryFields={<><label className="field expense-amount-field"><span>Monto</span><input min="0.01" ref={expenseAmountInputRef} step="0.01" type="number" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} required /></label><label className="field expense-subcategory-field"><span>Subcategoría del gasto</span><select value={expenseSubcategoryId} onChange={(event) => setExpenseSubcategoryId(event.target.value)} required><option value="">Selecciona una subcategoría</option>{subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label></>}
-      purpose="Movimiento del mes"
+      primaryFields={<><label className="field expense-amount-field"><span>Monto</span><input min="0.01" ref={expenseAmountInputRef} step="0.01" type="number" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} required /></label><label className="field expense-subcategory-field"><span>Subcategoría del gasto</span><select value={expenseSubcategoryId} onChange={(event) => setExpenseSubcategoryId(event.target.value)}><option value="">Uncategorized</option>{subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label></>}
+      purpose={editingExpenseId ? "Corrección del mes" : "Movimiento del mes"}
       slipRef={expenseSlipRef}
       supportingFields={<><label className="field"><span>Fecha del gasto</span><input type="date" value={expenseOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setExpenseOccurredAt(event.target.value)} required /></label><label className="field"><span>Método de pago</span><select value={expensePaymentMethod} onChange={handleExpensePaymentMethodChange} required><option value="NON_CASH">No efectivo</option><option value="CASH">Efectivo</option></select></label><label className="field"><span>Tarjeta de crédito (opcional)</span><select value={expenseCreditCardId} onChange={handleExpenseCreditCardChange}><option value="">Sin tarjeta / efectivo</option>{activeCreditCards.map((card) => <option key={card.id} value={card.id}>{formatCreditCardLabel(card)}</option>)}</select></label><label className="field expense-description-field"><span>Descripción (opcional)</span><input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} /></label></>}
-      title={editingExpenseId ? "Editar gasto" : "Registrar gasto"}
+      title={editingExpenseId ? "Corregir gasto registrado" : "Registrar gasto"}
       variant="primary"
     />
   ) : null;
@@ -670,7 +731,7 @@ export const ActiveMonthPage = () => {
           <MonthlyLedger
             days={ledger.monthId === activeMonth.id ? buildMonthlyLedgerViewModel({ monthId: activeMonth.id, status: activeMonth.status, entries: ledger.entries }).days : []}
             actionLabel={(entry) => { const income = activeMonth.incomes.find((item) => item.id === entry.entryKey); return income ? `ingreso ${income.sourceName}` : `gasto ${entry.metadata.description ?? "sin descripción"}`; }}
-            identityLabel={(entry) => { const income = activeMonth.incomes.find((item) => item.id === entry.entryKey); return income ? `Fuente: ${income.sourceName}` : undefined; }}
+            identityLabel={(entry) => { const income = activeMonth.incomes.find((item) => item.id === entry.entryKey); if (income) return `Fuente: ${income.sourceName}`; const expense = monthlyExpenseHistory.find((item) => item.id === entry.entryKey); return expense ? expense.category && expense.subcategory ? `Categoría: ${expense.category.name} / ${expense.subcategory.name}` : "Categoría: Uncategorized" : undefined; }}
             isActionable={(entry) => entry.eventType === "MONTHLY_INCOME"
               ? activeMonth.incomes.some((item) => item.id === entry.entryKey)
               : hasCurrentMonthlyExpenseHistory && monthlyExpenseHistory.some((item) => item.id === entry.entryKey)}
@@ -696,7 +757,7 @@ export const ActiveMonthPage = () => {
           <section aria-label="Acciones secundarias" className="secondary-action-strip">
             <Button disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("income")} type="button" variant="secondary">Registrar ingreso</Button>
             <Button disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("withdrawal")} type="button" variant="secondary">Retirar efectivo</Button>
-            <Button disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("deposit")} type="button" variant="secondary">Depositar en bolsillo</Button>
+            <Button aria-label="Depositar en bolsillo" disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("deposit")} type="button" variant="secondary">Depositar bolsillo</Button>
           </section>
           {incomeFeedback && secondaryForm !== "income" ? <p className={incomeFeedback.kind} role={incomeFeedback.kind === "error" ? "alert" : "status"}>{incomeFeedback.text}</p> : null}
           {!canMutateActiveMonth ? <p className="error">El mes está cerrado: los movimientos son de solo lectura.</p> : null}
@@ -715,17 +776,17 @@ export const ActiveMonthPage = () => {
         </>
       ) : null}
 
-      <Card aria-label="Estructura del mes" className="month-structure-card">
+      <Card aria-label="Ajustes del mes" className="month-structure-card">
         <details className="month-structure-disclosure" onToggle={(event) => setStructureOpen(event.currentTarget.open)} open={structureOpen}>
           <summary>
             <span>
-              <strong>Estructura del mes</strong>
-              <span>Corrige categorías y subcategorías de este mes sin perder de vista la plantilla global.</span>
+              <strong>Ajustes del mes</strong>
+              <span>Mantenimiento puntual de categorías y subcategorías de este mes; no hace parte del registro diario ni cambia la plantilla global.</span>
             </span>
           </summary>
           <div className="month-structure-content stack-md">
             <div className="row between wrap">
-              <h2>Estructura del mes</h2>
+              <h2>Ajustes del mes</h2>
               <Button variant="secondary" onClick={() => void refresh()} type="button">
                 Refrescar
               </Button>
@@ -739,11 +800,11 @@ export const ActiveMonthPage = () => {
               </strong>{" "}
               · estado {activeMonth.status}
             </p>
-            <p>Estos cambios corrigen solo la estructura de este mes; no modifican la plantilla global.</p>
+            <p>Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro.</p>
 
             {canMutateActiveMonth ? (
               <div className="stack-md">
-                <p>Crea categorías y subcategorías solo en este mes. Antes de promoverlas, marca la copia a plantilla únicamente si quieres que aparezcan en próximos meses.</p>
+                <p>Crea categorías y subcategorías solo para este mes. Antes de promoverlas, marca la copia a plantilla únicamente si quieres que aparezcan en próximos meses.</p>
 
                 <form aria-label="Crear categoría del mes activo" className="row gap-sm wrap" onSubmit={handleCreateCategory}>
                   <label className="field">

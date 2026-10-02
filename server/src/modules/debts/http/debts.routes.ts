@@ -1,4 +1,6 @@
-import { type Response, Router } from "express";
+import { type Request, type Response, Router } from "express";
+
+import { runIdempotentCreate, type IdempotencyStore, type StoredIdempotencyResponse } from "../../../lib/idempotency.js";
 
 import { DebtNotFoundError } from "../application/errors/debt-application-errors.js";
 import { DomainError } from "../domain/debt-errors.js";
@@ -30,8 +32,15 @@ const handleError = (response: Response, error: unknown) => {
   response.status(400).json({ message: readMessage(error) });
 };
 
-export const createDebtsRouter = (service: DebtsHttpService) => {
+type CreateDebtsRouterOptions = {
+  idempotencyStore?: IdempotencyStore;
+};
+
+export const createDebtsRouter = (service: DebtsHttpService, options: CreateDebtsRouterOptions = {}) => {
   const router = Router();
+
+  const runCreate = async (request: Request, scope: string, execute: () => Promise<StoredIdempotencyResponse>) =>
+    runIdempotentCreate({ request, scope, store: options.idempotencyStore, execute });
 
   router.get("/debts", async (_request, response) => {
     try {
@@ -53,13 +62,19 @@ export const createDebtsRouter = (service: DebtsHttpService) => {
   });
 
   router.post("/debts/:id/payments", async (request, response) => {
-    try {
-      const payload = parseRegisterDebtPaymentInput(request.body);
-      const debt = await service.registerPayment(request.params.id, payload);
-      response.status(201).json(toDebtApiView(debt));
-    } catch (error) {
-      handleError(response, error);
-    }
+    const result = await runCreate(request, "POST /api/debts/:id/payments", async () => {
+      try {
+        const payload = parseRegisterDebtPaymentInput(request.body);
+        const debt = await service.registerPayment(request.params.id, payload);
+        return { statusCode: 201, body: toDebtApiView(debt) };
+      } catch (error) {
+        if (error instanceof DebtNotFoundError) return { statusCode: 404, body: { message: error.message } };
+        if (isDomainError(error)) return { statusCode: error.statusCode, body: { message: error.message } };
+
+        return { statusCode: 400, body: { message: readMessage(error) } };
+      }
+    });
+    response.status(result.statusCode).json(result.body);
   });
 
   return router;

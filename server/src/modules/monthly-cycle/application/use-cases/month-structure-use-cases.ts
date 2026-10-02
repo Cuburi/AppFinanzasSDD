@@ -1,6 +1,6 @@
 import type { CreateMonthCategoryInput, CreateMonthSubcategoryInput, MonthView, UpdateMonthCategoryInput, UpdateMonthSubcategoryInput } from "../../dto/index.js";
 import { mapMonth } from "../../mappers/monthly-cycle-mappers.js";
-import { assertMonthCategory, assertMonthIsMutable, assertMonthSubcategory, hasAssociatedMonthMovements } from "../../shared/month-queries.js";
+import { assertMonthCategory, assertMonthSubcategory, hasAssociatedMonthMovements, lockMutableMonthForMutation } from "../../shared/month-queries.js";
 import { decimal } from "../../shared/money.js";
 import { DomainError } from "../../shared/service-errors.js";
 import { assertUniqueStructureName, nextSortOrder, normalizeStructureName } from "../../shared/structure-normalization.js";
@@ -20,8 +20,7 @@ export type MonthStructureUseCases = {
 export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStructureUseCases => ({
   async createMonthCategory(input) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
-      const existingMonth = await txPorts.months.findById(input.monthId);
-      assertMonthIsMutable(existingMonth);
+      const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
 
       const name = input.name.trim();
       assertUniqueStructureName(existingMonth.categories, name, "Category already exists in this month.");
@@ -44,8 +43,7 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
 
   async updateMonthCategory(input) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
-      const existingMonth = await txPorts.months.findById(input.monthId);
-      assertMonthIsMutable(existingMonth);
+      const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
       assertMonthCategory(existingMonth, input.categoryId);
 
       await txPorts.structure.updateMonthCategory({ categoryId: input.categoryId, name: input.name });
@@ -58,8 +56,7 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
 
   async deleteMonthCategory(monthId, categoryId) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
-      const existingMonth = await txPorts.months.findById(monthId);
-      assertMonthIsMutable(existingMonth);
+      const existingMonth = await lockMutableMonthForMutation(txPorts.months, monthId);
       const category = assertMonthCategory(existingMonth, categoryId);
 
       if (category.subcategories.length > 0) throw new DomainError(409, "Delete subcategories first before deleting this category.");
@@ -74,8 +71,7 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
 
   async createMonthSubcategory(input) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
-      const existingMonth = await txPorts.months.findById(input.monthId);
-      assertMonthIsMutable(existingMonth);
+      const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
       const parentCategory = assertMonthCategory(existingMonth, input.categoryId);
 
       const name = input.name.trim();
@@ -124,8 +120,7 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
 
   async updateMonthSubcategory(input) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
-      const existingMonth = await txPorts.months.findById(input.monthId);
-      assertMonthIsMutable(existingMonth);
+      const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
       assertMonthSubcategory(existingMonth, input.subcategoryId);
 
       if (input.defaultPocketId) await txPorts.pockets.ensurePocketIsActive(input.defaultPocketId, "Default pocket");
@@ -145,8 +140,7 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
 
   async deleteMonthSubcategory(monthId, subcategoryId) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
-      const existingMonth = await txPorts.months.findById(monthId);
-      assertMonthIsMutable(existingMonth);
+      const existingMonth = await lockMutableMonthForMutation(txPorts.months, monthId);
       assertMonthSubcategory(existingMonth, subcategoryId);
 
       if (hasAssociatedMonthMovements(existingMonth, subcategoryId)) throw new DomainError(409, "Cannot delete subcategory with associated movements.");

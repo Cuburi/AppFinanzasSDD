@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RM-027 Active Month Prototype</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0f12;
+      --rail: #12151a;
+      --surface: #181c22;
+      --surface-2: #20252d;
+      --surface-3: #272d36;
+      --line: #313843;
+      --line-strong: #4a5360;
+      --text: #f1f4f8;
+      --muted: #a9b0ba;
+      --subtle: #737c89;
+      --green: #8fb39e;
+      --green-strong: #b8d2c2;
+      --green-soft: #1f2a26;
+      --amber: #c4a96f;
+      --red: #c58b8b;
+      --violet: #9b95b8;
+      --blue: #8aa7c7;
+      --shadow: 0 24px 80px rgba(0, 0, 0, .32);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 70% 0%, rgba(138, 167, 199, .08), transparent 34rem), var(--bg); }
+    button, input, select { font: inherit; }
+
+    .shell { display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); min-height: 100vh; }
+    .rail { background: rgba(15, 21, 17, .92); border-right: 1px solid var(--line); display: grid; grid-template-rows: auto 1fr auto; gap: 2rem; padding: 1.5rem; position: sticky; top: 0; height: 100vh; }
+    .brand { display: grid; gap: .2rem; }
+    .brand strong { color: var(--text); font-size: 1.45rem; letter-spacing: -.04em; }
+    .brand span, .nav-group-label, .support p, .eyebrow, .muted { color: var(--muted); }
+    .nav { display: grid; align-content: start; gap: 1.4rem; }
+    .nav-group { display: grid; gap: .45rem; }
+    .nav-group-label { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; }
+    .nav a { border-left: 2px solid transparent; border-radius: .55rem; color: var(--muted); padding: .72rem .8rem; text-decoration: none; }
+    .nav a.active { background: rgba(138, 167, 199, .12); border-left-color: var(--blue); color: var(--text); }
+    .nav a:hover { background: var(--surface); color: var(--text); }
+    .support { border: 1px solid var(--line); border-radius: .9rem; padding: 1rem; }
+    .support button, .button { align-items: center; border: 1px solid transparent; border-radius: .62rem; cursor: pointer; display: inline-flex; justify-content: center; min-height: 44px; padding: .7rem 1rem; transition: transform 100ms cubic-bezier(.23, 1, .32, 1), border-color 120ms ease, background 120ms ease; }
+    .support button:active, .button:active { transform: scale(.98); }
+    .button.primary { background: var(--blue); color: #0b1016; font-weight: 750; }
+    .button.secondary { background: var(--surface-2); border-color: var(--line); color: var(--text); }
+    .button.ghost { background: transparent; border-color: var(--line); color: var(--muted); }
+
+    .main { padding: 2rem clamp(1.2rem, 4vw, 3.5rem) 4rem; }
+    .topbar { align-items: start; display: flex; gap: 1rem; justify-content: space-between; margin-bottom: 2rem; }
+    h1 { font-size: clamp(2rem, 4vw, 3.4rem); letter-spacing: -.055em; line-height: .95; margin: 0; }
+    h2, h3, p { margin-top: 0; }
+    .subtitle { color: var(--muted); margin: .6rem 0 0; max-width: 42rem; }
+    .top-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .7rem; justify-content: flex-end; }
+    .timestamp { color: var(--subtle); font-size: .9rem; }
+
+    .runway { align-items: stretch; display: grid; gap: 1.4rem; grid-template-columns: minmax(0, 1.25fr) minmax(21rem, .75fr); }
+    .panel { background: linear-gradient(180deg, rgba(32, 37, 45, .98), rgba(24, 28, 34, .98)); border: 1px solid var(--line); border-radius: 1.1rem; box-shadow: var(--shadow); min-width: 0; padding: 1.35rem; }
+    .availability { display: grid; gap: 1.3rem; }
+    .eyebrow { font-size: .73rem; font-weight: 750; letter-spacing: .13em; margin-bottom: .5rem; text-transform: uppercase; }
+    .money { font-size: clamp(3rem, 8vw, 6.2rem); font-variant-numeric: tabular-nums lining-nums; font-weight: 780; letter-spacing: -.065em; line-height: .9; margin: 0; overflow-wrap: anywhere; }
+    .health { align-items: center; display: flex; flex-wrap: wrap; gap: .7rem; }
+    .pill { border: 1px solid var(--line); border-radius: 999px; color: var(--muted); display: inline-flex; font-weight: 700; padding: .38rem .65rem; }
+    .pill.safe { background: var(--green-soft); border-color: rgba(143, 179, 158, .34); color: var(--green-strong); }
+    .metrics { display: grid; gap: .8rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .metric { border-top: 1px solid var(--line); display: grid; gap: .25rem; padding-top: .8rem; }
+    .metric span { color: var(--muted); font-size: .9rem; }
+    .metric strong { font-size: 1.15rem; font-variant-numeric: tabular-nums lining-nums; }
+    .progress-label { align-items: center; color: var(--muted); display: flex; justify-content: space-between; }
+    .progress { background: #0d130f; border-radius: 999px; height: .7rem; overflow: hidden; }
+    .progress > div { background: linear-gradient(90deg, var(--blue), var(--green-strong)); border-radius: inherit; height: 100%; width: 62%; }
+
+    .slip { display: grid; gap: 1rem; }
+    .slip h2 { font-size: 1.4rem; letter-spacing: -.025em; margin: 0; }
+    .form-grid { display: grid; gap: .85rem; }
+    label { color: var(--muted); display: grid; gap: .4rem; font-size: .9rem; }
+    input, select { background: #0f1511; border: 1px solid var(--line-strong); border-radius: .65rem; color: var(--text); min-height: 44px; padding: .7rem .85rem; width: 100%; }
+    input.amount { color: var(--text); font-size: 1.45rem; font-weight: 760; }
+    .split { display: grid; gap: .8rem; grid-template-columns: 1fr 1fr; }
+
+    .ledger { margin-top: 1.4rem; }
+    .section-head { align-items: end; display: flex; gap: 1rem; justify-content: space-between; margin-bottom: 1rem; }
+    .section-head h2 { letter-spacing: -.035em; margin: 0; }
+    .rows { display: grid; }
+    .movement { align-items: center; border-top: 1px solid var(--line); display: grid; gap: 1rem; grid-template-columns: 6.5rem minmax(0, 1fr) auto auto; padding: .95rem 0; }
+    .movement:first-child { border-top: 0; }
+    .movement time, .movement .kind { color: var(--muted); }
+    .movement strong { font-variant-numeric: tabular-nums lining-nums; }
+    .amount-negative { color: var(--red); }
+    .amount-positive { color: var(--green-strong); }
+    .row-actions { display: flex; gap: .45rem; }
+    .mini { min-height: 36px; padding: .45rem .62rem; }
+
+    .secondary-actions { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 1.4rem; }
+    .action-card { background: rgba(32, 37, 45, .62); border: 1px solid var(--line); border-radius: .95rem; padding: 1rem; }
+    .action-card h3 { margin-bottom: .35rem; }
+    .action-card p { color: var(--muted); margin-bottom: 1rem; }
+
+    .maintenance { margin-top: 1.4rem; }
+    .maintenance summary { align-items: center; cursor: pointer; display: flex; justify-content: space-between; list-style: none; min-height: 44px; }
+    .maintenance summary::-webkit-details-marker { display: none; }
+    .maintenance summary::after { color: var(--violet); content: "+"; font-size: 1.4rem; }
+    .maintenance[open] summary::after { content: "−"; }
+
+    .mobile-menu { display: none; }
+
+    @media (max-width: 1080px) {
+      .shell { display: block; }
+      .rail { align-items: center; display: flex; height: auto; justify-content: space-between; padding: .85rem 1rem; position: static; }
+      .nav, .support, .brand span { display: none; }
+      .mobile-menu { display: inline-flex; }
+      .main { padding-top: 1.5rem; }
+      .runway { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 720px) {
+      .topbar { display: grid; }
+      .top-actions { justify-content: start; }
+      .metrics, .secondary-actions, .split { grid-template-columns: 1fr; }
+      .movement { align-items: start; grid-template-columns: minmax(0, 1fr) auto; }
+      .movement time { grid-column: 1; }
+      .movement .desc { grid-column: 1; }
+      .movement strong { grid-column: 2; grid-row: 1 / span 2; text-align: right; }
+      .row-actions { grid-column: 1 / -1; }
+      .row-actions .button { width: 100%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { transition-duration: 0ms !important; }
+      .button:active, .support button:active { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail">
+      <div class="brand"><strong>AppFinanzas</strong><span>Finanzas personales</span></div>
+      <nav class="nav" aria-label="Navegación prototipo">
+        <div class="nav-group"><span class="nav-group-label">Daily</span><a class="active" href="#">Mes activo</a><a href="#">Cierre</a><a href="#">Reportes</a></div>
+        <div class="nav-group"><span class="nav-group-label">Financial context</span><a href="#">Bolsillos</a><a href="#">Deudas</a><a href="#">Tarjetas de crédito</a></div>
+        <div class="nav-group"><span class="nav-group-label">Setup</span><a href="#">Plantilla</a></div>
+      </nav>
+      <div class="support"><strong>Modo prototipo</strong><p>Wireframe visual para RM-027. No es UI productiva.</p><button type="button">Ver auditoría</button></div>
+      <button class="button secondary mobile-menu" type="button">Menú</button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><h1>Mes activo</h1><p class="subtitle">Tu centro de decisión para entender disponibilidad, registrar gastos y revisar lo que cambió.</p></div>
+        <div class="top-actions"><span class="timestamp">Actualizado hace 2 min</span><button class="button secondary" type="button">Actualizar</button></div>
+      </header>
+
+      <section class="runway" aria-label="Decisión principal del mes">
+        <article class="panel availability">
+          <div><p class="eyebrow">Disponible del mes</p><p class="money">$1.245.000</p></div>
+          <div class="health"><span class="pill safe">Mes seguro</span><span class="muted">Vas dentro del presupuesto actual.</span></div>
+          <div class="metrics">
+            <div class="metric"><span>Ingresos</span><strong>$3.200.000</strong></div>
+            <div class="metric"><span>Gastado</span><strong>$1.955.000</strong></div>
+            <div class="metric"><span>Efectivo</span><strong>$240.000</strong></div>
+          </div>
+          <div><div class="progress-label"><span>Presupuesto usado</span><strong>62%</strong></div><div class="progress" aria-hidden="true"><div></div></div></div>
+        </article>
+
+        <article class="panel slip">
+          <div><p class="eyebrow">Movimiento del mes</p><h2>Registrar gasto</h2></div>
+          <div class="form-grid">
+            <label>Monto<input class="amount" value="80.000" /></label>
+            <label>Subcategoría<select><option>Supermercado · quedan $220.000</option></select></label>
+            <div class="split"><label>Método<select><option>No efectivo</option><option>Efectivo</option></select></label><label>Tarjeta<select><option>Sin tarjeta</option><option>Visa Bancolombia</option></select></label></div>
+            <button class="button primary" type="button">Registrar gasto</button>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel ledger" aria-label="Movimientos recientes">
+        <div class="section-head"><div><p class="eyebrow">Evidencia</p><h2>Movimientos recientes</h2></div><button class="button ghost" type="button">Ver todos</button></div>
+        <div class="rows">
+          <article class="movement"><time>Hoy · 9:14</time><div class="desc"><strong>Gasto</strong><div class="kind">Supermercado · No efectivo</div></div><strong class="amount-negative">-$80.000</strong><div class="row-actions"><button class="button ghost mini">Editar</button><button class="button ghost mini">Eliminar</button></div></article>
+          <article class="movement"><time>Ayer · 18:20</time><div class="desc"><strong>Ingreso</strong><div class="kind">Nómina</div></div><strong class="amount-positive">+$3.200.000</strong><div class="row-actions"><button class="button ghost mini">Detalle</button></div></article>
+          <article class="movement"><time>Ayer · 12:02</time><div class="desc"><strong>Depósito a bolsillo</strong><div class="kind">Viaje · reserva de dinero</div></div><strong class="amount-negative">-$120.000</strong><div class="row-actions"><button class="button ghost mini">Detalle</button></div></article>
+        </div>
+      </section>
+
+      <section class="secondary-actions" aria-label="Acciones secundarias">
+        <article class="action-card"><h3>Registrar ingreso</h3><p>Aumenta el disponible del mes.</p><button class="button secondary">Abrir</button></article>
+        <article class="action-card"><h3>Retirar efectivo</h3><p>Mueve dinero hacia cash físico.</p><button class="button secondary">Abrir</button></article>
+        <article class="action-card"><h3>Depositar bolsillo</h3><p>Reserva dinero para una meta.</p><button class="button secondary">Abrir</button></article>
+      </section>
+
+      <details class="panel maintenance">
+        <summary><div><p class="eyebrow">Mantenimiento</p><h2>Mantenimiento del mes</h2><p class="muted">Categorías, subcategorías y estructura de este mes. No es parte del registro diario.</p></div></summary>
+        <p class="muted">Aquí vivirían los ajustes de estructura del mes, por debajo del loop diario.</p>
+      </details>
+    </main>
+  </div>
+</body>
+</html>

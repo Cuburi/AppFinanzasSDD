@@ -4,6 +4,7 @@ import test from "node:test";
 import { MonthStatus, MovementType, Prisma } from "../../../../lib/prisma-client.js";
 import { CLOSURE_USE_CASE_NAMES, createClosureUseCases } from "./closure-use-cases.js";
 import type { MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
+import type { MonthRecord } from "../../shared/service-types.js";
 
 const amount = (value: number) => new Prisma.Decimal(value.toFixed(2));
 
@@ -59,11 +60,17 @@ const deficitMonth = {
   ],
 };
 
-const createClosurePorts = (month = balancedMonth) => {
+const createClosurePorts = (month: MonthRecord = balancedMonth) => {
   const calls: unknown[] = [];
+  let lockCalls = 0;
   const txPorts = {
     months: {
       async findById(monthId: string) {
+        calls.push(["tx.months.findById", monthId]);
+        return month;
+      },
+      async lockForMutation(monthId: string) {
+        lockCalls += 1;
         calls.push(["tx.months.findById", monthId]);
         return month;
       },
@@ -111,8 +118,18 @@ const createClosurePorts = (month = balancedMonth) => {
     },
   } as unknown as MonthlyCyclePorts;
 
-  return { calls, ports };
+  return { calls, ports, getLockCalls: () => lockCalls };
 };
+
+test("closure mutations lock the owning month before evaluating mutable state", async () => {
+  const closureActionPorts = createClosurePorts(deficitMonth);
+  const closePorts = createClosurePorts();
+
+  await createClosureUseCases(closureActionPorts.ports).applyClosureAction({ monthId: "month-1", type: MovementType.DEFICIT_COVER_FROM_POCKET, sourcePocketId: "pocket-safe", targetSubcategoryId: "sub-market", amount: 25 });
+  await createClosureUseCases(closePorts.ports).closeMonth("month-1");
+
+  assert.equal(closureActionPorts.getLockCalls() + closePorts.getLockCalls(), 2);
+});
 
 test("closure use cases expose only the closure public surface", () => {
   assert.deepEqual(CLOSURE_USE_CASE_NAMES, ["getClosureReview", "applyClosureAction", "closeMonth"]);
@@ -133,12 +150,44 @@ test("getClosureReview reads the month through the month repository port and rep
   assert.deepEqual(calls, [["months.findById", "month-1"]]);
 });
 
-test("applyClosureAction persists surplus and deficit closure movements inside the transaction runner", async () => {
+test("closure keeps surplus as informational budget variance when uncategorized spending reconciles month money", () => {
+  const uncategorizedExpenseMonth = {
+    ...balancedMonth,
+    incomes: [{ ...balancedMonth.incomes[0]!, amount: amount(10_000) }],
+    categories: [{
+      ...balancedMonth.categories[0]!,
+      subcategories: [{ ...balancedMonth.categories[0]!.subcategories[0]!, plannedAmount: amount(10_000) }],
+    }],
+    movements: [{
+      id: "expense-uncategorized",
+      type: MovementType.EXPENSE,
+      amount: amount(10_000),
+      paymentMethod: "NON_CASH" as const,
+      sourceSubcategoryId: null,
+      targetSubcategoryId: null,
+      sourcePocketId: null,
+      targetPocketId: null,
+    }],
+  };
+
+  const review = createClosureUseCases(createClosurePorts(uncategorizedExpenseMonth).ports).getClosureReview("month-1");
+
+  return review.then((value) => {
+    assert.equal(value.availableMoney, 0);
+    assert.equal(value.canClose, true);
+    assert.deepEqual(value.budgetVariances, [{ subcategoryId: "sub-market", subcategoryName: "Market", amount: 10_000, kind: "SURPLUS", informational: true }]);
+  });
+});
+
+test("applyClosureAction rejects surplus transfer and persists deficit closure movements inside the transaction runner", async () => {
   const { calls, ports } = createClosurePorts(surplusMonth);
   const deficitPorts = createClosurePorts(deficitMonth);
   const useCases = createClosureUseCases(ports);
 
-  const surplusReview = await useCases.applyClosureAction({ monthId: "month-1", type: MovementType.SURPLUS_TO_POCKET_ON_CLOSE, sourceSubcategoryId: "sub-market" });
+  await assert.rejects(
+    () => useCases.applyClosureAction({ monthId: "month-1", type: MovementType.SURPLUS_TO_POCKET_ON_CLOSE, sourceSubcategoryId: "sub-market" }),
+    { message: "Budget variance is informational and cannot be transferred." },
+  );
   const deficitReview = await createClosureUseCases(deficitPorts.ports).applyClosureAction({
     monthId: "month-1",
     type: MovementType.DEFICIT_COVER_FROM_POCKET,
@@ -147,13 +196,9 @@ test("applyClosureAction persists surplus and deficit closure movements inside t
     amount: 25,
   });
 
-  assert.equal(surplusReview.pendingSurpluses.length, 1);
   assert.equal(deficitReview.pendingDeficits.length, 1);
   assert.deepEqual(calls, [
     ["transactionRunner.run"],
-    ["tx.months.findById", "month-1"],
-    ["tx.pockets.ensurePocketIsActive", "pocket-food", "Target pocket"],
-    ["tx.movements.create", "SURPLUS_TO_POCKET_ON_CLOSE", "100", "sub-market", null, null, "pocket-food"],
     ["tx.months.findById", "month-1"],
   ]);
   assert.deepEqual(deficitPorts.calls, [

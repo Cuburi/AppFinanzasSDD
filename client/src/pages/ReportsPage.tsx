@@ -136,6 +136,11 @@ export const ReportsPage = () => {
       </Card>
 
       <ReportSubcategorySection title="Top spending subcategories" emptyMessage="No spending recorded for this active month." items={report.topSpendingSubcategories} />
+      <Card aria-label="Uncategorized spending" className="stack-sm">
+        <SectionHeader title="Uncategorized" />
+        <p>{formatMoney(report.uncategorizedSpending.amount)}</p>
+        <p>Cash: {formatMoney(report.uncategorizedSpending.cashAmount)} · Non-cash: {formatMoney(report.uncategorizedSpending.nonCashAmount)}</p>
+      </Card>
       <ReportSubcategorySection title="Surplus subcategories" emptyMessage="No surplus subcategories for this active month." items={report.surplusSubcategories} />
       <ReportSubcategorySection title="Deficit subcategories" emptyMessage="No deficit subcategories for this active month." items={report.deficitSubcategories} />
     </section>

@@ -1,0 +1,64 @@
+# SDD bootstrap configuration. Existing specs and changes remain authoritative.
+schema: spec-driven
+project: appfinanzassdd
+artifact_store: hybrid
+execution_mode: interactive
+delivery_strategy: ask-on-risk
+review_budget_lines: 400
+strict_tdd: false
+
+context: |
+  Workspace: pnpm monorepo (Node 22) with client and server packages.
+  Client: React 18, Vite 5, TypeScript 5, Vitest, Testing Library, Playwright.
+  Server: Express 5, Prisma 6, TypeScript 5, Node's native test runner via tsx.
+  Architecture: server modules use application, domain, HTTP, infrastructure, and workflow boundaries.
+  Existing OpenSpec specs and changes are preserved; do not overwrite unrelated work.
+
+projects:
+  - path: client
+    stack: React 18, Vite 5, TypeScript 5
+    test_command: pnpm --dir client test
+    test_framework: Vitest 2 with Testing Library and jsdom
+    integration_test_command: pnpm --dir client test
+    e2e_test_command: pnpm --dir client test:e2e
+    coverage_command: ""
+    linter_command: ""
+    typecheck_command: pnpm --dir client typecheck
+    formatter_command: ""
+  - path: server
+    stack: Express 5, Prisma 6, TypeScript 5, Node 22
+    test_command: pnpm --dir server test
+    test_framework: Node native test runner with tsx
+    integration_test_command: pnpm --dir server test
+    e2e_test_command: ""
+    coverage_command: ""
+    linter_command: ""
+    typecheck_command: pnpm --dir server build
+    formatter_command: ""
+
+testing:
+  workspace_test_command: ""
+  strict_tdd_reason: No explicit workspace-level test command runs both client and server; project-local commands remain available.
+
+rules:
+  proposal:
+    - Include rollback plans for risky changes.
+    - Preserve existing OpenSpec artifacts and unrelated dirty work.
+  specs:
+    - Use Given/When/Then scenarios and RFC 2119 keywords.
+  design:
+    - Document decisions and boundary impacts with rationale.
+  tasks:
+    - Use hierarchical, session-completable tasks.
+  apply:
+    guidelines:
+      - Follow existing module and package conventions.
+      - Do not modify unrelated dirty work.
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas.

@@ -70,7 +70,9 @@ describe("ActiveMonthDashboard", () => {
     );
 
     const dashboard = screen.getByRole("region", { name: "Panel del mes activo" });
-    expect(within(dashboard).getByRole("heading", { level: 1, name: "Julio 2026" })).toBeInTheDocument();
+    expect(within(dashboard).getByRole("heading", { level: 1, name: "Mes activo" })).toBeInTheDocument();
+    expect(within(dashboard).getByText("Tu dinero, en contexto")).toBeInTheDocument();
+    expect(within(dashboard).getByText("Julio 2026")).toBeInTheDocument();
     expect(within(dashboard).getByRole("status", { name: /Mes abierto/i })).toBeInTheDocument();
     expect(within(dashboard).getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
   });
@@ -138,6 +140,7 @@ describe("ActiveMonthDashboard", () => {
     const activity = screen.getByRole("region", { name: "Actividad y contexto" });
 
     expect(financial.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(financial.closest(".dashboard-top-grid")).toContainElement(nextAction);
     expect(quickActions.compareDocumentPosition(financial) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(nextAction.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(warning.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -166,7 +169,7 @@ describe("ActiveMonthDashboard", () => {
     );
 
     const dashboard = screen.getByRole("region", { name: "Panel del mes activo" });
-    const title = within(dashboard).getByRole("heading", { level: 1, name: "Julio 2026" });
+    const title = within(dashboard).getByRole("heading", { level: 1, name: "Mes activo" });
     const financial = within(dashboard).getByRole("region", { name: "Resumen financiero" });
 
     expect(container.querySelector(".active-month-dashboard")).toBe(dashboard);

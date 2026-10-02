@@ -49,6 +49,12 @@ const report: BasicMonthlyReport = {
       amount: 225,
     },
   ],
+  uncategorizedSpending: {
+    label: "Uncategorized",
+    amount: 60,
+    cashAmount: 20,
+    nonCashAmount: 40,
+  },
   surplusSubcategories: [
     {
       subcategoryId: "sub-savings",

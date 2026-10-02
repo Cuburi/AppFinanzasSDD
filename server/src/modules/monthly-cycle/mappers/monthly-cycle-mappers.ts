@@ -82,7 +82,20 @@ const findSubcategoryContext = (month: MonthRecord, subcategoryId: string) => {
 
 export const mapExpenseHistory = (month: MonthRecord, movements: MovementHistoryRecord[]): ExpenseHistoryView => ({
   expenses: movements.map((movement) => {
-    const sourceSubcategoryId = movement.sourceSubcategoryId ?? "";
+    if (!movement.sourceSubcategoryId) {
+      return {
+        id: movement.id ?? "",
+        occurredAt: (movement.occurredAt ?? month.openedAt).toISOString(),
+        paymentMethod: movement.paymentMethod ?? PaymentMethod.NON_CASH,
+        amount: decimalToNumber(movement.amount),
+        description: movement.description ?? null,
+        creditCardId: movement.creditCardId ?? null,
+        category: null,
+        subcategory: null,
+      };
+    }
+
+    const sourceSubcategoryId = movement.sourceSubcategoryId;
     const context = findSubcategoryContext(month, sourceSubcategoryId);
 
     if (!context) {

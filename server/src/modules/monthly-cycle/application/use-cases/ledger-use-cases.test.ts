@@ -14,6 +14,7 @@ const month = {
     { id: "expense-cash", type: MovementType.EXPENSE, amount: amount(20), occurredAt: new Date("2026-05-12T00:00:00.000Z"), description: "Groceries", paymentMethod: PaymentMethod.CASH, sourceSubcategoryId: "food", targetSubcategoryId: null, sourcePocketId: null, targetPocketId: null },
     { id: "deposit-subcategory", type: MovementType.POCKET_DEPOSIT_FROM_SUBCATEGORY, amount: amount(30), occurredAt: new Date("2026-05-11T00:00:00.000Z"), description: null, paymentMethod: null, sourceSubcategoryId: "food", targetSubcategoryId: null, sourcePocketId: null, targetPocketId: "pocket-1" },
     { id: "expense-card", type: MovementType.EXPENSE, amount: amount(15), occurredAt: new Date("2026-05-11T00:00:00.000Z"), description: null, paymentMethod: PaymentMethod.NON_CASH, sourceSubcategoryId: "food", targetSubcategoryId: null, sourcePocketId: null, targetPocketId: null },
+    { id: "expense-uncategorized", type: MovementType.EXPENSE, amount: amount(12), occurredAt: new Date("2026-05-11T00:00:00.000Z"), description: "One-off", paymentMethod: PaymentMethod.NON_CASH, sourceSubcategoryId: null, targetSubcategoryId: null, sourcePocketId: null, targetPocketId: null },
     { id: "withdrawal", type: MovementType.CASH_WITHDRAWAL, amount: amount(25), monthId: "month-1", occurredAt: new Date("2026-05-09T00:00:00.000Z"), description: null, paymentMethod: null, sourceSubcategoryId: null, targetSubcategoryId: null, sourcePocketId: null, targetPocketId: null },
     { id: "deposit-available", type: MovementType.POCKET_DEPOSIT_FROM_AVAILABLE, amount: amount(20), monthId: "month-1", occurredAt: new Date("2026-05-08T00:00:00.000Z"), description: null, paymentMethod: null, sourceSubcategoryId: null, targetSubcategoryId: null, sourcePocketId: null, targetPocketId: "pocket-1" },
     { id: "external", type: MovementType.POCKET_DEPOSIT_EXTERNAL, amount: amount(40), occurredAt: new Date("2026-05-10T00:00:00.000Z"), description: null, paymentMethod: null, sourceSubcategoryId: null, targetSubcategoryId: null, sourcePocketId: null, targetPocketId: "pocket-1" },
@@ -47,7 +48,7 @@ test("getMonthlyLedger returns a closed month projection once, in stable canonic
   assert.deepEqual(ledger.entries.map((entry) => [entry.entryKey, entry.eventType, entry.direction]), [
     ["income-1", "MONTHLY_INCOME", "INFLOW"],
     ["expense-cash", "CASH_EXPENSE", "OUTFLOW"],
-    ["expense-card", "NON_CASH_EXPENSE", "OUTFLOW"], ["deposit-subcategory", "POCKET_DEPOSIT_FROM_SUBCATEGORY", "TRANSFER"], ["withdrawal", "CASH_WITHDRAWAL", "TRANSFER"], ["deposit-available", "POCKET_DEPOSIT_FROM_AVAILABLE", "TRANSFER"],
+    ["expense-card", "NON_CASH_EXPENSE", "OUTFLOW"], ["expense-uncategorized", "NON_CASH_EXPENSE", "OUTFLOW"], ["deposit-subcategory", "POCKET_DEPOSIT_FROM_SUBCATEGORY", "TRANSFER"], ["withdrawal", "CASH_WITHDRAWAL", "TRANSFER"], ["deposit-available", "POCKET_DEPOSIT_FROM_AVAILABLE", "TRANSFER"],
   ]);
   assert.deepEqual(calls, ["month-1"]);
 });
@@ -61,6 +62,7 @@ test("getMonthlyLedger includes every system event only when requested and prese
     ["income-1", "MONTHLY_INCOME", "INFLOW", "EXTERNAL", null, "MONTH", "month-1", 1000, "May", null, false],
     ["expense-cash", "CASH_EXPENSE", "OUTFLOW", "CASH", null, "EXPENSE", "food", 20, "Groceries", "CASH", false],
     ["expense-card", "NON_CASH_EXPENSE", "OUTFLOW", "SUBCATEGORY", "food", "EXPENSE", null, 15, null, "NON_CASH", false],
+    ["expense-uncategorized", "NON_CASH_EXPENSE", "OUTFLOW", "SUBCATEGORY", null, "EXPENSE", null, 12, "One-off", "NON_CASH", false],
     ["deposit-subcategory", "POCKET_DEPOSIT_FROM_SUBCATEGORY", "TRANSFER", "SUBCATEGORY", "food", "POCKET", "pocket-1", 30, null, null, false],
     ["withdrawal", "CASH_WITHDRAWAL", "TRANSFER", "MONTH", "month-1", "CASH", null, 25, null, null, false],
     ["deposit-available", "POCKET_DEPOSIT_FROM_AVAILABLE", "TRANSFER", "MONTH", "month-1", "POCKET", "pocket-1", 20, null, null, false],
@@ -70,7 +72,7 @@ test("getMonthlyLedger includes every system event only when requested and prese
     ["carryover", "CASH_CARRYOVER", "TRANSFER", "CASH", null, "CASH", null, 50, null, null, true],
   ]);
   assert.deepEqual(balanceEffects(ledger.entries), [
-    { eventType: "MONTHLY_INCOME", availableMoney: 1000, cashBalance: 0, subcategoryAvailable: 0, pocketBalance: 0 }, { eventType: "CASH_EXPENSE", availableMoney: 0, cashBalance: -20, subcategoryAvailable: -20, pocketBalance: 0 }, { eventType: "NON_CASH_EXPENSE", availableMoney: -15, cashBalance: 0, subcategoryAvailable: -15, pocketBalance: 0 }, { eventType: "POCKET_DEPOSIT_FROM_SUBCATEGORY", availableMoney: -30, cashBalance: 0, subcategoryAvailable: -30, pocketBalance: 30 }, { eventType: "CASH_WITHDRAWAL", availableMoney: -25, cashBalance: 25, subcategoryAvailable: 0, pocketBalance: 0 }, { eventType: "POCKET_DEPOSIT_FROM_AVAILABLE", availableMoney: -20, cashBalance: 0, subcategoryAvailable: 0, pocketBalance: 20 }, { eventType: "CLOSURE_SURPLUS", availableMoney: -5, cashBalance: 0, subcategoryAvailable: -5, pocketBalance: 5 }, { eventType: "DEFICIT_RESOLUTION", availableMoney: 0, cashBalance: 0, subcategoryAvailable: 0, pocketBalance: 0 }, { eventType: "DEFICIT_RESOLUTION", availableMoney: 0, cashBalance: 0, subcategoryAvailable: 10, pocketBalance: -10 }, { eventType: "CASH_CARRYOVER", availableMoney: 0, cashBalance: 50, subcategoryAvailable: 0, pocketBalance: 0 },
+    { eventType: "MONTHLY_INCOME", availableMoney: 1000, cashBalance: 0, subcategoryAvailable: 0, pocketBalance: 0 }, { eventType: "CASH_EXPENSE", availableMoney: 0, cashBalance: -20, subcategoryAvailable: -20, pocketBalance: 0 }, { eventType: "NON_CASH_EXPENSE", availableMoney: -15, cashBalance: 0, subcategoryAvailable: -15, pocketBalance: 0 }, { eventType: "NON_CASH_EXPENSE", availableMoney: -12, cashBalance: 0, subcategoryAvailable: 0, pocketBalance: 0 }, { eventType: "POCKET_DEPOSIT_FROM_SUBCATEGORY", availableMoney: -30, cashBalance: 0, subcategoryAvailable: -30, pocketBalance: 30 }, { eventType: "CASH_WITHDRAWAL", availableMoney: -25, cashBalance: 25, subcategoryAvailable: 0, pocketBalance: 0 }, { eventType: "POCKET_DEPOSIT_FROM_AVAILABLE", availableMoney: -20, cashBalance: 0, subcategoryAvailable: 0, pocketBalance: 20 }, { eventType: "CLOSURE_SURPLUS", availableMoney: -5, cashBalance: 0, subcategoryAvailable: -5, pocketBalance: 5 }, { eventType: "DEFICIT_RESOLUTION", availableMoney: 0, cashBalance: 0, subcategoryAvailable: 0, pocketBalance: 0 }, { eventType: "DEFICIT_RESOLUTION", availableMoney: 0, cashBalance: 0, subcategoryAvailable: 10, pocketBalance: -10 }, { eventType: "CASH_CARRYOVER", availableMoney: 0, cashBalance: 50, subcategoryAvailable: 0, pocketBalance: 0 },
   ]);
 });
 
@@ -82,5 +84,5 @@ test("getMonthlyLedger repeats the same total order and uses entryKey for same-r
   const [first, second] = await Promise.all([useCases.getMonthlyLedger({ monthId: "month-1", includeSystemEvents: false }), useCases.getMonthlyLedger({ monthId: "month-1", includeSystemEvents: false })]);
 
   assert.deepEqual(first.entries, second.entries);
-  assert.deepEqual(first.entries.map((entry) => entry.entryKey), ["income-1", "expense-cash", "expense-card", "deposit-subcategory", "withdrawal", "withdrawal-a", "withdrawal-z", "deposit-available"]);
+  assert.deepEqual(first.entries.map((entry) => entry.entryKey), ["income-1", "expense-cash", "expense-card", "expense-uncategorized", "deposit-subcategory", "withdrawal-a", "withdrawal-z", "withdrawal", "deposit-available"]);
 });

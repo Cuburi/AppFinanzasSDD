@@ -13,6 +13,13 @@ export type BasicReportSubcategoryView = {
   amount: number;
 };
 
+export type BasicReportUncategorizedView = {
+  label: "Uncategorized";
+  amount: number;
+  cashAmount: number;
+  nonCashAmount: number;
+};
+
 export type BasicMonthlyReportView = {
   summary: {
     monthId: string;
@@ -27,6 +34,7 @@ export type BasicMonthlyReportView = {
     totalSpentNonCash: number;
   };
   topSpendingSubcategories: BasicReportSubcategoryView[];
+  uncategorizedSpending: BasicReportUncategorizedView;
   surplusSubcategories: BasicReportSubcategoryView[];
   deficitSubcategories: BasicReportSubcategoryView[];
 };

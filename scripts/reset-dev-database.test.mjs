@@ -20,6 +20,8 @@ import {
   createInvocationContext,
   executeLocalReset,
   applicationTableQuery,
+  systemIdentifierQuery,
+  parseComposePs,
   removeVerifiedTarget,
   runResetWorkflow,
   verifyStablePlan,
@@ -28,6 +30,7 @@ import {
   volumeFingerprint,
 } from "./reset-local-database.mjs";
 
+const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 const composePath = fileURLToPath(new URL("../docker-compose.yml", import.meta.url));
 const devResetPath = fileURLToPath(new URL("./reset-dev-database.mjs", import.meta.url));
 const personalResetPath = fileURLToPath(new URL("./guard-personal-reset.mjs", import.meta.url));
@@ -159,6 +162,24 @@ test("public reset wrappers route valid invocations into guarded preflight", () 
   }
 });
 
+test("package-script personal reset arguments route into guarded preflight without a pnpm separator", () => {
+  const pnpmCommand = process.platform === "win32" ? "pnpm" : "pnpm";
+  const result = spawnSync(pnpmCommand, [
+    "db:personal:reset",
+    "--confirm", "RESET_APPFINANZAS_PERSONAL",
+    "--profile", "appfinanzas_personal",
+  ], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: { ...process.env, COMPOSE_PROJECT_NAME: "unsafe-override" },
+    shell: process.platform === "win32",
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /PREFLIGHT_REJECTED: Compose environment variable is not allowed: COMPOSE_PROJECT_NAME/);
+  assert.doesNotMatch(result.stderr, /CONFIRMATION_REJECTED/);
+});
+
 test("personal wrapper rejects unsafe Compose overrides before fresh-checkout filesystem access", () => {
   const freshCheckout = mkdtempSync(join(tmpdir(), "appfinanzas-reset-fresh-checkout-"));
   try {
@@ -209,6 +230,10 @@ test("active root environment must select the requested reset profile before mut
     () => assertActiveProfile("dev", 'DATABASE_URL="postgresql://postgres:postgres@localhost:5434/appfinanzas_personal?schema=public"'),
     (error) => error instanceof ResetFailure && error.code === "PREFLIGHT_REJECTED",
   );
+  assert.throws(
+    () => assertActiveProfile("personal", 'DATABASE_URL="postgresql://postgres:postgres@db.example.test:5434/appfinanzas_personal?schema=public"'),
+    (error) => error instanceof ResetFailure && error.code === "PREFLIGHT_REJECTED",
+  );
 });
 
 test("reconstruction uses the verified rendered snapshot and stops a running target before removal", () => {
@@ -230,17 +255,30 @@ test("reconstruction uses the verified rendered snapshot and stops a running tar
   ]);
 });
 
-test("post-reset commands exclude migration control data, quiet psql tags, and shell pnpm.cmd on Windows", () => {
+test("post-reset commands exclude migration control data, quiet psql tags, and use noninteractive guarded migrate deploy", () => {
   assert.match(applicationTableQuery(), /table_name NOT IN \('_prisma_migrations', 'MonthlyLedgerBackfillControl'\)/);
-  assert.deepEqual(buildMigrationCommand("dev", "win32"), ["pnpm.cmd", ["prisma:dev:migrate"], { shell: true }]);
-  assert.deepEqual(buildMigrationCommand("personal", "linux"), ["pnpm", ["prisma:personal:migrate"], { shell: false }]);
+  assert.deepEqual(buildMigrationCommand("dev", "win32"), ["node", ["scripts/run-prisma-with-profile.mjs", "dev", "--", "migrate", "deploy", "--schema", "prisma/schema.prisma"], { shell: false }]);
+  assert.deepEqual(buildMigrationCommand("personal", "linux"), ["node", ["scripts/run-prisma-with-profile.mjs", "personal", "--", "migrate", "deploy", "--schema", "prisma/schema.prisma"], { shell: false }]);
   assert.deepEqual(buildSqlCommand("container-id", "appfinanzas_dev", "SELECT 1"), ["docker", ["exec", "container-id", "psql", "-U", "postgres", "-d", "appfinanzas_dev", "-q", "-tAc", "SELECT 1"]]);
+});
+
+test("system identifier SQL uses valid PostgreSQL composite field syntax", () => {
+  assert.equal(systemIdentifierQuery(), "SELECT (pg_control_system()).system_identifier");
+  assert.notEqual(systemIdentifierQuery(), "SELECT pg_control_system().system_identifier");
+  assert.deepEqual(buildSqlCommand("container-id", "appfinanzas_dev", systemIdentifierQuery()), [
+    "docker",
+    ["exec", "container-id", "psql", "-U", "postgres", "-d", "appfinanzas_dev", "-q", "-tAc", "SELECT (pg_control_system()).system_identifier"],
+  ]);
 });
 
 test("personal reset requires the exact ordered dual confirmation without extra arguments", () => {
   assert.deepEqual(
     validatePersonalConfirmation(["--confirm", "RESET_APPFINANZAS_PERSONAL", "--profile", "appfinanzas_personal"]),
     { profile: "personal" },
+  );
+  assert.throws(
+    () => validatePersonalConfirmation(["--", "--confirm", "RESET_APPFINANZAS_PERSONAL", "--profile", "appfinanzas_personal"]),
+    (error) => error instanceof ResetFailure && error.code === "CONFIRMATION_REJECTED",
   );
   assert.throws(
     () => validatePersonalConfirmation(["--profile", "appfinanzas_personal", "--confirm", "RESET_APPFINANZAS_PERSONAL"]),
@@ -274,6 +312,12 @@ test("reset failures expose stable pre- and post-mutation taxonomy", () => {
 
 const resetContext = () => createInvocationContext({
   policyName: "dev",
+  cwd: "/repo",
+  sourceHashes: { "docker-compose.yml": "compose-hash", ".env": "env-hash" },
+});
+
+const personalContext = () => createInvocationContext({
+  policyName: "personal",
   cwd: "/repo",
   sourceHashes: { "docker-compose.yml": "compose-hash", ".env": "env-hash" },
 });
@@ -313,18 +357,171 @@ const renderedDevService = () => JSON.stringify({
   volumes: { appfinanzas_postgres_dev_data: {} },
 });
 
+const renderedPersonalService = () => JSON.stringify({
+  services: {
+    "postgres-personal": {
+      container_name: "appfinanzas-postgres-personal",
+      environment: { POSTGRES_DB: "appfinanzas_personal" },
+      ports: ["5434:5432"],
+      volumes: ["appfinanzas_postgres_personal_data:/var/lib/postgresql/data"],
+    },
+  },
+  volumes: { appfinanzas_postgres_personal_data: {} },
+});
+
+test("dev reset planning accepts unmarked disposable dev targets before mutation", () => {
+  for (const marker of [null, "", undefined]) {
+    const plan = createResetPlan({ context: resetContext(), render: renderedDevService, inspectTarget: () => ({ ...verifiedTarget, marker, systemIdentifier: null }) });
+    assert.equal(plan.target.containerId, "container-id");
+    assert.equal(plan.target.recoveryMode, "unmarked-dev-target");
+    assert.equal(plan.target.volume.name, "repo_appfinanzas_postgres_dev_data");
+  }
+});
+
+test("dev reset planning rejects unsafe unmarked dev target mismatches before mutation", () => {
+  for (const target of [
+    { ...verifiedTarget, marker: null, labels: { ...verifiedTarget.labels, "com.docker.compose.service": "postgres-personal" } },
+    { ...verifiedTarget, marker: null, port: "5434" },
+    { ...verifiedTarget, marker: null, database: "appfinanzas_personal" },
+    { ...verifiedTarget, marker: null, volume: { ...verifiedVolume, Labels: { ...verifiedVolume.Labels, "com.docker.compose.volume": "other_volume" } } },
+    { ...verifiedTarget, marker: null, consumers: ["container-id", "other-container"] },
+  ]) {
+    assert.throws(
+      () => createResetPlan({ context: resetContext(), render: renderedDevService, inspectTarget: () => target }),
+      (error) => error instanceof ResetFailure
+        && error.code === "PREFLIGHT_REJECTED"
+        && error.phase === "pre-mutation",
+    );
+  }
+});
+
+test("dev reset planning accepts missing disposable dev target only when no known volume exists", () => {
+  const plan = createResetPlan({
+    context: resetContext(),
+    render: renderedDevService,
+    inspectTarget: () => ({ absent: true, volume: null, consumers: [] }),
+  });
+  assert.equal(plan.target.recoveryMode, "missing-dev-target");
+  assert.equal(plan.target.containerId, undefined);
+
+  assert.throws(
+    () => createResetPlan({
+      context: resetContext(),
+      render: renderedDevService,
+      inspectTarget: () => ({ absent: true, volume: verifiedVolume, consumers: [] }),
+    }),
+    (error) => error instanceof ResetFailure
+      && error.code === "PREFLIGHT_REJECTED"
+      && error.phase === "pre-mutation"
+      && /no known target volume/.test(error.message),
+  );
+});
+
+test("Compose ps parsing normalizes object, array, newline-delimited, and empty output", () => {
+  const first = { ID: "container-1", Service: "postgres-dev" };
+  const second = { ID: "container-2", Service: "postgres-dev" };
+
+  assert.deepEqual(parseComposePs(JSON.stringify(first)), [first]);
+  assert.deepEqual(parseComposePs(JSON.stringify([first])), [first]);
+  assert.deepEqual(parseComposePs(`${JSON.stringify(first)}\n${JSON.stringify(second)}\n`), [first, second]);
+  assert.deepEqual(parseComposePs("\n  \r\n"), []);
+});
+
+test("dev reset planning rejects ambiguous target discovery before mutation", () => {
+  const ambiguousTargets = parseComposePs(`${JSON.stringify({ ID: "container-1" })}\n${JSON.stringify({ ID: "container-2" })}`);
+  assert.equal(ambiguousTargets.length, 2);
+  assert.throws(
+    () => createResetPlan({
+      context: resetContext(),
+      render: renderedDevService,
+      inspectTarget: () => { if (ambiguousTargets.length > 1) throw new Error("Expected at most one target container."); },
+    }),
+    (error) => error instanceof ResetFailure
+      && error.code === "PREFLIGHT_REJECTED"
+      && error.phase === "pre-mutation"
+      && /Target discovery failed: Expected at most one target container/.test(error.message),
+  );
+});
+
+test("dev reset planning rejects mismatched markers before mutation", () => {
+  for (const marker of ["personal:system-id", "dev:other-system-id"]) {
+    assert.throws(
+      () => createResetPlan({ context: resetContext(), render: renderedDevService, inspectTarget: () => ({ ...verifiedTarget, marker }) }),
+      (error) => error instanceof ResetFailure
+        && error.code === "PREFLIGHT_REJECTED"
+        && error.phase === "pre-mutation"
+        && /marker is missing or mismatched/.test(error.message),
+    );
+  }
+});
+
+const verifiedPersonalTarget = () => ({
+  ...verifiedTarget,
+  name: "appfinanzas-postgres-personal",
+  labels: { "com.docker.compose.project": "repo", "com.docker.compose.service": "postgres-personal" },
+  mounts: [{ Name: "repo_appfinanzas_postgres_personal_data", Destination: "/var/lib/postgresql/data", RW: true }],
+  port: "5434",
+  database: "appfinanzas_personal",
+  volume: {
+    ...verifiedTarget.volume,
+    Name: "repo_appfinanzas_postgres_personal_data",
+    Labels: { "com.docker.compose.project": "repo", "com.docker.compose.volume": "appfinanzas_postgres_personal_data" },
+  },
+});
+
+test("personal reset planning accepts unmarked existing personal targets with full local identity proof", () => {
+  for (const marker of [null, "", undefined]) {
+    const plan = createResetPlan({
+      context: personalContext(),
+      render: renderedPersonalService,
+      inspectTarget: () => ({ ...verifiedPersonalTarget(), marker, systemIdentifier: null }),
+    });
+
+    assert.equal(plan.target.containerId, "container-id");
+    assert.equal(plan.target.recoveryMode, "unmarked-personal-target");
+    assert.equal(plan.target.volume.name, "repo_appfinanzas_postgres_personal_data");
+  }
+});
+
+test("personal reset planning still rejects missing targets and unmarked personal mismatches before mutation", () => {
+  for (const inspectTarget of [
+    () => ({ absent: true, volume: null, consumers: [] }),
+    () => ({ ...verifiedPersonalTarget(), marker: null, labels: { "com.docker.compose.project": "repo", "com.docker.compose.service": "postgres-dev" } }),
+    () => ({ ...verifiedPersonalTarget(), marker: null, port: "5433" }),
+    () => ({ ...verifiedPersonalTarget(), marker: null, database: "appfinanzas_dev" }),
+    () => ({ ...verifiedPersonalTarget(), marker: null, volume: { ...verifiedPersonalTarget().volume, Labels: { "com.docker.compose.project": "repo", "com.docker.compose.volume": "appfinanzas_postgres_dev_data" } } }),
+    () => ({ ...verifiedPersonalTarget(), marker: null, consumers: ["container-id", "other-container"] }),
+  ]) {
+    assert.throws(
+      () => createResetPlan({ context: personalContext(), render: renderedPersonalService, inspectTarget }),
+      (error) => error instanceof ResetFailure
+        && error.code === "PREFLIGHT_REJECTED"
+        && error.phase === "pre-mutation",
+    );
+  }
+});
+
+test("personal reset planning rejects mismatched personal markers before mutation", () => {
+  for (const marker of ["dev:system-id", "personal:other-system-id"]) {
+    assert.throws(
+      () => createResetPlan({ context: personalContext(), render: renderedPersonalService, inspectTarget: () => ({ ...verifiedPersonalTarget(), marker }) }),
+      (error) => error instanceof ResetFailure
+        && error.code === "PREFLIGHT_REJECTED"
+        && error.phase === "pre-mutation"
+        && /marker is missing or mismatched/.test(error.message),
+    );
+  }
+});
+
 test("reset plans bind the rendered target, runtime volume, fingerprint, and sole owner", () => {
   const render = renderedDevService;
   const plan = createResetPlan({ context: resetContext(), render, inspectTarget: () => verifiedTarget });
 
   assert.equal(plan.renderedConfig.sha256.length, 64);
   assert.equal(plan.target.containerId, "container-id");
+  assert.equal(plan.target.recoveryMode, "marked");
   assert.equal(plan.target.volume.name, "repo_appfinanzas_postgres_dev_data");
   assert.equal(plan.target.volume.fingerprint.length, 64);
-  assert.throws(
-    () => createResetPlan({ context: resetContext(), render, inspectTarget: () => ({ ...verifiedTarget, marker: null }) }),
-    (error) => error instanceof ResetFailure && error.code === "PREFLIGHT_REJECTED",
-  );
   assert.throws(
     () => createResetPlan({ context: resetContext(), render, inspectTarget: () => ({ ...verifiedTarget, consumers: ["container-id", "other-container"] }) }),
     (error) => error instanceof ResetFailure && error.code === "PREFLIGHT_REJECTED",

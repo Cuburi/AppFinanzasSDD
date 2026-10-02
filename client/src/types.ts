@@ -103,6 +103,18 @@ export type CreditCardView = {
   active: boolean;
 };
 
+export type CreateCreditCardInput = {
+  issuer: string;
+  name: string;
+  limit?: number | null;
+  closingDay: number;
+  dueDay: number;
+};
+
+export type UpdateCreditCardInput = Partial<CreateCreditCardInput> & {
+  active?: boolean;
+};
+
 export type CreditCardStatementBucketView = {
   periodStart: string;
   periodEnd: string;
@@ -168,7 +180,7 @@ export type PaymentMethod = "NON_CASH" | "CASH";
 
 export type RecordExpenseInput = {
   monthId: string;
-  sourceSubcategoryId: string;
+  sourceSubcategoryId: string | null;
   amount: number;
   occurredAt: string;
   paymentMethod: PaymentMethod;
@@ -215,6 +227,7 @@ export type ExpenseHistoryFilters = {
   paymentMethod?: PaymentMethod;
   subcategoryId?: string;
   creditCardId?: string;
+  classification?: "UNCATEGORIZED";
 };
 
 export type ExpenseHistoryItem = {
@@ -227,11 +240,11 @@ export type ExpenseHistoryItem = {
   category: {
     id: string;
     name: string;
-  };
+  } | null;
   subcategory: {
     id: string;
     name: string;
-  };
+  } | null;
 };
 
 export type WithdrawCashInput = {
@@ -276,9 +289,17 @@ export type BasicReportSubcategory = {
   amount: number;
 };
 
+export type BasicReportUncategorized = {
+  label: "Uncategorized";
+  amount: number;
+  cashAmount: number;
+  nonCashAmount: number;
+};
+
 export type BasicMonthlyReport = {
   summary: BasicReportSummary;
   topSpendingSubcategories: BasicReportSubcategory[];
+  uncategorizedSpending: BasicReportUncategorized;
   surplusSubcategories: BasicReportSubcategory[];
   deficitSubcategories: BasicReportSubcategory[];
 };
@@ -328,11 +349,20 @@ export type ClosurePendingDeficit = {
   amount: number;
 };
 
+export type ClosureBudgetVariance = {
+  subcategoryId: string;
+  subcategoryName: string;
+  amount: number;
+  kind: "SURPLUS" | "DEFICIT";
+  informational: true;
+};
+
 export type ClosureReview = {
   monthId: string;
   status: "ACTIVE" | "CLOSED";
   pendingSurpluses: ClosurePendingSurplus[];
   pendingDeficits: ClosurePendingDeficit[];
+  budgetVariances: ClosureBudgetVariance[];
   availableMoney: number;
   availableMoneyBlocker: "SURPLUS" | "DEFICIT" | null;
   canClose: boolean;

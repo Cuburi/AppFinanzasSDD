@@ -32,9 +32,15 @@ const month = {
 
 const createIncomePorts = () => {
   const calls: unknown[] = [];
+  let lockCalls = 0;
   const txPorts = {
     months: {
       async findById(monthId: string) {
+        calls.push(["tx.months.findById", monthId]);
+        return month;
+      },
+      async lockForMutation(monthId: string) {
+        lockCalls += 1;
         calls.push(["tx.months.findById", monthId]);
         return month;
       },
@@ -70,8 +76,19 @@ const createIncomePorts = () => {
     },
   } as unknown as MonthlyCyclePorts;
 
-  return { calls, ports };
+  return { calls, ports, getLockCalls: () => lockCalls };
 };
+
+test("income mutations lock the owning month before evaluating mutable state", async () => {
+  const { ports, getLockCalls } = createIncomePorts();
+  const useCases = createIncomeUseCases(ports);
+
+  await useCases.createMonthlyIncome({ monthId: "month-1", sourceName: "Bonus", amount: 250, receivedAt: "2026-05-20T00:00:00.000Z" });
+  await useCases.updateMonthlyIncome({ monthId: "month-1", incomeId: "income-1", amount: 1200 });
+  await useCases.deleteMonthlyIncome("month-1", "income-1");
+
+  assert.equal(getLockCalls(), 3);
+});
 
 test("income use cases expose only the monthly income public surface", () => {
   assert.deepEqual(INCOME_USE_CASE_NAMES, ["createMonthlyIncome", "updateMonthlyIncome", "deleteMonthlyIncome"]);

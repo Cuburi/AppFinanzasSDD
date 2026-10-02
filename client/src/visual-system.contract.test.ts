@@ -133,37 +133,37 @@ describe("visual system contracts", () => {
     expect(compactShellRules).toContain(".dashboard-runway { grid-template-columns: 1fr; }");
   });
 
-  it("makes the Living Ledger shell declarations win the cascade", () => {
-    expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("var(--color-bg)");
+  it("makes the Prototype D shell declarations win the cascade", () => {
+    expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("var(--ww-sidebar)");
     expect(effectiveDeclaration(styles, ".app-header", "border-radius")).toBe("0");
     expect(effectiveDeclaration(styles, ".nav a", "background")).toBe("transparent");
     expect(effectiveDeclaration(styles, ".nav a", "border")).toBe("0");
-    expect(effectiveDeclaration(styles, ".card", "background")).toBe("var(--color-surface)");
+    expect(effectiveDeclaration(styles, ".card", "background")).toBe("var(--ww-surface)");
     expect(effectiveDeclaration(styles, ".button.primary", "background")).toBe("var(--color-primary)");
   });
 
-  it("keeps the Living Ledger accents restrained while preserving semantic distinction", () => {
-    const livingLedgerTokens = cssBlock(":root");
+  it("keeps the Prototype D accents purposeful while preserving semantic distinction", () => {
+    const prototypeTokens = cssBlock(":root");
 
-    expect(livingLedgerTokens).toContain("--color-primary: #aebe72;");
-    expect(livingLedgerTokens).toContain("--color-guidance: #988eb7;");
-    expect(livingLedgerTokens).toContain("--color-success: #8fb39e;");
-    expect(livingLedgerTokens).toContain("--color-warning: #c3aa7a;");
-    expect(livingLedgerTokens).toContain("--color-danger: #bb8d8d;");
-    expect(livingLedgerTokens).toContain("--color-success-bg: #1b2720;");
-    expect(livingLedgerTokens).toContain("--color-warning-bg: #2a261d;");
-    expect(livingLedgerTokens).toContain("--color-danger-bg: #2b2020;");
+    expect(prototypeTokens).toContain("--ww-canvas: #101817;");
+    expect(prototypeTokens).toContain("--ww-sidebar: #0b1212;");
+    expect(prototypeTokens).toContain("--ww-teal: #6de1c3;");
+    expect(prototypeTokens).toContain("--ww-lime: #d5f576;");
+    expect(prototypeTokens).toContain("--ww-coral: #ff9d8b;");
+    expect(prototypeTokens).toContain("--color-primary: var(--ww-teal);");
+    expect(prototypeTokens).toContain("--color-success: var(--ww-lime);");
+    expect(prototypeTokens).toContain("--color-danger: var(--ww-coral);");
     expect(cssBlock(".registration-slip-edit")).toContain("border-color: var(--color-guidance);");
   });
 
-  it("retains the flat shell while a labeled drawer and 320px contracts replace the desktop rail", () => {
+  it("retains the Prototype D rail while a labeled drawer and 320px contracts protect compact widths", () => {
     const compactShellRules = mediaBlock("(max-width: 1119px)");
 
     expect(compactShellRules).toContain(".app-shell { display: block; padding-inline: 0; }");
     expect(compactShellRules).toContain(".app-header .nav { display: none; }");
     expect(compactShellRules).toContain(".navigation-drawer");
     expect(cssBlock("body")).not.toContain("min-width: 320px;");
-    expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("var(--color-bg)");
+    expect(effectiveDeclaration(styles, ".app-header", "background")).toBe("var(--ww-sidebar)");
     expect(effectiveDeclaration(styles, ".nav a", "background")).toBe("transparent");
     expect(effectiveDeclaration(styles, ".button.primary", "background")).toBe("var(--color-primary)");
   });
@@ -231,7 +231,15 @@ describe("visual system contracts", () => {
     expect(styles).toContain("transform: translateY(0.375rem);");
     expect(styles).toContain(".active-month-dashboard .button:active");
     expect(styles).toContain("transform: scale(0.98);");
-    expect(styles).not.toContain("@keyframes");
+    // Prototype D permits only these named availability-hero animations; all other motion stays transition-based.
+    const keyframeNames = [...styles.matchAll(/@keyframes\s+([a-z0-9-]+)/g)].map((match) => match[1]);
+    expect(keyframeNames).toEqual([
+      "financial-hero-ambient",
+      "financial-pulse-flow",
+      "financial-float-orb-a",
+      "financial-float-orb-b",
+      "financial-ring-drift",
+    ]);
 
     expect(reducedMotionRules).toContain(".active-month-dashboard > .dashboard-context,");
     expect(reducedMotionRules).toContain("transition-duration: 0ms;");

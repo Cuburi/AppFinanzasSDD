@@ -4,6 +4,7 @@ import type {
   BasicMonthlyReport,
   CashSummary,
   CreateDebtInput,
+  CreateCreditCardInput,
   CreditCardListFilter,
   CreditCardStatementSummaryListView,
   CreditCardView,
@@ -20,6 +21,7 @@ import type {
   RegisterDebtPaymentInput,
   RecordExpenseInput,
   SavingsPocket,
+  UpdateCreditCardInput,
   UpdateExpenseInput,
   UpdateMonthCategoryInput,
   UpdateMonthlyIncomeInput,
@@ -28,6 +30,21 @@ import type {
   UpdatePocketInput,
   WithdrawCashInput,
 } from "../types";
+
+export type IdempotencyOptions = {
+  idempotencyKey?: string;
+};
+
+const createIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+
+const jsonHeaders = (idempotency?: boolean | IdempotencyOptions) => ({
+  "Content-Type": "application/json",
+  ...(idempotency
+    ? {
+        "Idempotency-Key": typeof idempotency === "object" && idempotency.idempotencyKey ? idempotency.idempotencyKey : createIdempotencyKey(),
+      }
+    : {}),
+});
 
 const readJson = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
@@ -89,12 +106,10 @@ export const api = {
 
     return readJson<DebtView>(response);
   },
-  async registerDebtPayment(id: string, input: RegisterDebtPaymentInput): Promise<DebtView> {
+  async registerDebtPayment(id: string, input: RegisterDebtPaymentInput, options: IdempotencyOptions = {}): Promise<DebtView> {
     const response = await fetch(`/api/debts/${id}/payments`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: jsonHeaders(options),
       body: JSON.stringify(input),
     });
 
@@ -117,6 +132,32 @@ export const api = {
   async getCurrentCreditCardStatements(): Promise<CreditCardStatementSummaryListView> {
     const response = await fetch("/api/credit-cards/statements/current");
     return readJson<CreditCardStatementSummaryListView>(response);
+  },
+  async createCreditCard(input: CreateCreditCardInput): Promise<CreditCardView> {
+    const response = await fetch("/api/credit-cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+
+    return readJson<CreditCardView>(response);
+  },
+  async updateCreditCard(id: string, input: UpdateCreditCardInput): Promise<CreditCardView> {
+    const response = await fetch(`/api/credit-cards/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+
+    return readJson<CreditCardView>(response);
+  },
+  async activateCreditCard(id: string): Promise<CreditCardView> {
+    const response = await fetch(`/api/credit-cards/${id}/activate`, { method: "PATCH" });
+    return readJson<CreditCardView>(response);
+  },
+  async inactivateCreditCard(id: string): Promise<CreditCardView> {
+    const response = await fetch(`/api/credit-cards/${id}/inactivate`, { method: "PATCH" });
+    return readJson<CreditCardView>(response);
   },
   async getPocket(id: string): Promise<SavingsPocket> {
     const response = await fetch(`/api/pockets/${id}`);
@@ -182,12 +223,10 @@ export const api = {
     const payload = await readJson<{ month: Month | null }>(response);
     return payload.month;
   },
-  async recordExpense(input: RecordExpenseInput): Promise<Month> {
+  async recordExpense(input: RecordExpenseInput, options: IdempotencyOptions = {}): Promise<Month> {
     const response = await fetch(`/api/months/${input.monthId}/expenses`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: jsonHeaders(options),
       body: JSON.stringify({
         sourceSubcategoryId: input.sourceSubcategoryId,
         amount: input.amount,
@@ -232,6 +271,7 @@ export const api = {
     if (filters.paymentMethod) params.set("paymentMethod", filters.paymentMethod);
     if (filters.subcategoryId) params.set("subcategoryId", filters.subcategoryId);
     if (filters.creditCardId) params.set("creditCardId", filters.creditCardId);
+    if (filters.classification) params.set("classification", filters.classification);
 
     const query = params.toString();
     const response = await fetch(`/api/months/${monthId}/expenses${query ? `?${query}` : ""}`);
@@ -309,12 +349,10 @@ export const api = {
 
     return readJson<Month>(response);
   },
-  async withdrawCash(input: WithdrawCashInput): Promise<Month> {
+  async withdrawCash(input: WithdrawCashInput, options: IdempotencyOptions = {}): Promise<Month> {
     const response = await fetch(`/api/months/${input.monthId}/cash-withdrawals`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: jsonHeaders(options),
       body: JSON.stringify({
         amount: input.amount,
         occurredAt: input.occurredAt,
@@ -333,12 +371,10 @@ export const api = {
     const response = await fetch(`/api/months/${monthId}/reports/basic`);
     return readJson<BasicMonthlyReport>(response);
   },
-  async createMonthlyIncome(input: CreateMonthlyIncomeInput): Promise<Month> {
+  async createMonthlyIncome(input: CreateMonthlyIncomeInput, options: IdempotencyOptions = {}): Promise<Month> {
     const response = await fetch(`/api/months/${input.monthId}/incomes`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: jsonHeaders(options),
       body: JSON.stringify({
         sourceName: input.sourceName,
         amount: input.amount,
@@ -372,24 +408,20 @@ export const api = {
 
     return readJson<Month>(response);
   },
-  async depositToPocket(input: ActiveMonthPocketDepositInput): Promise<Month> {
+  async depositToPocket(input: ActiveMonthPocketDepositInput, options: IdempotencyOptions = {}): Promise<Month> {
     const response = await fetch("/api/pockets/deposits", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: jsonHeaders(options),
       body: JSON.stringify(serializeActiveMonthPocketDeposit(input)),
     });
     const payload = await readJson<{ month: Month }>(response);
 
     return payload.month;
   },
-  async depositExternalToPocket(input: ExternalPocketDepositInput): Promise<null> {
+  async depositExternalToPocket(input: ExternalPocketDepositInput, options: IdempotencyOptions = {}): Promise<null> {
     const response = await fetch("/api/pockets/deposits", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: jsonHeaders(options),
       body: JSON.stringify(input),
     });
     const payload = await readJson<{ month: null }>(response);
@@ -400,12 +432,10 @@ export const api = {
     const response = await fetch(`/api/months/${monthId}/closure-review`);
     return readJson<ClosureReview>(response);
   },
-  async applyClosureAction(input: ClosureActionInput): Promise<ClosureReview> {
+  async applyClosureAction(input: ClosureActionInput, options: IdempotencyOptions = {}): Promise<ClosureReview> {
     const response = await fetch(`/api/months/${input.monthId}/closure-actions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: jsonHeaders(options),
       body: JSON.stringify({
         type: input.type,
         sourceSubcategoryId: input.sourceSubcategoryId,

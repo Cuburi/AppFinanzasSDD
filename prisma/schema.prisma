@@ -219,3 +219,19 @@ model DebtPayment {
 
   @@index([debtId, paidAt])
 }
+
+model IdempotencyRecord {
+  id              String   @id @default(cuid())
+  requestKey      String
+  scope           String
+  method          String
+  path            String
+  bodyFingerprint String
+  statusCode      Int?
+  responseBody    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([requestKey, scope])
+  @@index([createdAt])
+}

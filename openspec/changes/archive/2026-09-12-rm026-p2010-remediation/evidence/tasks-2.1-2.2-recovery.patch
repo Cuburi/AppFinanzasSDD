@@ -1,0 +1,64 @@
+diff --git a/server/src/modules/monthly-cycle/infrastructure/prisma/monthly-cycle-prisma-concurrency.integration.test.ts b/server/src/modules/monthly-cycle/infrastructure/prisma/monthly-cycle-prisma-concurrency.integration.test.ts
+index 94e0ab4..9f0dba5 100644
+--- a/server/src/modules/monthly-cycle/infrastructure/prisma/monthly-cycle-prisma-concurrency.integration.test.ts
++++ b/server/src/modules/monthly-cycle/infrastructure/prisma/monthly-cycle-prisma-concurrency.integration.test.ts
+@@ -10,6 +10,59 @@ import { createMonthlyCyclePrismaAdapters, createMonthlyCyclePrismaTransactionRu
+ 
+ const prisma = new PrismaClient();
+ 
++const createDeterministicP2010RecoveryRunner = () => {
++  const realRunner = createMonthlyCyclePrismaTransactionRunner(prisma as never);
++  let attemptCount = 0;
++
++  return {
++    attempts: () => attemptCount,
++    transactionRunner: {
++      run: realRunner.run,
++      runSerializable<T>(work: (ports: Omit<MonthlyCyclePorts, "transactionRunner">) => Promise<T>) {
++        return realRunner.runSerializable(async (ports) => {
++          attemptCount += 1;
++          return work({
++            ...ports,
++            depositWriterGate: { async isEnabled() { return true; } },
++            movements: {
++              ...ports.movements,
++              async create(input) {
++                await ports.movements.create(input);
++                if (attemptCount === 1) throw { code: "P2010", meta: { code: "40001" } };
++              },
++            },
++          });
++        });
++      },
++    },
++  };
++};
++
++test("qualifying P2010 recovery rolls back the first real PostgreSQL write and commits exactly once", async () => {
++  if (!process.env.DATABASE_URL?.includes("appfinanzas_dev")) throw new Error("This integration test requires the dev PostgreSQL profile.");
++  const id = `rm026-recovery-${Date.now()}`;
++  const year = 5500 + (Date.now() % 1000);
++  const occurredAt = new Date(Date.UTC(year, 0, 10));
++  const month = await prisma.month.create({ data: { year, month: 1, openedAt: new Date(Date.UTC(year, 0, 1)) } });
++  const pocket = await prisma.savingsPocket.create({ data: { name: id } });
++  await prisma.monthlyIncome.create({ data: { monthId: month.id, sourceName: id, amount: new Prisma.Decimal("0.30"), receivedAt: occurredAt } });
++  const { transactionRunner, attempts } = createDeterministicP2010RecoveryRunner();
++  const deposit = createStrictDepositToPocketUseCase({ ...createMonthlyCyclePrismaAdapters(prisma as never), transactionRunner });
++
++  try {
++    await deposit({ sourceKind: "MONTH_AVAILABLE", monthId: month.id, targetPocketId: pocket.id, amount: 0.2, occurredAt: occurredAt.toISOString() });
++    assert.equal(attempts(), 2);
++    assert.equal(await prisma.movement.count({ where: { monthId: month.id, targetPocketId: pocket.id } }), 1);
++    const balances = calculateMonthBalances(await createMonthlyCyclePrismaAdapters(prisma as never).months.findById(month.id));
++    assert.equal(balances.availableMoney, 0.1);
++    assert.equal(balances.pocketBalances.get(pocket.id), 0.2);
++  } finally {
++    await prisma.month.delete({ where: { id: month.id } });
++    await prisma.savingsPocket.delete({ where: { id: pocket.id } });
++    await prisma.$disconnect();
++  }
++});
++
+ test("strict deposits reread limited funds after a real PostgreSQL conflict and prevent overspending", async () => {
+   if (!process.env.DATABASE_URL?.includes("appfinanzas_dev")) throw new Error("This integration test requires the dev PostgreSQL profile.");
+   const id = `slice4-race-${Date.now()}`;

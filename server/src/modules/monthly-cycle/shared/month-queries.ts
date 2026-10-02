@@ -1,8 +1,9 @@
 import { MonthStatus } from "../application/monthly-cycle-types.js";
 
 import type { TemplateInput } from "../dto/index.js";
-import { DomainError } from "./service-errors.js";
+import { DomainError, SemanticError } from "./service-errors.js";
 import { monthInclude, templateInclude, type MonthRecord, type MonthlyCycleDb } from "./service-types.js";
+import type { MonthRepositoryPort } from "../application/ports/monthly-cycle-ports.js";
 
 export const readMonthById = async (db: MonthlyCycleDb, monthId: string): Promise<MonthRecord> => {
   const month = await db.month.findUnique({
@@ -25,8 +26,14 @@ export const readTemplateCategories = async (db: MonthlyCycleDb) =>
 
 export const assertMonthIsMutable = (month: MonthRecord) => {
   if (month.status === MonthStatus.CLOSED) {
-    throw new DomainError(409, "Closed months are immutable.");
+    throw new SemanticError("MONTH_NOT_ACTIVE", 409, "Closed months are immutable.");
   }
+};
+
+export const lockMutableMonthForMutation = async (months: Pick<MonthRepositoryPort, "lockForMutation">, monthId: string): Promise<MonthRecord> => {
+  const month = await months.lockForMutation(monthId);
+  assertMonthIsMutable(month);
+  return month;
 };
 
 export const findMonthSubcategory = (month: MonthRecord, subcategoryId: string) =>

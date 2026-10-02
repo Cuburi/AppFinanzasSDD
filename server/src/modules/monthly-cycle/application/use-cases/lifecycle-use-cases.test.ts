@@ -58,6 +58,10 @@ const createLifecyclePorts = () => {
   const calls: string[] = [];
   const txPorts = {
     months: {
+      async lockForMutation(monthId: string) {
+        calls.push(`tx.months.lockForMutation:${monthId}`);
+        return activeMonth;
+      },
       async findActiveSummary(status: MonthStatus) {
         calls.push(`tx.months.findActiveSummary:${status}`);
         return null;
@@ -159,11 +163,12 @@ test("getActiveMonth and closeMonth keep read and close semantics behind ports",
     pendingSubcategories: [],
     pendingSurpluses: [],
     pendingDeficits: [],
+    budgetVariances: [],
     availableMoney: 0,
     availableMoneyBlocker: null,
   }));
 
   assert.equal(found?.id, "month-1");
   assert.equal(closed.status, MonthStatus.CLOSED);
-  assert.deepEqual(calls, ["months.findActive", "transactionRunner.run", "tx.months.findById:month-1", "tx.months.close:month-1"]);
+  assert.deepEqual(calls, ["months.findActive", "transactionRunner.run", "tx.months.lockForMutation:month-1", "tx.months.close:month-1"]);
 });
