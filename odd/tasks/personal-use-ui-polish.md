@@ -39,7 +39,7 @@ Polish the remaining personal-use UI friction points as a coherent, reviewable U
 - [x] Add Template collapsible groups plus stable card polish and commit it.
 - [x] Improve category/subcategory selection efficiency and commit it.
 - [x] Polish Pockets UI and commit it.
-- [ ] Run checks, native review/fallback if needed, and prepare PR.
+- [x] Run checks, native review/fallback if needed, and prepare PR.
 
 ## Acceptance checks
 
@@ -66,3 +66,7 @@ Polish the remaining personal-use UI friction points as a coherent, reviewable U
 - Commit `6e3de51` — `feat(active-month): group subcategory selectors`.
 - Pockets UI now separates creation, money flow cards, pocket balance hierarchy, editing, and recent movement direction/provenance presentation without API changes.
 - Verification passed: full client suite via `pnpm --dir client test -- src/pages/PocketsPage.test.tsx src/features/pockets/components/PocketRecentMovements.test.tsx src/visual-system.contract.test.ts` (230 tests), `pnpm --dir client typecheck`, and `git diff --check`.
+- Commit `a906995` — `feat(pockets): clarify money flow UI`.
+- Final independent verification passed: clean working tree, branch diff limited to `client/**` plus ODD task file, no server changes, `pnpm --dir client test` (25 files / 230 tests), `pnpm --dir client typecheck`, and `git diff --check origin/dev...HEAD` passed.
+- Native review inspect found an empty workspace candidate because the work is committed; committed-range assessment reported review due but native review unavailable, so fallback independent verification was used.
+- Final post-evidence verification passed again: clean tree, no server files, `git diff --check origin/dev...HEAD`, `pnpm --dir client test` (230 tests), and `pnpm --dir client typecheck`.
