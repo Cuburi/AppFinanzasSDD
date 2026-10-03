@@ -248,6 +248,15 @@ describe("visual system contracts", () => {
     expect(compactRules).toContain(".template-category-disclosure > summary");
   });
 
+  it("keeps pocket money flows, balances, and maintenance visually distinct at compact widths", () => {
+    expect(topLevelCssBlock(".pockets-action-grid")).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
+    expect(topLevelCssBlock(".pocket-card")).toContain("grid-template-columns: minmax(0, 1fr) minmax(16rem, .55fr);");
+    expect(topLevelCssBlock(".pocket-movement-in")).toContain("border-left-color: var(--color-success);");
+    expect(topLevelCssBlock(".pocket-movement-out")).toContain("border-left-color: var(--color-warning);");
+    expect(styles).toContain(".pockets-create-form, .pockets-action-grid, .pockets-action-form, .pocket-card { grid-template-columns: 1fr; }");
+    expect(styles).toContain(".pockets-action-form .button { justify-self: stretch; width: 100%; }");
+  });
+
   it("keeps active-month motion compositor-safe, interruptible, and removable for reduced motion", () => {
     const reducedMotionRules = mediaBlock("(prefers-reduced-motion: reduce)");
 

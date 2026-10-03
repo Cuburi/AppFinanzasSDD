@@ -38,7 +38,7 @@ Polish the remaining personal-use UI friction points as a coherent, reviewable U
 - [x] Improve Active Month secondary panel layout and commit it.
 - [x] Add Template collapsible groups plus stable card polish and commit it.
 - [x] Improve category/subcategory selection efficiency and commit it.
-- [ ] Polish Pockets UI and commit it.
+- [x] Polish Pockets UI and commit it.
 - [ ] Run checks, native review/fallback if needed, and prepare PR.
 
 ## Acceptance checks
@@ -63,3 +63,6 @@ Polish the remaining personal-use UI friction points as a coherent, reviewable U
 - Commit `8952b53` — `feat(template): collapse category groups`.
 - Active Month expense and pocket-deposit source subcategory selectors now use native category `<optgroup>` grouping while preserving selected subcategory IDs.
 - Verification passed: `pnpm --dir client vitest run src/pages/ActiveMonthPage.test.tsx` (53 tests) and `pnpm --dir client typecheck`.
+- Commit `6e3de51` — `feat(active-month): group subcategory selectors`.
+- Pockets UI now separates creation, money flow cards, pocket balance hierarchy, editing, and recent movement direction/provenance presentation without API changes.
+- Verification passed: full client suite via `pnpm --dir client test -- src/pages/PocketsPage.test.tsx src/features/pockets/components/PocketRecentMovements.test.tsx src/visual-system.contract.test.ts` (230 tests), `pnpm --dir client typecheck`, and `git diff --check`.

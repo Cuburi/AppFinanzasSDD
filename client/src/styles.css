@@ -1841,3 +1841,52 @@ body {
   .template-subcategory-row { gap: 8px; grid-template-columns: 1fr; padding: 12px; }
   .template-remove-subcategory { justify-self: start; }
 }
+
+/* Pockets separate creation, money flow, and maintenance without changing their ledger contracts. */
+.pockets-page { max-width: 84rem; }
+.pockets-card-heading { align-items: end; display: flex; gap: var(--space-3); justify-content: space-between; }
+.pockets-card-heading h2, .pocket-card h3, .pocket-card h4, .pocket-recent-movements h4 { letter-spacing: -.025em; margin: 0; }
+.pockets-card-heading > p { color: var(--color-text-muted); margin: 0; max-width: 34rem; }
+.pockets-create-card { background: linear-gradient(125deg, rgba(109, 225, 195, .10), var(--ww-surface) 52%); border-color: rgba(109, 225, 195, .30); }
+.pockets-create-form, .pockets-action-form { align-items: end; display: grid; gap: 13px; min-width: 0; }
+.pockets-create-form { grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(8rem, .7fr)) auto; }
+.pockets-create-form .small-field, .pockets-action-form .small-field { width: auto; }
+.pockets-create-form .button { white-space: nowrap; }
+.pockets-action-grid { display: grid; gap: 22px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pockets-action-card { min-width: 0; }
+.pockets-deposit-card { border-top: 3px solid var(--color-primary); }
+.pockets-withdrawal-card { border-top: 3px solid var(--color-warning); }
+.pockets-action-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pockets-action-form .field:first-child, .pockets-action-form .field:last-of-type, .pockets-action-form .button { grid-column: 1 / -1; }
+.pockets-action-form .button { justify-self: start; }
+.pocket-card { align-items: start; display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(16rem, .55fr); }
+.pocket-card-summary { min-width: 0; }
+.pocket-card-title { align-items: start; display: flex; gap: var(--space-2); justify-content: space-between; }
+.pocket-card-title h3 { font-size: 1.25rem; }
+.pocket-card-balance { background: rgba(109, 225, 195, .06); border: 1px solid var(--color-border); border-radius: 12px; display: grid; gap: 3px; padding: 14px; }
+.pocket-card-balance > span:first-child, .pocket-card-goal { color: var(--color-text-muted); font-size: 13px; margin: 0; }
+.pocket-card-balance > strong { font-size: 1.5rem; font-variant-numeric: tabular-nums lining-nums; letter-spacing: -.035em; }
+.pocket-card-balance .pill { justify-self: start; }
+.pocket-edit-form { background: rgba(8, 24, 23, .22); border: 1px solid var(--color-border); border-radius: 13px; display: grid; gap: 13px; min-width: 0; padding: 16px; }
+.pocket-edit-form .small-field { width: 100%; }
+.pocket-edit-form .button { width: 100%; }
+.pocket-recent-movements { border-top: 1px solid var(--color-border); display: grid; gap: 10px; margin-top: var(--space-2); padding-top: var(--space-3); }
+.pocket-recent-movements-heading { align-items: baseline; display: flex; gap: var(--space-2); justify-content: space-between; }
+.pocket-recent-movements-heading > span, .pocket-movement-meta, .pocket-movements-empty { color: var(--color-text-muted); font-size: 12px; }
+.pocket-recent-movements ul { display: grid; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.pocket-movement { border-left: 3px solid var(--color-border-strong); display: grid; gap: 5px; min-width: 0; padding: 9px 11px; }
+.pocket-movement-in { background: rgba(213, 245, 118, .07); border-left-color: var(--color-success); }
+.pocket-movement-out { background: rgba(255, 209, 122, .07); border-left-color: var(--color-warning); }
+.pocket-movement-main, .pocket-movement-meta { align-items: baseline; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.pocket-movement-main > span:last-child { overflow-wrap: anywhere; }
+.pocket-movement-direction { font-size: 12px; font-weight: 800; text-transform: uppercase; }
+.pocket-movement-in .pocket-movement-direction { color: var(--color-success); }
+.pocket-movement-out .pocket-movement-direction { color: var(--color-warning); }
+
+@media (max-width: 760px) {
+  .pockets-card-heading { align-items: start; flex-direction: column; }
+  .pockets-create-form, .pockets-action-grid, .pockets-action-form, .pocket-card { grid-template-columns: 1fr; }
+  .pockets-action-form .field:first-child, .pockets-action-form .field:last-of-type, .pockets-action-form .button { grid-column: auto; }
+  .pockets-action-form .button { justify-self: stretch; width: 100%; }
+  .pocket-card-title { align-items: start; }
+}

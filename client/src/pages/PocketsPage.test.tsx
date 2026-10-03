@@ -98,6 +98,25 @@ describe("PocketsPage", () => {
     expect(apiMock.getPockets).toHaveBeenLastCalledWith("inactive");
   });
 
+  it("groups pocket money flows and editing into distinct responsive presentation regions", async () => {
+    render(<PocketsPage />);
+
+    const depositCard = screen.getByLabelText("Registrar ingreso externo");
+    const withdrawalCard = screen.getByLabelText("Registrar retiro o gasto");
+    const depositForm = depositCard.querySelector("form");
+    const withdrawalForm = withdrawalCard.querySelector("form");
+    const pocketCard = (await screen.findByText("Emergencias")).closest("article");
+    if (!depositForm || !withdrawalForm || !pocketCard) throw new Error("Missing pocket presentation region.");
+
+    expect(depositCard).toHaveClass("pockets-action-card", "pockets-deposit-card");
+    expect(withdrawalCard).toHaveClass("pockets-action-card", "pockets-withdrawal-card");
+    expect(depositForm).toHaveClass("pockets-action-form");
+    expect(withdrawalForm).toHaveClass("pockets-action-form");
+    expect(pocketCard).toHaveClass("pocket-card");
+    expect(within(pocketCard).getByRole("heading", { name: "Editar bolsillo" })).toBeInTheDocument();
+    expect(within(pocketCard).getByText("Saldo disponible")).toBeInTheDocument();
+  });
+
   it("normalizes leading zeros in pocket amount inputs", async () => {
     render(<PocketsPage />);
 

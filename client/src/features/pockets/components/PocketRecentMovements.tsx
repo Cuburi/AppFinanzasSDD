@@ -15,18 +15,29 @@ const movementProvenance = (movement: SavingsPocketMovement) => {
 };
 
 export const PocketRecentMovements = ({ movements }: PocketRecentMovementsProps) => (
-  <div>
-    <strong>Movimientos recientes</strong>
+  <section className="pocket-recent-movements" aria-label="Movimientos recientes">
+    <div className="pocket-recent-movements-heading">
+      <h4>Movimientos recientes</h4>
+      {movements.length > 0 ? <span>{Math.min(movements.length, 5)} más recientes</span> : null}
+    </div>
     {movements.length > 0 ? (
       <ul>
         {movements.slice(0, 5).map((movement) => (
-          <li key={movement.id}>
-            <time dateTime={movement.occurredAt}>{new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(movement.occurredAt))}</time> · {movement.direction === "in" ? "Entrada" : "Salida"} {formatMoney(movement.amount)} · {movement.description ?? "Movimiento sin descripción"} · {movementProvenance(movement)}
+          <li className={`pocket-movement pocket-movement-${movement.direction}`} key={movement.id}>
+            <div className="pocket-movement-main">
+              <span className="pocket-movement-direction">{movement.direction === "in" ? "Entrada" : "Salida"}</span>
+              <strong>{formatMoney(movement.amount)}</strong>
+              <span>{movement.description ?? "Movimiento sin descripción"}</span>
+            </div>
+            <div className="pocket-movement-meta">
+              <time dateTime={movement.occurredAt}>{new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(movement.occurredAt))}</time>
+              <span>{movementProvenance(movement)}</span>
+            </div>
           </li>
         ))}
       </ul>
     ) : (
-      <p>No se recibieron movimientos recientes.</p>
+      <p className="pocket-movements-empty">No se recibieron movimientos recientes.</p>
     )}
-  </div>
+  </section>
 );

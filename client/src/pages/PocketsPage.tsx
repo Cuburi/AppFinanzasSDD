@@ -280,12 +280,18 @@ export const PocketsPage = () => {
   };
 
   return (
-    <section className="page stack-lg">
-      <SectionHeader title="Bolsillos" description="Gestioná bolsillos activos e inactivos sin borrar el historial de movimientos." />
+    <section className="page stack-lg pockets-page">
+      <SectionHeader title="Bolsillos" description="Creá, fondeá y usá tus bolsillos sin perder el historial de cada movimiento." />
 
-      <Card aria-label="Crear bolsillo" className="stack-md">
-        <h2>Crear bolsillo</h2>
-        <form className="row gap-sm wrap" onSubmit={createPocket}>
+      <Card aria-label="Crear bolsillo" className="stack-md pockets-create-card">
+        <div className="pockets-card-heading">
+          <div>
+            <p className="eyebrow">Nuevo bolsillo</p>
+            <h2>Crear bolsillo</h2>
+          </div>
+          <p>Definí una meta y, si lo necesitás, empezá con un saldo inicial.</p>
+        </div>
+        <form className="pockets-create-form" onSubmit={createPocket}>
           <label className="field">
             <span>Nombre del bolsillo</span>
             <input value={newPocketName} onChange={(event) => setNewPocketName(event.target.value)} required />
@@ -304,11 +310,17 @@ export const PocketsPage = () => {
         </form>
       </Card>
 
-      <Card aria-label="Registrar ingreso externo" className="stack-md">
-        <h2>Registrar ingreso externo</h2>
-        <p>Este ingreso no se descuenta del mes.</p>
-        <form className="row gap-sm wrap" onSubmit={registerExternalDeposit}>
-          <label className="field">
+      <div className="pockets-action-grid">
+        <Card aria-label="Registrar ingreso externo" className="stack-md pockets-action-card pockets-deposit-card">
+          <div className="pockets-card-heading">
+            <div>
+              <p className="eyebrow">Agregar dinero</p>
+              <h2>Registrar ingreso externo</h2>
+            </div>
+            <p>Sumá dinero que no se descuenta del presupuesto mensual.</p>
+          </div>
+          <form className="pockets-action-form" onSubmit={registerExternalDeposit}>
+            <label className="field">
             <span>Bolsillo destino</span>
             <select disabled={loading || submitting} value={externalPocketId} onChange={(event) => setExternalPocketId(event.target.value)} required>
               <option value="">Seleccioná un bolsillo activo</option>
@@ -327,15 +339,20 @@ export const PocketsPage = () => {
             <span>Origen externo (opcional)</span>
             <input disabled={submitting} value={externalSourceLabel} onChange={(event) => setExternalSourceLabel(event.target.value)} />
           </label>
-          <Button disabled={loading || submitting || pockets.filter((pocket) => pocket.active).length === 0} type="submit">Registrar ingreso externo</Button>
-        </form>
-      </Card>
+            <Button disabled={loading || submitting || pockets.filter((pocket) => pocket.active).length === 0} type="submit">Registrar ingreso externo</Button>
+          </form>
+        </Card>
 
-      <Card aria-label="Registrar retiro o gasto" className="stack-md">
-        <h2>Registrar retiro o gasto</h2>
-        <p>Este movimiento descuenta el saldo del bolsillo sin afectar el mes.</p>
-        <form className="row gap-sm wrap" onSubmit={registerPocketWithdrawal}>
-          <label className="field">
+        <Card aria-label="Registrar retiro o gasto" className="stack-md pockets-action-card pockets-withdrawal-card">
+          <div className="pockets-card-heading">
+            <div>
+              <p className="eyebrow">Usar dinero</p>
+              <h2>Registrar retiro o gasto</h2>
+            </div>
+            <p>Descuenta el saldo del bolsillo, sin afectar el presupuesto mensual.</p>
+          </div>
+          <form className="pockets-action-form" onSubmit={registerPocketWithdrawal}>
+            <label className="field">
             <span>Bolsillo de origen</span>
             <select disabled={loading || submitting} value={withdrawalPocketId} onChange={(event) => setWithdrawalPocketId(event.target.value)} required>
               <option value="">Seleccioná un bolsillo activo</option>
@@ -354,9 +371,10 @@ export const PocketsPage = () => {
             <span>Descripción (opcional)</span>
             <input disabled={submitting} value={withdrawalDescription} onChange={(event) => setWithdrawalDescription(event.target.value)} />
           </label>
-          <Button disabled={loading || submitting || pockets.filter((pocket) => pocket.active).length === 0} type="submit">Registrar retiro o gasto</Button>
-        </form>
-      </Card>
+            <Button disabled={loading || submitting || pockets.filter((pocket) => pocket.active).length === 0} type="submit">Registrar retiro o gasto</Button>
+          </form>
+        </Card>
+      </div>
 
       {message ? <p className="success">{message}</p> : null}
       {error ? <div className="stack-sm" role="alert"><p className="error">{error}</p><Button onClick={() => void retryPockets()} type="button" variant="tertiary">Reintentar bolsillos</Button></div> : null}
@@ -372,21 +390,32 @@ export const PocketsPage = () => {
 
         <div className="stack-sm">
           {pockets.map((pocket) => (
-            <article className="budget-line align-start" key={pocket.id}>
-              <div className="stack-sm grow">
-                <div>
-                  <strong>{pocket.name}</strong>
+            <article className="budget-line align-start pocket-card" key={pocket.id}>
+              <div className="stack-sm grow pocket-card-summary">
+                <div className="pocket-card-title">
+                  <div>
+                    <p className="eyebrow">Bolsillo</p>
+                    <h3>{pocket.name}</h3>
+                  </div>
                   <StatusPill tone={pocket.active ? "success" : "neutral"}>{pocket.active ? "Activo" : "Inactivo"}</StatusPill>
                 </div>
-                <StatusPill tone={pocket.balance > 0 ? "success" : "neutral"} aria-label={`${pocket.balance > 0 ? "Success" : "Neutral"}: Balance ${formatMoney(pocket.balance)}`}>
-                  Balance: {formatMoney(pocket.balance)}
-                </StatusPill>
-                <p>{pocket.goalAmount === null ? "Sin meta definida" : `Meta: ${formatMoney(pocket.goalAmount)}`}</p>
+                <div className="pocket-card-balance">
+                  <span>Saldo disponible</span>
+                  <strong>{formatMoney(pocket.balance)}</strong>
+                  <StatusPill tone={pocket.balance > 0 ? "success" : "neutral"} aria-label={`${pocket.balance > 0 ? "Success" : "Neutral"}: Balance ${formatMoney(pocket.balance)}`}>
+                    Balance: {formatMoney(pocket.balance)}
+                  </StatusPill>
+                </div>
+                <p className="pocket-card-goal">{pocket.goalAmount === null ? "Sin meta definida" : `Meta: ${formatMoney(pocket.goalAmount)}`}</p>
 
                 <PocketRecentMovements movements={pocket.recentMovements ?? []} />
               </div>
 
-              <form className="row gap-sm wrap align-start" onSubmit={(event) => event.preventDefault()}>
+              <form className="pocket-edit-form" onSubmit={(event) => event.preventDefault()}>
+                <div>
+                  <p className="eyebrow">Configuración</p>
+                  <h4>Editar bolsillo</h4>
+                </div>
                 <label className="field">
                   <span>Editar nombre</span>
                   <input

@@ -36,7 +36,14 @@ describe("PocketRecentMovements", () => {
       />,
     );
 
-    expect(screen.getByText(/Retiro o gasto del bolsillo/).closest("li")).toHaveTextContent("Salida $25.00 · Groceries · Retiro o gasto del bolsillo");
+    const movement = screen.getByText(/Retiro o gasto del bolsillo/).closest("li");
+
+    expect(movement).toHaveClass("pocket-movement-out");
+    expect(within(movement!).getByText("Salida")).toHaveClass("pocket-movement-direction");
+    expect(movement).toHaveTextContent("Salida");
+    expect(movement).toHaveTextContent("$25.00");
+    expect(movement).toHaveTextContent("Groceries");
+    expect(movement).toHaveTextContent("Retiro o gasto del bolsillo");
   });
 
   it("explains when the current response has no recent movements", () => {
