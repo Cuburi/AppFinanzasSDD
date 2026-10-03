@@ -218,6 +218,15 @@ describe("visual system contracts", () => {
     expect(styles).toContain(".secondary-action-strip {\n  grid-column: 1 / -1;\n  grid-row: 2;\n}");
   });
 
+  it("gives disclosed secondary movement panels the full desktop workspace width", () => {
+    const compactRules = mediaBlock("(max-width: 767px)");
+
+    expect(topLevelCssBlock(".secondary-form-panel")).toContain("grid-column: 1 / -1;");
+    expect(topLevelCssBlock(".secondary-form-panel")).toContain("min-width: 0;");
+    expect(topLevelCssBlock(".secondary-form-panel > .registration-slip")).toContain("width: 100%;");
+    expect(compactRules).toContain(".secondary-form-panel { grid-column: 1; }");
+  });
+
   it("keeps degraded-support warnings before activity in the grid at desktop and mobile widths", () => {
     const desktopRules = topLevelCssBlock(".active-month-dashboard.dashboard-operational");
     const tabletRules = mediaBlock("(max-width: 768px)");

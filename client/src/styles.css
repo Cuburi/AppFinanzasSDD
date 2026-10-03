@@ -799,6 +799,7 @@ body { background: var(--color-bg); }
   .registration-slip-actions .button { width: 100%; }
   .secondary-action-strip { display: grid; }
   .secondary-action-strip .button { width: 100%; }
+  .secondary-form-panel { grid-column: 1; }
 }
 
 @media (max-width: 390px) {
@@ -1765,6 +1766,16 @@ body {
 .secondary-action-strip {
   grid-column: 1 / -1;
   grid-row: 2;
+}
+
+/* Secondary flows remain part of the workspace, so their form can use both desktop columns. */
+.secondary-form-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.secondary-form-panel > .registration-slip {
+  width: 100%;
 }
 
 @media (max-width: 1119px) {
