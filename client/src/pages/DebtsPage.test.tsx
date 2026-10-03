@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -59,9 +59,9 @@ describe("DebtsPage", () => {
     expect(screen.getByText("Laura")).toBeInTheDocument();
     expect(screen.getByText("Yo debo")).toBeInTheDocument();
     expect(screen.getByText("Estado: OPEN")).toBeInTheDocument();
-    expect(screen.getByText("Total: COP $300000.00")).toBeInTheDocument();
-    expect(screen.getByText("Saldo: COP $200000.00")).toBeInTheDocument();
-    expect(screen.getByText("Initial payment · COP $100000.00")).toBeInTheDocument();
+    expect(screen.getByText("Total: $300.000 COP")).toBeInTheDocument();
+    expect(screen.getByText("Saldo: $200.000 COP")).toBeInTheDocument();
+    expect(screen.getByText("Initial payment · $100.000 COP")).toBeInTheDocument();
   });
 
   it("exposes open debt risk and paid debt completion through semantic status labels", async () => {
@@ -71,8 +71,17 @@ describe("DebtsPage", () => {
 
     expect(await screen.findByRole("status", { name: "Danger: Yo debo · OPEN" })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Success: Yo debo · PAID" })).toBeInTheDocument();
-    expect(screen.getByRole("status", { name: "Warning: Saldo pendiente COP $200000.00" })).toBeInTheDocument();
-    expect(screen.getByRole("status", { name: "Success: Saldo liquidado COP $0.00" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Warning: Saldo pendiente $200.000 COP" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Success: Saldo liquidado $0 COP" })).toBeInTheDocument();
+  });
+
+  it("normalizes leading zeros in debt amounts", async () => {
+    render(<DebtsPage />);
+
+    const amount = await screen.findByLabelText("Monto total");
+    fireEvent.change(amount, { target: { value: "0124" } });
+
+    expect(amount).toHaveValue(124);
   });
 
   it("creates a debt and keeps it visible in the MVP list", async () => {
@@ -135,7 +144,7 @@ describe("DebtsPage", () => {
     );
     expect(await screen.findByText("Pago registrado.")).toBeInTheDocument();
     expect(within(debtCard).getByText("Estado: PAID")).toBeInTheDocument();
-    expect(within(debtCard).getByText("Saldo: COP $0.00")).toBeInTheDocument();
+    expect(within(debtCard).getByText("Saldo: $0 COP")).toBeInTheDocument();
   });
 
   it("surfaces backend validation errors without pretending success", async () => {
@@ -153,6 +162,6 @@ describe("DebtsPage", () => {
 
     expect(await screen.findByText("Payment exceeds remaining balance.")).toBeInTheDocument();
     expect(screen.queryByText("Pago registrado.")).not.toBeInTheDocument();
-    expect(within(debtCard).getByText("Saldo: COP $200000.00")).toBeInTheDocument();
+    expect(within(debtCard).getByText("Saldo: $200.000 COP")).toBeInTheDocument();
   });
 });

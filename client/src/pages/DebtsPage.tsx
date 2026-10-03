@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 import { api } from "../lib/api";
+import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
 import { Button, Card, SectionHeader, StatusPill } from "../components/ui";
 import type { DebtDirection, DebtView } from "../types";
 
-const formatMoney = (amount: number, currency: string) => `${currency} $${amount.toFixed(2)}`;
+const formatMoney = (amount: number, _currency: string) => formatCop(amount);
 
 const directionLabel = (direction: DebtDirection) => (direction === "I_OWE" ? "Yo debo" : "Me deben");
 
@@ -64,7 +65,7 @@ export const DebtsPage = () => {
       const createdDebt = await api.createDebt({
         direction,
         counterpartyName,
-        totalAmount: Number(totalAmount),
+        totalAmount: parseAmountInput(totalAmount),
         originDate,
         description: parseOptionalText(description),
       });
@@ -88,7 +89,7 @@ export const DebtsPage = () => {
 
     try {
       const updatedDebt = await api.registerDebtPayment(debt.id, {
-        amount: Number(paymentAmounts[debt.id] ?? ""),
+        amount: parseAmountInput(paymentAmounts[debt.id] ?? ""),
         paidAt: paymentDates[debt.id] ?? "",
         notes: parseOptionalText(paymentNotes[debt.id] ?? ""),
       });
@@ -124,7 +125,7 @@ export const DebtsPage = () => {
           </label>
           <label className="field small-field">
             <span>Monto total</span>
-            <input min="0.01" step="0.01" type="number" value={totalAmount} onChange={(event) => setTotalAmount(event.target.value)} required />
+            <input min="0.01" step="0.01" type="number" value={totalAmount} onChange={(event) => setTotalAmount(normalizeAmountInput(event.target.value))} required />
           </label>
           <label className="field small-field">
             <span>Fecha de origen</span>
@@ -189,7 +190,7 @@ export const DebtsPage = () => {
                       step="0.01"
                       type="number"
                       value={paymentAmounts[debt.id] ?? ""}
-                      onChange={(event) => setPaymentAmounts((current) => ({ ...current, [debt.id]: event.target.value }))}
+                      onChange={(event) => setPaymentAmounts((current) => ({ ...current, [debt.id]: normalizeAmountInput(event.target.value) }))}
                       required
                     />
                   </label>

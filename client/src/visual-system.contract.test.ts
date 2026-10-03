@@ -210,6 +210,14 @@ describe("visual system contracts", () => {
     expect(styles).toContain("@media (max-width: 320px)");
   });
 
+  it("keeps the expense registration card and monthly ledger paired on the first workspace row", () => {
+    const workspaceCorrection = "Prototype D correction: workspace cards share the first row";
+
+    expect(cssBlockAfter(".dashboard-expense-slip", workspaceCorrection)).toContain("grid-row: 1;");
+    expect(styles).toContain(".monthly-ledger {\n  grid-column: 2;\n  grid-row: 1;\n}");
+    expect(styles).toContain(".secondary-action-strip {\n  grid-column: 1 / -1;\n  grid-row: 2;\n}");
+  });
+
   it("keeps degraded-support warnings before activity in the grid at desktop and mobile widths", () => {
     const desktopRules = topLevelCssBlock(".active-month-dashboard.dashboard-operational");
     const tabletRules = mediaBlock("(max-width: 768px)");

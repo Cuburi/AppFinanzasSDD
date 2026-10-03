@@ -53,6 +53,7 @@ export const composeMonthlyCycleService = ({
   withdrawCash: cashUseCases.withdrawCash,
   getCashSummary: cashUseCases.getCashSummary,
   depositToPocket: movementUseCases.depositToPocket,
+  withdrawFromPocket: movementUseCases.withdrawFromPocket,
   createMonthlyIncome: incomeUseCases.createMonthlyIncome,
   updateMonthlyIncome: incomeUseCases.updateMonthlyIncome,
   deleteMonthlyIncome: incomeUseCases.deleteMonthlyIncome,

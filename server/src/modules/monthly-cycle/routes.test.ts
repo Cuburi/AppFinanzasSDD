@@ -376,6 +376,39 @@ test("monthlyCycleRouter returns the service quiescence conflict for pocket depo
   }
 });
 
+test("monthlyCycleRouter validates and delegates pocket withdrawals with semantic errors", async () => {
+  const calls: unknown[] = [];
+  const server = createTestServer({
+    async withdrawFromPocket(input: unknown) {
+      calls.push(input);
+      return null;
+    },
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+    const valid = await fetch(`http://127.0.0.1:${address.port}/api/pockets/withdrawals`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sourcePocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10", description: "Groceries" }),
+    });
+    const invalid = await fetch(`http://127.0.0.1:${address.port}/api/pockets/withdrawals`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sourcePocketId: "pocket-1", amount: 0, occurredAt: "2026-05-10" }),
+    });
+
+    assert.equal(valid.status, 201);
+    assert.deepEqual(await valid.json(), { month: null });
+    assert.equal(invalid.status, 400);
+    assert.deepEqual(await invalid.json(), { code: "INVALID_AMOUNT", message: "Deposit amount must be greater than zero." });
+    assert.deepEqual(calls, [{ sourcePocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10", description: "Groceries" }]);
+  } finally {
+    server.close();
+  }
+});
+
 test("monthlyCycleRouter preserves PUT /api/template payload and response contract", async () => {
   const calls: unknown[] = [];
   const server = createTestServer({

@@ -29,6 +29,7 @@ import type {
   Template,
   UpdatePocketInput,
   WithdrawCashInput,
+  WithdrawFromPocketInput,
 } from "../types";
 
 export type IdempotencyOptions = {
@@ -420,6 +421,16 @@ export const api = {
   },
   async depositExternalToPocket(input: ExternalPocketDepositInput, options: IdempotencyOptions = {}): Promise<null> {
     const response = await fetch("/api/pockets/deposits", {
+      method: "POST",
+      headers: jsonHeaders(options),
+      body: JSON.stringify(input),
+    });
+    const payload = await readJson<{ month: null }>(response);
+
+    return payload.month;
+  },
+  async withdrawFromPocket(input: WithdrawFromPocketInput, options: IdempotencyOptions = {}): Promise<null> {
+    const response = await fetch("/api/pockets/withdrawals", {
       method: "POST",
       headers: jsonHeaders(options),
       body: JSON.stringify(input),

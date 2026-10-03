@@ -4,6 +4,7 @@ import test from "node:test";
 import { MonthStatus, MovementType, PaymentMethod, Prisma } from "../../../../lib/prisma-client.js";
 import { createMovementUseCases, createStrictDepositToPocketUseCase, MOVEMENT_USE_CASE_NAMES, type StrictDepositToPocketInput } from "./movement-use-cases.js";
 import type { MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
+import { SemanticError } from "../../shared/service-errors.js";
 
 const amount = (value: number) => new Prisma.Decimal(value.toFixed(2));
 
@@ -131,8 +132,73 @@ test("movement mutations lock the owning month before evaluating mutable state",
 });
 
 test("movement use cases expose only the expense and pocket-deposit public surface", () => {
-  assert.deepEqual(MOVEMENT_USE_CASE_NAMES, ["recordExpense", "updateExpense", "deleteExpense", "depositToPocket"]);
-  assert.deepEqual(Object.keys(createMovementUseCases(createMovementPorts().ports)), ["recordExpense", "updateExpense", "deleteExpense", "depositToPocket"]);
+  assert.deepEqual(MOVEMENT_USE_CASE_NAMES, ["recordExpense", "updateExpense", "deleteExpense", "depositToPocket", "withdrawFromPocket"]);
+  assert.deepEqual(Object.keys(createMovementUseCases(createMovementPorts().ports)), ["recordExpense", "updateExpense", "deleteExpense", "depositToPocket", "withdrawFromPocket"]);
+});
+
+test("withdrawFromPocket records an unlinked outgoing pocket movement after checking the active balance", async () => {
+  const { calls, created, ports } = createMovementPorts();
+  const txPorts = await new Promise<Omit<MonthlyCyclePorts, "transactionRunner">>((resolve) => {
+    void ports.transactionRunner.run(async (resolvedPorts) => {
+      resolve(resolvedPorts);
+      return undefined;
+    });
+  });
+  txPorts.pockets.ensureStrictPocketIsActive = async (pocketId: string, label: string) => {
+    calls.push(["tx.pockets.ensureStrictPocketIsActive", pocketId, label]);
+  };
+  txPorts.pockets.getBalance = async (pocketId: string) => {
+    calls.push(["tx.pockets.getBalance", pocketId]);
+    return 100;
+  };
+  calls.splice(0, calls.length);
+
+  const result = await createMovementUseCases(ports).withdrawFromPocket({
+    sourcePocketId: "pocket-safe",
+    amount: 25,
+    occurredAt: "2026-05-10T00:00:00.000Z",
+    description: "Groceries",
+  });
+
+  assert.equal(result, null);
+  assert.equal((created[0] as { type: MovementType; sourcePocketId: string; monthId?: string | null }).type, MovementType.DEFICIT_COVER_FROM_POCKET);
+  assert.equal((created[0] as { sourcePocketId: string }).sourcePocketId, "pocket-safe");
+  assert.equal((created[0] as { monthId?: string | null }).monthId, undefined);
+  assert.deepEqual(calls, [
+    ["transactionRunner.runSerializable"],
+    ["tx.pockets.ensureStrictPocketIsActive", "pocket-safe", "Source pocket"],
+    ["tx.pockets.getBalance", "pocket-safe"],
+    ["tx.movements.create", "DEFICIT_COVER_FROM_POCKET", "25", null, null],
+  ]);
+});
+
+test("withdrawFromPocket rejects inactive, missing, insufficient, and invalid sources before persisting", async () => {
+  const { calls, created, ports } = createMovementPorts();
+  const txPorts = await new Promise<Omit<MonthlyCyclePorts, "transactionRunner">>((resolve) => {
+    void ports.transactionRunner.run(async (resolvedPorts) => {
+      resolve(resolvedPorts);
+      return undefined;
+    });
+  });
+  txPorts.pockets.ensureStrictPocketIsActive = async () => {
+    throw new SemanticError("NOT_FOUND", 404, "Source pocket was not found.");
+  };
+  txPorts.pockets.getBalance = async () => 10;
+
+  await assert.rejects(
+    () => createMovementUseCases(ports).withdrawFromPocket({ sourcePocketId: "missing", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    { code: "NOT_FOUND" },
+  );
+  txPorts.pockets.ensureStrictPocketIsActive = async () => {};
+  await assert.rejects(
+    () => createMovementUseCases(ports).withdrawFromPocket({ sourcePocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    { code: "INSUFFICIENT_FUNDS" },
+  );
+  await assert.rejects(
+    () => (createMovementUseCases(ports).withdrawFromPocket as (input: unknown) => Promise<unknown>)({ sourcePocketId: "pocket-safe", amount: 0, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    { code: "INVALID_AMOUNT" },
+  );
+  assert.deepEqual(created, []);
 });
 
 test("recordExpense persists an expense inside the transaction runner and returns the mapped month", async () => {
