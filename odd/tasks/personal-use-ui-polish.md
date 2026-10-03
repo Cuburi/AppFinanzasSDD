@@ -36,7 +36,7 @@ Polish the remaining personal-use UI friction points as a coherent, reviewable U
 
 - [x] Explore current Active Month, Template, selector, and Pockets UI structures.
 - [x] Improve Active Month secondary panel layout and commit it.
-- [ ] Add Template collapsible groups plus stable card polish and commit it.
+- [x] Add Template collapsible groups plus stable card polish and commit it.
 - [ ] Improve category/subcategory selection efficiency and commit it.
 - [ ] Polish Pockets UI and commit it.
 - [ ] Run checks, native review/fallback if needed, and prepare PR.
@@ -57,3 +57,6 @@ Polish the remaining personal-use UI friction points as a coherent, reviewable U
 - Risk: avoid replacing native selects with a custom combobox in this PR unless necessary; group/clarify native selectors first to avoid accessibility scope creep.
 - Active Month secondary panels now wrap disclosed income, cash withdrawal, and pocket deposit slips in `.secondary-form-panel`, spanning the full desktop workspace and collapsing safely on narrow screens.
 - Verification passed: `pnpm --dir client exec vitest run src/visual-system.contract.test.ts src/pages/ActiveMonthPage.test.tsx` (67 tests), full accidental client suite (225 tests), `pnpm --dir client typecheck`, and `git diff --check`.
+- Commit `f622627` — `fix(active-month): widen secondary panels`.
+- Template category cards now use controlled native `details` disclosures, start open, stay collapsed across ordinary rerenders, and keep existing save/edit behavior.
+- Verification passed: `pnpm --dir client exec vitest run src/pages/TemplatePage.test.tsx src/visual-system.contract.test.ts` (21 tests), full accidental client suite (227 tests), and `pnpm --dir client typecheck`.

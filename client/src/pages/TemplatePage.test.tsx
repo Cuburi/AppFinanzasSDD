@@ -76,6 +76,26 @@ describe("TemplatePage", () => {
     expect(screen.getByLabelText("Subcategoría Supermercado")).toHaveValue("Supermercado");
   });
 
+  it("uses an initially open native disclosure for each category's editable subcategories", async () => {
+    const user = userEvent.setup();
+
+    render(<TemplatePage />);
+
+    const disclosure = await screen.findByRole("group", { name: "Subcategorías de Hogar" });
+    const trigger = disclosure.querySelector("summary");
+
+    expect(disclosure).toHaveAttribute("open");
+    expect(trigger).toHaveAttribute("aria-label", "Alternar subcategorías de Hogar");
+
+    await user.click(trigger!);
+
+    expect(disclosure).not.toHaveAttribute("open");
+
+    await user.click(screen.getByRole("button", { name: "Agregar categoría" }));
+
+    expect(disclosure).not.toHaveAttribute("open");
+  });
+
   it("normalizes leading zeros in planned amounts", async () => {
     render(<TemplatePage />);
 

@@ -236,6 +236,18 @@ describe("visual system contracts", () => {
     expect(cssBlock(".active-month-dashboard .dashboard-activity")).toContain("grid-column: auto;");
   });
 
+  it("keeps template category disclosures and cards stable in the dark visual system", () => {
+    const compactRules = mediaBlock("(max-width: 760px)");
+
+    expect(topLevelCssBlock(".template-structure-page")).toContain("max-width: none;");
+    expect(topLevelCssBlock(".template-category-card")).toContain("border-color: var(--ww-line);");
+    expect(topLevelCssBlock(".template-category-disclosure > summary")).toContain("min-height: 56px;");
+    expect(topLevelCssBlock(".template-category-disclosure > summary")).toContain("cursor: pointer;");
+    expect(topLevelCssBlock(".template-category-disclosure[open] > summary::after")).toContain('content: "−";');
+    expect(topLevelCssBlock(".template-category-content")).toContain("border-top: 1px solid var(--ww-line);");
+    expect(compactRules).toContain(".template-category-disclosure > summary");
+  });
+
   it("keeps active-month motion compositor-safe, interruptible, and removable for reduced motion", () => {
     const reducedMotionRules = mediaBlock("(prefers-reduced-motion: reduce)");
 
