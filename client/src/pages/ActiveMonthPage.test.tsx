@@ -396,6 +396,42 @@ describe("ActiveMonthPage", () => {
     expect(apiMock.getActiveMonth).toHaveBeenCalledTimes(1);
   });
 
+  it("groups subcategory selectors by category and keeps duplicate names distinguishable", async () => {
+    const user = userEvent.setup();
+    apiMock.getActiveMonth.mockResolvedValueOnce({
+      ...activeMonth,
+      categories: [
+        {
+          ...activeMonth.categories[0],
+          id: "cat-home",
+          name: "Hogar",
+          subcategories: [{ ...activeMonth.categories[0].subcategories[0], id: "sub-home-transport", name: "Transporte", available: 120 }],
+        },
+        {
+          ...activeMonth.categories[0],
+          id: "cat-travel",
+          name: "Viajes",
+          subcategories: [{ ...activeMonth.categories[0].subcategories[0], id: "sub-travel-transport", name: "Transporte", available: 80 }],
+        },
+      ],
+    });
+
+    render(<ActiveMonthPage />);
+
+    const expenseSelect = await screen.findByLabelText("Subcategoría del gasto");
+    expect(within(expenseSelect).getByRole("group", { name: "Hogar" })).toHaveTextContent("Transporte ($120 COP)");
+    expect(within(expenseSelect).getByRole("group", { name: "Viajes" })).toHaveTextContent("Transporte ($80 COP)");
+    expect([...expenseSelect.querySelectorAll("optgroup")].map((group) => group.label)).toEqual(["Hogar", "Viajes"]);
+
+    await user.click(screen.getByRole("button", { name: "Depositar en bolsillo" }));
+    const depositSelect = screen.getByLabelText("Subcategoría de origen");
+    expect(within(depositSelect).getByRole("group", { name: "Hogar" })).toHaveTextContent("Transporte ($120 COP)");
+    expect(within(depositSelect).getByRole("group", { name: "Viajes" })).toHaveTextContent("Transporte ($80 COP)");
+
+    await user.selectOptions(depositSelect, "sub-travel-transport");
+    expect(depositSelect).toHaveValue("sub-travel-transport");
+  });
+
   it("funds a pocket from a subcategory with the strict active-month payload", async () => {
     const user = userEvent.setup();
 
