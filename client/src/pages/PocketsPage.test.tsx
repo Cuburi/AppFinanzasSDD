@@ -98,6 +98,35 @@ describe("PocketsPage", () => {
     expect(apiMock.getPockets).toHaveBeenLastCalledWith("inactive");
   });
 
+  it("groups pocket money flows and editing into distinct responsive presentation regions", async () => {
+    render(<PocketsPage />);
+
+    const depositCard = screen.getByLabelText("Registrar ingreso externo");
+    const withdrawalCard = screen.getByLabelText("Registrar retiro o gasto");
+    const depositForm = depositCard.querySelector("form");
+    const withdrawalForm = withdrawalCard.querySelector("form");
+    const pocketCard = (await screen.findByText("Emergencias")).closest("article");
+    if (!depositForm || !withdrawalForm || !pocketCard) throw new Error("Missing pocket presentation region.");
+
+    expect(depositCard).toHaveClass("pockets-action-card", "pockets-deposit-card");
+    expect(withdrawalCard).toHaveClass("pockets-action-card", "pockets-withdrawal-card");
+    expect(depositForm).toHaveClass("pockets-action-form");
+    expect(withdrawalForm).toHaveClass("pockets-action-form");
+    expect(pocketCard).toHaveClass("pocket-card");
+    expect(within(pocketCard).getByRole("heading", { name: "Emergencias" })).toHaveClass("pocket-card-name");
+    expect(within(pocketCard).getByRole("button", { name: "Editar bolsillo" })).toBeInTheDocument();
+    expect(within(pocketCard).queryByRole("heading", { name: "Editar bolsillo" })).not.toBeInTheDocument();
+
+    await userEvent.setup().click(within(pocketCard).getByRole("button", { name: "Editar bolsillo" }));
+
+    expect(within(pocketCard).getByRole("heading", { name: "Editar bolsillo" })).toBeInTheDocument();
+    expect(within(pocketCard).getByRole("button", { name: "Cancelar edición" })).toBeInTheDocument();
+    expect(within(pocketCard).getByText("Saldo disponible")).toBeInTheDocument();
+
+    await userEvent.setup().click(within(pocketCard).getByRole("button", { name: "Cancelar edición" }));
+    expect(within(pocketCard).queryByRole("heading", { name: "Editar bolsillo" })).not.toBeInTheDocument();
+  });
+
   it("normalizes leading zeros in pocket amount inputs", async () => {
     render(<PocketsPage />);
 
@@ -275,6 +304,7 @@ describe("PocketsPage", () => {
     const emergencyCard = screen.getByText("Emergencias").closest("article");
     if (!emergencyCard) throw new Error("Missing pocket card.");
 
+    await user.click(within(emergencyCard).getByRole("button", { name: "Editar bolsillo" }));
     await user.clear(within(emergencyCard).getByLabelText("Editar nombre"));
     await user.type(within(emergencyCard).getByLabelText("Editar nombre"), "Reserva");
     await user.clear(within(emergencyCard).getByLabelText("Editar meta"));
@@ -288,6 +318,7 @@ describe("PocketsPage", () => {
       }),
     );
 
+    await user.click(within(emergencyCard).getByRole("button", { name: "Editar bolsillo" }));
     await user.click(within(emergencyCard).getByRole("button", { name: "Desactivar" }));
 
     await waitFor(() => expect(apiMock.deactivatePocket).toHaveBeenCalledWith("pocket-emergency"));
@@ -353,6 +384,7 @@ describe("PocketsPage", () => {
     const emergencyCard = (await screen.findByText("Emergencias")).closest("article");
     if (!emergencyCard) throw new Error("Missing pocket card.");
 
+    await user.click(within(emergencyCard).getByRole("button", { name: "Editar bolsillo" }));
     await user.click(within(emergencyCard).getByRole("button", { name: "Desactivar" }));
 
     await waitFor(() => expect(apiMock.deactivatePocket).toHaveBeenCalledWith("pocket-emergency"));
@@ -372,6 +404,7 @@ describe("PocketsPage", () => {
     const emergencyCard = (await screen.findByText("Emergencias")).closest("article");
     if (!emergencyCard) throw new Error("Missing pocket card.");
 
+    await user.click(within(emergencyCard).getByRole("button", { name: "Editar bolsillo" }));
     await user.click(within(emergencyCard).getByRole("button", { name: "Desactivar" }));
 
     await waitFor(() => expect(apiMock.deactivatePocket).toHaveBeenCalledWith("pocket-emergency"));
