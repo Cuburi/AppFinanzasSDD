@@ -1,10 +1,12 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { PocketRecentMovements } from "./PocketRecentMovements";
 
 describe("PocketRecentMovements", () => {
-  it("keeps the first five supplied movements in response order with accurate provenance", () => {
+  it("previews three movements, then expands the remaining supplied movements in response order", async () => {
+    const user = userEvent.setup();
     render(
       <PocketRecentMovements
         movements={[
@@ -19,13 +21,21 @@ describe("PocketRecentMovements", () => {
     );
 
     const movements = screen.getAllByRole("listitem");
-    expect(movements).toHaveLength(5);
+    expect(movements).toHaveLength(3);
     expect(movements[0]).toHaveTextContent("Externo — Employer");
     expect(movements[1]).toHaveTextContent("Origen externo");
     expect(movements[1]).toHaveTextContent("Movimiento sin descripción");
     expect(movements[2]).toHaveTextContent("Financiado por mes — Disponible del mes");
     expect(within(movements[0]!).getByRole("time")).toHaveAttribute("dateTime", "2026-05-14T12:00:00.000Z");
     expect(screen.queryByText("Not shown")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ver 3 movimientos más" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Ver 3 movimientos más" }));
+
+    expect(screen.getAllByRole("listitem")).toHaveLength(6);
+    expect(screen.getByText("Not shown")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Mostrar menos movimientos" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
     expect(screen.queryByRole("link", { name: /view all/i })).not.toBeInTheDocument();
   });
 

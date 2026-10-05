@@ -227,6 +227,7 @@ describe("ActiveMonthPage", () => {
 
     const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
     if (!expenseForm) throw new Error("Missing expense form.");
+    await user.selectOptions(within(expenseForm).getByLabelText("Categoría del gasto"), "cat-income");
     await user.selectOptions(within(expenseForm).getByLabelText("Subcategoría del gasto"), "sub-bonus");
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
     await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
@@ -279,14 +280,20 @@ describe("ActiveMonthPage", () => {
     const expenseSlip = await screen.findByRole("region", { name: "Registrar gasto" });
     expect(expenseSlip).toHaveClass("registration-slip-primary", "registration-slip-create");
     const amount = within(expenseSlip).getByLabelText("Monto", { selector: "input" });
+    const category = within(expenseSlip).getByLabelText("Categoría del gasto");
     const subcategory = within(expenseSlip).getByLabelText("Subcategoría del gasto");
     const primaryFields = expenseSlip.querySelector(".registration-slip-primary-fields");
     const supportingFields = expenseSlip.querySelector(".registration-slip-supporting-fields");
-    expect(amount.compareDocumentPosition(subcategory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(amount.compareDocumentPosition(category) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(category.compareDocumentPosition(subcategory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(subcategory).toBeDisabled();
+    expect(subcategory).not.toBeRequired();
     expect(primaryFields).not.toBeNull();
     expect(supportingFields).not.toBeNull();
     expect(primaryFields!.compareDocumentPosition(supportingFields!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
+    await user.selectOptions(category, "cat-income");
+    expect(subcategory).toBeRequired();
     await user.selectOptions(subcategory, "sub-bonus");
     await user.type(amount, "700");
     await user.click(within(expenseSlip).getByRole("button", { name: "Registrar gasto" }));
@@ -396,40 +403,38 @@ describe("ActiveMonthPage", () => {
     expect(apiMock.getActiveMonth).toHaveBeenCalledTimes(1);
   });
 
-  it("groups subcategory selectors by category and keeps duplicate names distinguishable", async () => {
+  it("uses separate category and subcategory fields and clears stale selections when the category changes", async () => {
     const user = userEvent.setup();
     apiMock.getActiveMonth.mockResolvedValueOnce({
       ...activeMonth,
       categories: [
-        {
-          ...activeMonth.categories[0],
-          id: "cat-home",
-          name: "Hogar",
-          subcategories: [{ ...activeMonth.categories[0].subcategories[0], id: "sub-home-transport", name: "Transporte", available: 120 }],
-        },
-        {
-          ...activeMonth.categories[0],
-          id: "cat-travel",
-          name: "Viajes",
-          subcategories: [{ ...activeMonth.categories[0].subcategories[0], id: "sub-travel-transport", name: "Transporte", available: 80 }],
-        },
+        { ...activeMonth.categories[0], id: "cat-home", name: "Hogar", subcategories: [{ ...activeMonth.categories[0].subcategories[0], id: "sub-home-transport", name: "Transporte", available: 120 }] },
+        { ...activeMonth.categories[0], id: "cat-travel", name: "Viajes", subcategories: [{ ...activeMonth.categories[0].subcategories[0], id: "sub-travel-transport", name: "Transporte", available: 80 }] },
       ],
     });
 
     render(<ActiveMonthPage />);
 
-    const expenseSelect = await screen.findByLabelText("Subcategoría del gasto");
-    expect(within(expenseSelect).getByRole("group", { name: "Hogar" })).toHaveTextContent("Transporte ($120 COP)");
-    expect(within(expenseSelect).getByRole("group", { name: "Viajes" })).toHaveTextContent("Transporte ($80 COP)");
-    expect([...expenseSelect.querySelectorAll("optgroup")].map((group) => group.label)).toEqual(["Hogar", "Viajes"]);
+    const expenseCategory = await screen.findByLabelText("Categoría del gasto");
+    const expenseSubcategory = screen.getByLabelText("Subcategoría del gasto");
+    expect(expenseSubcategory).toBeDisabled();
+    expect(screen.getByRole("option", { name: "Sin categoría (Uncategorized)" })).toBeInTheDocument();
+    await user.selectOptions(expenseCategory, "cat-home");
+    await user.selectOptions(expenseSubcategory, "sub-home-transport");
+    await user.selectOptions(expenseCategory, "cat-travel");
+    expect(expenseSubcategory).toHaveValue("");
+    expect(within(expenseSubcategory).getByRole("option", { name: "Transporte ($80 COP)" })).toBeInTheDocument();
+    expect(within(expenseSubcategory).queryByRole("option", { name: "Transporte ($120 COP)" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Depositar en bolsillo" }));
-    const depositSelect = screen.getByLabelText("Subcategoría de origen");
-    expect(within(depositSelect).getByRole("group", { name: "Hogar" })).toHaveTextContent("Transporte ($120 COP)");
-    expect(within(depositSelect).getByRole("group", { name: "Viajes" })).toHaveTextContent("Transporte ($80 COP)");
-
-    await user.selectOptions(depositSelect, "sub-travel-transport");
-    expect(depositSelect).toHaveValue("sub-travel-transport");
+    const depositCategory = screen.getByLabelText("Categoría de origen");
+    const depositSubcategory = screen.getByLabelText("Subcategoría de origen");
+    expect(depositSubcategory).toBeDisabled();
+    await user.selectOptions(depositCategory, "cat-home");
+    await user.selectOptions(depositSubcategory, "sub-home-transport");
+    await user.selectOptions(depositCategory, "cat-travel");
+    expect(depositSubcategory).toHaveValue("");
+    expect(within(depositSubcategory).getByRole("option", { name: "Transporte ($80 COP)" })).toBeInTheDocument();
   });
 
   it("funds a pocket from a subcategory with the strict active-month payload", async () => {
@@ -437,7 +442,8 @@ describe("ActiveMonthPage", () => {
 
     render(<ActiveMonthPage />);
 
-    expect(await screen.findAllByRole("option", { name: "Bonus ($500 COP)" })).toHaveLength(1);
+    expect(await screen.findByLabelText("Categoría del gasto")).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Bonus ($500 COP)" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("ID bolsillo destino")).not.toBeInTheDocument();
     expect(apiMock.getPockets).toHaveBeenCalledWith("active");
 
@@ -446,6 +452,7 @@ describe("ActiveMonthPage", () => {
     if (!depositForm) throw new Error("Missing deposit form.");
 
     await user.selectOptions(within(depositForm).getByLabelText("Origen de los fondos"), "SUBCATEGORY");
+    await user.selectOptions(within(depositForm).getByLabelText("Categoría de origen"), "cat-income");
     await user.selectOptions(within(depositForm).getByLabelText("Subcategoría de origen"), "sub-bonus");
     await user.selectOptions(within(depositForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
     await user.type(within(depositForm).getByLabelText("Monto", { selector: "input" }), "125");
@@ -656,6 +663,7 @@ describe("ActiveMonthPage", () => {
     const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
     if (!expenseForm) throw new Error("Missing expense form.");
 
+    await user.selectOptions(within(expenseForm).getByLabelText("Categoría del gasto"), "cat-income");
     await user.selectOptions(within(expenseForm).getByLabelText("Subcategoría del gasto"), "sub-bonus");
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "35");
     fireEvent.change(within(expenseForm).getByLabelText("Fecha del gasto"), { target: { value: "2026-05-15" } });
@@ -684,6 +692,7 @@ describe("ActiveMonthPage", () => {
     const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
     if (!expenseForm) throw new Error("Missing expense form.");
 
+    await user.selectOptions(within(expenseForm).getByLabelText("Categoría del gasto"), "cat-income");
     await user.selectOptions(within(expenseForm).getByLabelText("Subcategoría del gasto"), "sub-bonus");
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
     await user.selectOptions(within(expenseForm).getByLabelText("Tarjeta de crédito (opcional)"), "card-1");
@@ -741,6 +750,7 @@ describe("ActiveMonthPage", () => {
     const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
     if (!expenseForm) throw new Error("Missing expense form.");
 
+    await user.selectOptions(within(expenseForm).getByLabelText("Categoría del gasto"), "cat-income");
     await user.selectOptions(within(expenseForm).getByLabelText("Subcategoría del gasto"), "sub-bonus");
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
     fireEvent.change(within(expenseForm).getByLabelText("Fecha del gasto"), { target: { value: "2026-05-12" } });
@@ -768,7 +778,8 @@ describe("ActiveMonthPage", () => {
     const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
     if (!expenseForm) throw new Error("Missing expense form.");
 
-    expect(within(expenseForm).getByRole("option", { name: "Uncategorized" })).toBeInTheDocument();
+    expect(within(expenseForm).getByRole("option", { name: "Sin categoría (Uncategorized)" })).toBeInTheDocument();
+    expect(within(expenseForm).getByLabelText("Subcategoría del gasto")).toBeDisabled();
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
     await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
 
@@ -784,6 +795,7 @@ describe("ActiveMonthPage", () => {
     const expenseForm = (await screen.findByRole("button", { name: "Registrar gasto" })).closest("form");
     if (!expenseForm) throw new Error("Missing expense form.");
 
+    await user.selectOptions(within(expenseForm).getByLabelText("Categoría del gasto"), "cat-income");
     await user.selectOptions(within(expenseForm).getByLabelText("Subcategoría del gasto"), "sub-bonus");
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
     await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));

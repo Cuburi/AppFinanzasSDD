@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 
 import { api } from "../lib/api";
 import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
@@ -40,6 +41,7 @@ export const TemplatePage = () => {
   const [saving, setSaving] = useState(false);
   const [activePockets, setActivePockets] = useState<SavingsPocket[]>([]);
   const [openCategories, setOpenCategories] = useState<Record<number, boolean>>({ 0: true });
+  const [headerMotionStyle, setHeaderMotionStyle] = useState<CSSProperties>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,6 +153,23 @@ export const TemplatePage = () => {
     }));
   };
 
+  const handleHeaderPointerMove = (event: PointerEvent<HTMLElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - bounds.left) / bounds.width) * 100;
+    const y = ((event.clientY - bounds.top) / bounds.height) * 100;
+    const tiltY = ((x - 50) / 50) * 5;
+    const tiltX = -((y - 50) / 50) * 4;
+
+    setHeaderMotionStyle({
+      "--hero-x": `${x}%`,
+      "--hero-y": `${y}%`,
+      "--tilt-x": `${tiltX}deg`,
+      "--tilt-y": `${tiltY}deg`,
+    } as CSSProperties);
+  };
+
+  const resetHeaderMotion = () => setHeaderMotionStyle({});
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
@@ -176,7 +195,12 @@ export const TemplatePage = () => {
 
   return (
     <section className="page template-structure-page">
-      <header className="template-structure-header">
+      <header
+        className="template-structure-header"
+        onPointerLeave={resetHeaderMotion}
+        onPointerMove={handleHeaderPointerMove}
+        style={headerMotionStyle}
+      >
         <div>
           <p className="eyebrow">Base de presupuesto</p>
           <h1>Estructura para meses futuros</h1>

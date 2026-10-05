@@ -52,6 +52,7 @@ export const PocketsPage = () => {
   const [newPocketInitialBalance, setNewPocketInitialBalance] = useState("");
   const [editNames, setEditNames] = useState<Record<string, string>>({});
   const [editGoals, setEditGoals] = useState<Record<string, string>>({});
+  const [editingPocketId, setEditingPocketId] = useState<string | null>(null);
   const [externalPocketId, setExternalPocketId] = useState("");
   const [externalAmount, setExternalAmount] = useState("");
   const [externalOccurredAt, setExternalOccurredAt] = useState(localCalendarDate);
@@ -181,12 +182,19 @@ export const PocketsPage = () => {
         active: pocket.active,
       });
       setPockets((current) => current.map((currentPocket) => (currentPocket.id === pocket.id ? updatedPocket : currentPocket)));
+      setEditingPocketId(null);
       setMessage("Bolsillo actualizado.");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo actualizar el bolsillo.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const cancelPocketEdit = (pocket: SavingsPocket) => {
+    setEditNames((current) => ({ ...current, [pocket.id]: pocket.name }));
+    setEditGoals((current) => ({ ...current, [pocket.id]: pocket.goalAmount?.toString() ?? "" }));
+    setEditingPocketId(null);
   };
 
   const deactivatePocket = async (pocket: SavingsPocket) => {
@@ -395,9 +403,20 @@ export const PocketsPage = () => {
                 <div className="pocket-card-title">
                   <div>
                     <p className="eyebrow">Bolsillo</p>
-                    <h3>{pocket.name}</h3>
+                    <h3 className="pocket-card-name">{pocket.name}</h3>
                   </div>
-                  <StatusPill tone={pocket.active ? "success" : "neutral"}>{pocket.active ? "Activo" : "Inactivo"}</StatusPill>
+                  <div className="pocket-card-title-actions">
+                    <StatusPill tone={pocket.active ? "success" : "neutral"}>{pocket.active ? "Activo" : "Inactivo"}</StatusPill>
+                    <Button
+                      aria-controls={`pocket-edit-${pocket.id}`}
+                      aria-expanded={editingPocketId === pocket.id}
+                      onClick={() => setEditingPocketId((current) => (current === pocket.id ? null : pocket.id))}
+                      type="button"
+                      variant="tertiary"
+                    >
+                      Editar bolsillo
+                    </Button>
+                  </div>
                 </div>
                 <div className="pocket-card-balance">
                   <span>Saldo disponible</span>
@@ -408,40 +427,47 @@ export const PocketsPage = () => {
                 </div>
                 <p className="pocket-card-goal">{pocket.goalAmount === null ? "Sin meta definida" : `Meta: ${formatMoney(pocket.goalAmount)}`}</p>
 
+                {editingPocketId === pocket.id ? (
+                  <form className="pocket-edit-form" id={`pocket-edit-${pocket.id}`} onSubmit={(event) => event.preventDefault()}>
+                    <div>
+                      <p className="eyebrow">Configuración</p>
+                      <h4>Editar bolsillo</h4>
+                    </div>
+                    <label className="field">
+                      <span>Editar nombre</span>
+                      <input
+                        value={editNames[pocket.id] ?? pocket.name}
+                        onChange={(event) => setEditNames((current) => ({ ...current, [pocket.id]: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field small-field">
+                      <span>Editar meta</span>
+                      <input
+                        min="0"
+                        step="0.01"
+                        type="number"
+                        value={editGoals[pocket.id] ?? ""}
+                        onChange={(event) => setEditGoals((current) => ({ ...current, [pocket.id]: normalizeAmountInput(event.target.value) }))}
+                      />
+                    </label>
+                    <div className="pocket-edit-actions">
+                      <Button disabled={submitting} onClick={() => void updatePocket(pocket)} type="button">
+                        Guardar cambios
+                      </Button>
+                      <Button disabled={submitting} onClick={() => cancelPocketEdit(pocket)} type="button" variant="secondary">
+                        Cancelar edición
+                      </Button>
+                      {pocket.active ? (
+                        <Button variant="tertiary" disabled={submitting} onClick={() => void deactivatePocket(pocket)} type="button">
+                          Desactivar
+                        </Button>
+                      ) : null}
+                    </div>
+                  </form>
+                ) : null}
+
                 <PocketRecentMovements movements={pocket.recentMovements ?? []} />
               </div>
-
-              <form className="pocket-edit-form" onSubmit={(event) => event.preventDefault()}>
-                <div>
-                  <p className="eyebrow">Configuración</p>
-                  <h4>Editar bolsillo</h4>
-                </div>
-                <label className="field">
-                  <span>Editar nombre</span>
-                  <input
-                    value={editNames[pocket.id] ?? pocket.name}
-                    onChange={(event) => setEditNames((current) => ({ ...current, [pocket.id]: event.target.value }))}
-                  />
-                </label>
-                <label className="field small-field">
-                  <span>Editar meta</span>
-                  <input
-                    min="0"
-                    step="0.01"
-                    type="number"
-                    value={editGoals[pocket.id] ?? ""}
-                    onChange={(event) => setEditGoals((current) => ({ ...current, [pocket.id]: normalizeAmountInput(event.target.value) }))}
-                  />
-                </label>
-                <Button disabled={submitting} onClick={() => void updatePocket(pocket)} type="button">
-                  Guardar cambios
-                </Button>
-                {pocket.active ? (
-                  <Button variant="tertiary" disabled={submitting} onClick={() => void deactivatePocket(pocket)} type="button">
-                    Desactivar
-                  </Button>
-                ) : null}
-              </form>
             </article>
           ))}
         </div>

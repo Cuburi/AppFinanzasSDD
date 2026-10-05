@@ -76,6 +76,23 @@ describe("TemplatePage", () => {
     expect(screen.getByLabelText("Subcategoría Supermercado")).toHaveValue("Supermercado");
   });
 
+  it("keeps category cards static while reserving pointer tilt for the template hero", async () => {
+    const { container } = render(<TemplatePage />);
+
+    await screen.findByRole("heading", { name: "Estructura para meses futuros" });
+    const header = container.querySelector<HTMLElement>(".template-structure-header");
+    const category = screen.getByRole("article", { name: "Categoría Hogar" });
+    if (!header) throw new Error("Missing template hero.");
+    Object.defineProperty(header, "getBoundingClientRect", {
+      value: () => ({ bottom: 100, height: 100, left: 0, right: 200, top: 0, width: 200, x: 0, y: 0 }),
+    });
+
+    fireEvent(header, new MouseEvent("pointermove", { bubbles: true, clientX: 150, clientY: 25 }));
+
+    expect(header).toHaveStyle("--hero-x: 75%; --hero-y: 25%; --tilt-x: 2deg; --tilt-y: 2.5deg;");
+    expect(category).not.toHaveAttribute("style");
+  });
+
   it("uses an initially open native disclosure for each category's editable subcategories", async () => {
     const user = userEvent.setup();
 
