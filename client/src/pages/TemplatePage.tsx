@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 
 import { api } from "../lib/api";
 import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
@@ -39,6 +40,8 @@ export const TemplatePage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activePockets, setActivePockets] = useState<SavingsPocket[]>([]);
+  const [openCategories, setOpenCategories] = useState<Record<number, boolean>>({ 0: true });
+  const [headerMotionStyle, setHeaderMotionStyle] = useState<CSSProperties>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +49,9 @@ export const TemplatePage = () => {
     const load = async () => {
       try {
         const [currentTemplate, pockets] = await Promise.all([api.getTemplate(), api.getPockets("active")]);
-        setTemplate(toTemplateDraft(currentTemplate));
+        const nextTemplate = toTemplateDraft(currentTemplate);
+        setTemplate(nextTemplate);
+        setOpenCategories(Object.fromEntries(nextTemplate.categories.map((_, index) => [index, true])));
         setActivePockets(pockets);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "No se pudo cargar la plantilla y los bolsillos activos.");
@@ -107,15 +112,19 @@ export const TemplatePage = () => {
   };
 
   const addCategory = () => {
-    setTemplate((current) => ({
-      categories: [...current.categories, emptyCategory()],
-    }));
+    setTemplate((current) => {
+      setOpenCategories((open) => ({ ...open, [current.categories.length]: true }));
+      return { categories: [...current.categories, emptyCategory()] };
+    });
   };
 
   const removeCategory = (categoryIndex: number) => {
     setTemplate((current) => ({
       categories: current.categories.filter((_, index) => index !== categoryIndex),
     }));
+    setOpenCategories((open) =>
+      Object.fromEntries(Object.values(open).filter((_, index) => index !== categoryIndex).map((value, index) => [index, value])),
+    );
   };
 
   const addSubcategory = (categoryIndex: number) => {
@@ -144,6 +153,23 @@ export const TemplatePage = () => {
     }));
   };
 
+  const handleHeaderPointerMove = (event: PointerEvent<HTMLElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - bounds.left) / bounds.width) * 100;
+    const y = ((event.clientY - bounds.top) / bounds.height) * 100;
+    const tiltY = ((x - 50) / 50) * 5;
+    const tiltX = -((y - 50) / 50) * 4;
+
+    setHeaderMotionStyle({
+      "--hero-x": `${x}%`,
+      "--hero-y": `${y}%`,
+      "--tilt-x": `${tiltX}deg`,
+      "--tilt-y": `${tiltY}deg`,
+    } as CSSProperties);
+  };
+
+  const resetHeaderMotion = () => setHeaderMotionStyle({});
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
@@ -152,7 +178,9 @@ export const TemplatePage = () => {
 
     try {
       const savedTemplate = await api.updateTemplate(toEditableTemplate(template));
-      setTemplate(toTemplateDraft(savedTemplate));
+      const nextTemplate = toTemplateDraft(savedTemplate);
+      setTemplate(nextTemplate);
+      setOpenCategories((open) => Object.fromEntries(nextTemplate.categories.map((_, index) => [index, open[index] ?? true])));
       setMessage("Plantilla guardada. Los próximos meses usarán este snapshot.");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo guardar la plantilla.");
@@ -167,7 +195,12 @@ export const TemplatePage = () => {
 
   return (
     <section className="page template-structure-page">
-      <header className="template-structure-header">
+      <header
+        className="template-structure-header"
+        onPointerLeave={resetHeaderMotion}
+        onPointerMove={handleHeaderPointerMove}
+        style={headerMotionStyle}
+      >
         <div>
           <p className="eyebrow">Base de presupuesto</p>
           <h1>Estructura para meses futuros</h1>
@@ -190,87 +223,105 @@ export const TemplatePage = () => {
 
           return (
             <article aria-label={`Categoría ${category.name || categoryIndex + 1}`} className="card template-category-card" key={`category-${categoryIndex}`}>
-              <header className="template-category-header">
-                <label className="field grow">
-                  <span>Categoría</span>
-                  <input
-                    value={category.name}
-                    onChange={(event) => updateCategoryName(categoryIndex, event.target.value)}
-                    placeholder="Ej: Hogar"
-                  />
-                </label>
+              <details
+                aria-label={`Subcategorías de ${category.name || categoryIndex + 1}`}
+                className="template-category-disclosure"
+                open={openCategories[categoryIndex] ?? true}
+                onToggle={(event) => {
+                  const isOpen = event.currentTarget.open;
+                  setOpenCategories((open) => ({ ...open, [categoryIndex]: isOpen }));
+                }}
+              >
+                <summary aria-label={`Alternar subcategorías de ${category.name || categoryIndex + 1}`}>
+                  <span>
+                    <strong>{category.name || `Categoría ${categoryIndex + 1}`}</strong>
+                    <small>{category.subcategories.length} subcategoría{category.subcategories.length === 1 ? "" : "s"}</small>
+                  </span>
+                  <span className="template-category-summary">
+                    <span>Subtotal de {category.name || "la categoría"}</span>
+                    <strong>{formatCop(categoryTotal)}</strong>
+                  </span>
+                </summary>
 
-                <div className="template-category-summary">
-                  <span>Subtotal de {category.name || "la categoría"}</span>
-                  <strong>{formatCop(categoryTotal)}</strong>
-                </div>
-
-                <button className="button tertiary" type="button" onClick={() => removeCategory(categoryIndex)}>
-                  Eliminar categoría
-                </button>
-              </header>
-
-              <div className="template-subcategory-list">
-                <div aria-hidden="true" className="template-subcategory-columns">
-                  <span>Subcategoría</span>
-                  <span>Monto planificado</span>
-                  <span>Bolsillo por defecto</span>
-                </div>
-                {category.subcategories.map((subcategory, subcategoryIndex) => (
-                  <div className="template-subcategory-row" key={`subcategory-${categoryIndex}-${subcategoryIndex}`}>
-                    <label className="field">
-                      <span className="sr-only">Subcategoría</span>
+                <div className="template-category-content">
+                  <header className="template-category-header">
+                    <label className="field grow">
+                      <span>Categoría</span>
                       <input
-                        aria-label={`Subcategoría ${subcategory.name || subcategoryIndex + 1}`}
-                        value={subcategory.name}
-                        onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "name", event.target.value)}
-                        placeholder="Ej: Supermercado"
+                        value={category.name}
+                        onChange={(event) => updateCategoryName(categoryIndex, event.target.value)}
+                        placeholder="Ej: Hogar"
                       />
                     </label>
 
-                    <label className="field field-amount">
-                      <span className="sr-only">Monto planificado</span>
-                      <input
-                        aria-label={`Monto planificado de ${subcategory.name || subcategoryIndex + 1}`}
-                        min="0"
-                        step="0.01"
-                        type="number"
-                        value={subcategory.plannedAmount}
-                        onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "plannedAmount", normalizeAmountInput(event.target.value))}
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span className="sr-only">Bolsillo por defecto (opcional)</span>
-                      <select
-                        aria-label="Bolsillo por defecto (opcional)"
-                        value={subcategory.defaultPocketId ?? ""}
-                        onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "defaultPocketId", event.target.value)}
-                      >
-                        <option value="">Sin bolsillo por defecto</option>
-                        {activePockets.map((pocket) => (
-                          <option key={pocket.id} value={pocket.id}>
-                            {pocket.name} ({formatCop(pocket.balance)})
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <button
-                      aria-label={`Quitar subcategoría ${subcategory.name || subcategoryIndex + 1}`}
-                      className="button tertiary template-remove-subcategory"
-                      type="button"
-                      onClick={() => removeSubcategory(categoryIndex, subcategoryIndex)}
-                    >
-                      Quitar
+                    <button className="button tertiary" type="button" onClick={() => removeCategory(categoryIndex)}>
+                      Eliminar categoría
                     </button>
-                  </div>
-                ))}
-              </div>
+                  </header>
 
-              <button className="button tertiary template-add-subcategory" type="button" onClick={() => addSubcategory(categoryIndex)}>
-                Agregar subcategoría
-              </button>
+                  <div className="template-subcategory-list">
+                    <div aria-hidden="true" className="template-subcategory-columns">
+                      <span>Subcategoría</span>
+                      <span>Monto planificado</span>
+                      <span>Bolsillo por defecto</span>
+                    </div>
+                    {category.subcategories.map((subcategory, subcategoryIndex) => (
+                      <div className="template-subcategory-row" key={`subcategory-${categoryIndex}-${subcategoryIndex}`}>
+                        <label className="field">
+                          <span className="sr-only">Subcategoría</span>
+                          <input
+                            aria-label={`Subcategoría ${subcategory.name || subcategoryIndex + 1}`}
+                            value={subcategory.name}
+                            onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "name", event.target.value)}
+                            placeholder="Ej: Supermercado"
+                          />
+                        </label>
+
+                        <label className="field field-amount">
+                          <span className="sr-only">Monto planificado</span>
+                          <input
+                            aria-label={`Monto planificado de ${subcategory.name || subcategoryIndex + 1}`}
+                            min="0"
+                            step="0.01"
+                            type="number"
+                            value={subcategory.plannedAmount}
+                            onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "plannedAmount", normalizeAmountInput(event.target.value))}
+                          />
+                        </label>
+
+                        <label className="field">
+                          <span className="sr-only">Bolsillo por defecto (opcional)</span>
+                          <select
+                            aria-label="Bolsillo por defecto (opcional)"
+                            value={subcategory.defaultPocketId ?? ""}
+                            onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "defaultPocketId", event.target.value)}
+                          >
+                            <option value="">Sin bolsillo por defecto</option>
+                            {activePockets.map((pocket) => (
+                              <option key={pocket.id} value={pocket.id}>
+                                {pocket.name} ({formatCop(pocket.balance)})
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <button
+                          aria-label={`Quitar subcategoría ${subcategory.name || subcategoryIndex + 1}`}
+                          className="button tertiary template-remove-subcategory"
+                          type="button"
+                          onClick={() => removeSubcategory(categoryIndex, subcategoryIndex)}
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button className="button tertiary template-add-subcategory" type="button" onClick={() => addSubcategory(categoryIndex)}>
+                    Agregar subcategoría
+                  </button>
+                </div>
+              </details>
             </article>
           );
         })}

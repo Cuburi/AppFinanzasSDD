@@ -183,6 +183,31 @@ describe("visual system contracts", () => {
     expect(compactRules).toContain(".registration-slip-actions .button { width: 100%; }");
   });
 
+  it("keeps the expense category pair intentional and stacked on compact screens", () => {
+    const compactRules = mediaBlock("(max-width: 767px)");
+
+    expect(topLevelCssBlock(".expense-capture-form .expense-category-fields")).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
+    expect(topLevelCssBlock(".expense-capture-form .expense-category-fields")).toContain("border: 1px solid var(--ww-line);");
+    expect(topLevelCssBlock(".expense-capture-form .registration-slip-supporting-fields .field")).toContain("padding: 11px 12px;");
+    expect(styles).toContain(".expense-capture-form .expense-category-fields,\n  .expense-capture-form .registration-slip-supporting-fields {\n    grid-template-columns: 1fr;");
+  });
+
+  it("keeps the expense card stretched so its primary CTA aligns with the ledger CTA", () => {
+    expect(effectiveDeclaration(styles, ".dashboard-expense-capture", "align-self")).toBe("stretch");
+    expect(effectiveDeclaration(styles, ".dashboard-expense-capture > .registration-slip", "height")).toBe("100%");
+    expect(effectiveDeclaration(styles, ".dashboard-expense-capture > .registration-slip", "align-self")).toBe("stretch");
+    expect(effectiveDeclaration(styles, ".dashboard-expense-capture > .registration-slip", "display")).toBe("flex");
+    expect(effectiveDeclaration(styles, ".dashboard-expense-capture > .registration-slip", "flex-direction")).toBe("column");
+    expect(topLevelCssBlock(".expense-capture-form")).toContain("display: flex;");
+    expect(topLevelCssBlock(".expense-capture-form")).toContain("flex: 1 1 auto;");
+    expect(topLevelCssBlock(".expense-capture-form")).toContain("flex-direction: column;");
+    expect(topLevelCssBlock(".expense-capture-form")).toContain("height: 100%;");
+    expect(topLevelCssBlock(".expense-capture-form")).toContain("min-height: 0;");
+    expect(topLevelCssBlock(".expense-capture-form .registration-slip-actions")).toContain("align-self: stretch;");
+    expect(topLevelCssBlock(".expense-capture-form .registration-slip-actions")).toContain("margin-top: auto;");
+    expect(topLevelCssBlock(".expense-capture-form .registration-slip-actions")).not.toContain("margin-top: 20px;");
+  });
+
   it("keeps the active-month dashboard readable and actionable from tablet through narrow and zoomed viewports", () => {
     const tabletRules = mediaBlock("(max-width: 768px)");
     const phoneRules = mediaBlock("(max-width: 390px)");
@@ -218,6 +243,15 @@ describe("visual system contracts", () => {
     expect(styles).toContain(".secondary-action-strip {\n  grid-column: 1 / -1;\n  grid-row: 2;\n}");
   });
 
+  it("gives disclosed secondary movement panels the full desktop workspace width", () => {
+    const compactRules = mediaBlock("(max-width: 767px)");
+
+    expect(topLevelCssBlock(".secondary-form-panel")).toContain("grid-column: 1 / -1;");
+    expect(topLevelCssBlock(".secondary-form-panel")).toContain("min-width: 0;");
+    expect(topLevelCssBlock(".secondary-form-panel > .registration-slip")).toContain("width: 100%;");
+    expect(compactRules).toContain(".secondary-form-panel { grid-column: 1; }");
+  });
+
   it("keeps degraded-support warnings before activity in the grid at desktop and mobile widths", () => {
     const desktopRules = topLevelCssBlock(".active-month-dashboard.dashboard-operational");
     const tabletRules = mediaBlock("(max-width: 768px)");
@@ -225,6 +259,54 @@ describe("visual system contracts", () => {
     expect(desktopRules).not.toContain('"activity activity"');
     expect(tabletRules).not.toContain('"activity"');
     expect(cssBlock(".active-month-dashboard .dashboard-activity")).toContain("grid-column: auto;");
+  });
+
+  it("keeps template category disclosures and cards stable in the dark visual system", () => {
+    const compactRules = mediaBlock("(max-width: 760px)");
+
+    expect(topLevelCssBlock(".template-structure-page")).toContain("max-width: none;");
+    expect(topLevelCssBlock(".template-category-card")).toContain("background: var(--ww-surface);");
+    expect(topLevelCssBlock(".template-category-card")).toContain("border-color: var(--ww-line);");
+    expect(topLevelCssBlock(".template-category-card")).not.toContain("transform:");
+    expect(topLevelCssBlock(".template-category-card")).not.toContain("radial-gradient");
+    expect(styles).not.toContain(".template-category-card:hover");
+    expect(topLevelCssBlock(".template-structure-header")).toContain("radial-gradient(circle at var(--hero-x) var(--hero-y)");
+    expect(topLevelCssBlock(".template-structure-header")).toContain("perspective(1100px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));");
+    expect(styles).toContain(".template-structure-header:hover { border-color:");
+    expect(styles).toContain(".template-structure-header { transition-duration: 0ms; transform: none !important; }");
+    expect(topLevelCssBlock(".template-category-disclosure > summary")).toContain("min-height: 56px;");
+    expect(topLevelCssBlock(".template-category-disclosure > summary")).toContain("cursor: pointer;");
+    expect(topLevelCssBlock(".template-category-disclosure[open] > summary::after")).toContain('content: "−";');
+    expect(topLevelCssBlock(".template-category-content")).toContain("border-top: 1px solid var(--ww-line);");
+    expect(compactRules).toContain(".template-category-disclosure > summary");
+  });
+
+  it("keeps pocket money flows, balances, and maintenance visually distinct at compact widths", () => {
+    expect(topLevelCssBlock(".pockets-action-grid")).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
+    expect(topLevelCssBlock(".pockets-page")).toContain("max-width: none;");
+    expect(topLevelCssBlock(".pocket-card")).toContain("display: block;");
+    expect(topLevelCssBlock(".pocket-card-title-actions")).toContain("justify-content: flex-end;");
+    expect(topLevelCssBlock(".pocket-card-name")).toContain("font-size: 1.5rem;");
+    expect(topLevelCssBlock(".pocket-card-name")).toContain("font-weight: 800;");
+    expect(topLevelCssBlock(".pocket-movement-in")).toContain("border-left-color: var(--color-success);");
+    expect(topLevelCssBlock(".pocket-movement-out")).toContain("border-left-color: var(--color-warning);");
+    expect(styles).toContain(".pockets-create-form, .pockets-action-grid, .pockets-action-form { grid-template-columns: 1fr; }");
+    expect(styles).toContain(".pockets-action-form .button { justify-self: stretch; width: 100%; }");
+  });
+
+  it("keeps the active-month hero breathable at desktop without forcing compact viewport height", () => {
+    const heroRules = cssBlockAfter(
+      ".financial-summary.hero.active-month-hero",
+      "Prototype D correction: keep the card visibly three-dimensional, breathable, and safe for live COP values.",
+    );
+    const compactRules = mediaBlock("(max-width: 980px)");
+
+    expect(heroRules).toContain("align-items: center;");
+    expect(heroRules).toContain("column-gap: clamp(2rem, 5vw, 5rem);");
+    expect(heroRules).toContain("min-height: 390px;");
+    expect(heroRules).toContain("padding: clamp(2rem, 5vw, 3.75rem);");
+    expect(cssBlock(".financial-primary")).toContain("padding-inline-start: clamp(0rem, 1vw, 0.75rem);");
+    expect(compactRules).toContain("min-height: 0;");
   });
 
   it("keeps active-month motion compositor-safe, interruptible, and removable for reduced motion", () => {
