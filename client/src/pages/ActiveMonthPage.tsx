@@ -14,7 +14,19 @@ import type { CreditCardView, ExpenseHistoryItem, Month, MonthCategory, MonthlyI
 
 const now = new Date();
 
+const localCalendarDate = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 const formatMonthDate = (month: Month) => `${month.year}-${String(month.month).padStart(2, "0")}-01`;
+const defaultMovementDate = (month: Month, date = new Date()) => (date.getFullYear() === month.year && date.getMonth() + 1 === month.month ? localCalendarDate(date) : formatMonthDate(month));
+const timestampForMovementDate = (dateValue: string, reference = new Date()) => {
+  const [year, month, day] = dateValue.split("-").map(Number);
+  if (!year || !month || !day) return dateValue;
+  return new Date(year, month - 1, day, reference.getHours(), reference.getMinutes(), reference.getSeconds(), reference.getMilliseconds()).toISOString();
+};
 const formatDisplayDate = (value: string) => new Date(value).toLocaleDateString("es-CO", { timeZone: "UTC" });
 const formatPaymentMethod = (paymentMethod: PaymentMethod) => (paymentMethod === "CASH" ? "Efectivo" : "No efectivo");
 const balanceTrend = (amount: number) => (amount < 0 ? "negative" : amount > 0 ? "positive" : "neutral");
@@ -184,9 +196,9 @@ export const ActiveMonthPage = () => {
     historyMonthId.current = activeMonth.id;
     setExpenseHistory([]);
     setExpenseHistoryMonthId(null);
-    setExpenseOccurredAt(formatMonthDate(activeMonth));
-    setWithdrawalOccurredAt(formatMonthDate(activeMonth));
-    setDepositOccurredAt(formatMonthDate(activeMonth));
+    setExpenseOccurredAt(defaultMovementDate(activeMonth));
+    setWithdrawalOccurredAt(defaultMovementDate(activeMonth));
+    setDepositOccurredAt(defaultMovementDate(activeMonth));
     void refreshExpenseHistoryBestEffort(activeMonth.id);
   }, [activeMonth?.id, dashboard.viewModel.lifecycle]);
 
@@ -243,7 +255,7 @@ export const ActiveMonthPage = () => {
     setExpenseSubcategoryId("");
     setExpenseAmount("");
     setExpenseDescription("");
-    setExpenseOccurredAt(monthData ? formatMonthDate(monthData) : "");
+    setExpenseOccurredAt(monthData ? defaultMovementDate(monthData) : "");
     setExpensePaymentMethod("NON_CASH");
     setExpenseCreditCardId("");
     setEditingExpenseId(null);
@@ -404,7 +416,7 @@ export const ActiveMonthPage = () => {
       sourceSubcategoryId: expenseSubcategoryId || null,
       amount: parseAmountInput(expenseAmount),
       description: expenseDescription,
-      occurredAt: expenseOccurredAt || formatMonthDate(activeMonth),
+      occurredAt: editingExpenseId ? expenseOccurredAt || formatMonthDate(activeMonth) : timestampForMovementDate(expenseOccurredAt || defaultMovementDate(activeMonth)),
       paymentMethod: expenseCreditCardId ? "NON_CASH" : expensePaymentMethod,
       creditCardId: expensePaymentMethod === "CASH" ? null : expenseCreditCardId || null,
     };
@@ -553,7 +565,7 @@ export const ActiveMonthPage = () => {
       const updatedMonth = await api.withdrawCash({
         monthId: activeMonth.id,
         amount: parseAmountInput(withdrawalAmount),
-        occurredAt: withdrawalOccurredAt || formatMonthDate(activeMonth),
+        occurredAt: timestampForMovementDate(withdrawalOccurredAt || defaultMovementDate(activeMonth)),
         description: withdrawalDescription || undefined,
       });
       dashboard.replaceMonth(updatedMonth);
@@ -580,7 +592,7 @@ export const ActiveMonthPage = () => {
         monthId: activeMonth.id,
         sourceName: incomeSourceName,
         amount: parseAmountInput(incomeAmount),
-        receivedAt: incomeReceivedAt || formatMonthDate(activeMonth),
+        receivedAt: editingIncomeId ? incomeReceivedAt || formatMonthDate(activeMonth) : timestampForMovementDate(incomeReceivedAt || defaultMovementDate(activeMonth)),
         notes: incomeNotes || null,
       };
       const updatedMonth = editingIncomeId
@@ -633,7 +645,7 @@ export const ActiveMonthPage = () => {
         monthId: activeMonth.id,
         targetPocketId: depositPocketId,
         amount: parseAmountInput(depositAmount),
-        occurredAt: depositOccurredAt || formatMonthDate(activeMonth),
+        occurredAt: timestampForMovementDate(depositOccurredAt || defaultMovementDate(activeMonth)),
       };
       const updatedMonth = await api.depositToPocket(
         depositSourceKind === "SUBCATEGORY"
@@ -743,7 +755,7 @@ export const ActiveMonthPage = () => {
       primaryFields={<><label className="field expense-amount-field"><span>Monto</span><input min="0.01" ref={expenseAmountInputRef} step="0.01" type="number" value={expenseAmount} onChange={(event) => setExpenseAmount(normalizeAmountInput(event.target.value))} required /></label><div className="expense-category-fields"><label className="field expense-category-field"><span>Categoría del gasto</span><select value={expenseCategoryId} onChange={handleExpenseCategoryChange}><option value="">Sin categoría (Uncategorized)</option>{activeMonth.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label className="field expense-subcategory-field"><span>Subcategoría del gasto</span><select disabled={!expenseCategory} required={Boolean(expenseCategory)} value={expenseSubcategoryId} onChange={(event) => setExpenseSubcategoryId(event.target.value)}><option value="">{expenseCategory ? "Selecciona una subcategoría" : "Selecciona primero una categoría"}</option>{expenseCategory?.subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label></div></>}
       purpose={editingExpenseId ? "Corrección del mes" : "Movimiento del mes"}
       slipRef={expenseSlipRef}
-      supportingFields={<><label className="field"><span>Fecha del gasto</span><input type="date" value={expenseOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setExpenseOccurredAt(event.target.value)} required /></label><label className="field"><span>Método de pago</span><select value={expensePaymentMethod} onChange={handleExpensePaymentMethodChange} required><option value="NON_CASH">No efectivo</option><option value="CASH">Efectivo</option></select></label><label className="field"><span>Tarjeta de crédito (opcional)</span><select value={expenseCreditCardId} onChange={handleExpenseCreditCardChange}><option value="">Sin tarjeta / efectivo</option>{activeCreditCards.map((card) => <option key={card.id} value={card.id}>{formatCreditCardLabel(card)}</option>)}</select></label><label className="field expense-description-field"><span>Descripción (opcional)</span><input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} /></label></>}
+      supportingFields={<><label className="field"><span>Fecha del gasto</span><input type="date" value={expenseOccurredAt || defaultMovementDate(activeMonth)} onChange={(event) => setExpenseOccurredAt(event.target.value)} required /></label><label className="field"><span>Método de pago</span><select value={expensePaymentMethod} onChange={handleExpensePaymentMethodChange} required><option value="NON_CASH">No efectivo</option><option value="CASH">Efectivo</option></select></label><label className="field"><span>Tarjeta de crédito (opcional)</span><select value={expenseCreditCardId} onChange={handleExpenseCreditCardChange}><option value="">Sin tarjeta / efectivo</option>{activeCreditCards.map((card) => <option key={card.id} value={card.id}>{formatCreditCardLabel(card)}</option>)}</select></label><label className="field expense-description-field"><span>Descripción (opcional)</span><input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} /></label></>}
       title={editingExpenseId ? "Corregir gasto registrado" : "Registrar gasto"}
       variant="primary"
     />
