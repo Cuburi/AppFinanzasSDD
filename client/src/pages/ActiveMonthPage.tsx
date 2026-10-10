@@ -25,7 +25,7 @@ const defaultMovementDate = (month: Month, date = new Date()) => (date.getFullYe
 const timestampForMovementDate = (dateValue: string, reference = new Date()) => {
   const [year, month, day] = dateValue.split("-").map(Number);
   if (!year || !month || !day) return dateValue;
-  return new Date(Date.UTC(year, month - 1, day, reference.getHours(), reference.getMinutes(), reference.getSeconds(), reference.getMilliseconds())).toISOString();
+  return new Date(year, month - 1, day, reference.getHours(), reference.getMinutes(), reference.getSeconds(), reference.getMilliseconds()).toISOString();
 };
 const formatDisplayDate = (value: string) => new Date(value).toLocaleDateString("es-CO", { timeZone: "UTC" });
 const formatPaymentMethod = (paymentMethod: PaymentMethod) => (paymentMethod === "CASH" ? "Efectivo" : "No efectivo");

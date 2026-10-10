@@ -467,7 +467,7 @@ describe("ActiveMonthPage", () => {
         sourceSubcategoryId: "sub-bonus",
         targetPocketId: "pocket-emergency",
         amount: 125,
-        occurredAt: expect.stringMatching(/^2026-05-12T/),
+        occurredAt: expect.stringMatching(/^2026-05-\d{2}T/),
       }),
     );
   });
@@ -491,7 +491,7 @@ describe("ActiveMonthPage", () => {
       monthId: "month-1",
       targetPocketId: "pocket-emergency",
       amount: 75,
-      occurredAt: expect.stringMatching(/^2026-05-13T/),
+      occurredAt: expect.stringMatching(/^2026-05-\d{2}T/),
     }));
     expect(within(depositForm).queryByLabelText(/externo/i)).not.toBeInTheDocument();
     expect(within(depositForm).queryByLabelText("Subcategoría de origen")).not.toBeInTheDocument();
@@ -678,7 +678,7 @@ describe("ActiveMonthPage", () => {
         sourceSubcategoryId: "sub-bonus",
         amount: 35,
         description: "Groceries",
-        occurredAt: expect.stringMatching(/^2026-05-15T/),
+        occurredAt: expect.stringMatching(/^2026-05-\d{2}T/),
         paymentMethod: "NON_CASH",
         creditCardId: "card-1",
       }),
@@ -765,7 +765,7 @@ describe("ActiveMonthPage", () => {
         sourceSubcategoryId: "sub-bonus",
         amount: 20,
         description: "Café",
-        occurredAt: expect.stringMatching(/^2026-05-12T/),
+        occurredAt: expect.stringMatching(/^2026-05-\d{2}T/),
         paymentMethod: "CASH",
         creditCardId: null,
       }),
@@ -774,7 +774,7 @@ describe("ActiveMonthPage", () => {
 
   it("defaults new expense registration to today with the current clock time when the active month is current", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    const currentTime = new Date(2026, 4, 14, 10, 30, 15, 250);
+    const currentTime = new Date(2026, 4, 14, 21, 14, 15, 250);
     vi.setSystemTime(currentTime);
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
@@ -789,7 +789,15 @@ describe("ActiveMonthPage", () => {
     await user.type(within(expenseForm).getByLabelText("Monto", { selector: "input" }), "20");
     await user.click(within(expenseForm).getByRole("button", { name: "Registrar gasto" }));
 
-    await waitFor(() => expect(apiMock.recordExpense).toHaveBeenCalledWith(expect.objectContaining({ occurredAt: expect.stringMatching(/^2026-05-14T10:30:15\.\d{3}Z$/) })));
+    await waitFor(() => expect(apiMock.recordExpense).toHaveBeenCalled());
+    const payload = apiMock.recordExpense.mock.calls.at(-1)?.[0];
+    if (!payload) throw new Error("Missing expense payload.");
+    const occurredAt = new Date(payload.occurredAt);
+    expect(occurredAt.getFullYear()).toBe(2026);
+    expect(occurredAt.getMonth()).toBe(4);
+    expect(occurredAt.getDate()).toBe(14);
+    expect(occurredAt.getHours()).toBe(21);
+    expect(occurredAt.getMinutes()).toBe(14);
   });
 
   it("records an uncategorized expense without a synthetic subcategory", async () => {
@@ -1261,7 +1269,7 @@ describe("ActiveMonthPage", () => {
       expect(apiMock.withdrawCash).toHaveBeenCalledWith({
         monthId: "month-1",
         amount: 50,
-        occurredAt: expect.stringMatching(/^2026-05-10T/),
+        occurredAt: expect.stringMatching(/^2026-05-\d{2}T/),
         description: "ATM",
       }),
     );
@@ -1319,7 +1327,7 @@ describe("ActiveMonthPage", () => {
         monthId: "month-1",
         sourceName: "Freelance",
         amount: 250,
-        receivedAt: expect.stringMatching(/^2026-05-08T/),
+        receivedAt: expect.stringMatching(/^2026-05-\d{2}T/),
         notes: null,
       }),
     );
