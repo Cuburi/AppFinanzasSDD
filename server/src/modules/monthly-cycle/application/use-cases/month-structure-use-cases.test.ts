@@ -5,7 +5,64 @@ import { MonthStatus, Prisma } from "../../../../lib/prisma-client.js";
 import { createMonthStructureUseCases, MONTH_STRUCTURE_USE_CASE_NAMES } from "./month-structure-use-cases.js";
 import type { MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 
+import { parseUpdateMonthCategoryInput, parseUpdateMonthSubcategoryInput } from "../../dto/month-structure.dto.js";
+
 const amount = (value: number) => new Prisma.Decimal(value.toFixed(2));
+
+test("month edit parsers default propagation off and reject non-boolean flags and caller template ids", () => {
+  assert.equal(parseUpdateMonthCategoryInput("m", "c", { name: "Food" }).updateTemplate, false);
+  assert.equal(parseUpdateMonthSubcategoryInput("m", "s", { name: "Food", plannedAmount: 10 }).updateTemplate, false);
+  for (const value of [null, "true", 1]) {
+    assert.throws(() => parseUpdateMonthCategoryInput("m", "c", { name: "Food", updateTemplate: value }));
+    assert.throws(() => parseUpdateMonthSubcategoryInput("m", "s", { name: "Food", plannedAmount: 10, updateTemplate: value }));
+  }
+  assert.throws(() => parseUpdateMonthCategoryInput("m", "c", { name: "Food", templateCategoryId: "injected" }));
+  assert.throws(() => parseUpdateMonthSubcategoryInput("m", "s", { name: "Food", plannedAmount: 10, templateSubcategoryId: "injected" }));
+});
+
+test("opt-in edits propagate stored identities and retain an omitted month pocket", async () => {
+  const { ports, calls } = createStructurePorts();
+  const useCases = createMonthStructureUseCases(ports);
+  assert.equal((await useCases.updateMonthCategory({ monthId: "month-1", categoryId: "cat-food", name: "Groceries", updateTemplate: true })).id, "month-1");
+  await useCases.updateMonthSubcategory({ monthId: "month-1", subcategoryId: "sub-market", name: "Shopping", plannedAmount: 125, updateTemplate: true });
+  await useCases.updateMonthSubcategory({ monthId: "month-1", subcategoryId: "sub-market", name: "Shopping", plannedAmount: 125, defaultPocketId: "new-pocket", updateTemplate: true });
+  assert.ok(calls.some((call) => JSON.stringify(call) === JSON.stringify(["tx.structure.updateTemplateCategory", "template-food", "Groceries"])));
+  assert.ok(calls.some((call) => JSON.stringify(call) === JSON.stringify(["tx.structure.updateTemplateSubcategory", "template-market", "Shopping", "125", "pocket-food"])));
+  assert.ok(calls.some((call) => JSON.stringify(call) === JSON.stringify(["tx.structure.updateTemplateSubcategory", "template-market", "Shopping", "125", "new-pocket"])));
+  assert.equal(calls.filter((call) => (call as string[])[0] === "transactionRunner.runSerializable").length, 3);
+});
+
+test("opt-in edits reject missing, stale, conflicting, inactive and wrong-parent links before writes", async () => {
+  for (const link of [null, "stale"]) {
+    const snapshot = { ...month, categories: [{ ...month.categories[0]!, templateCategoryId: link, subcategories: [{ ...month.categories[0]!.subcategories[0]!, templateSubcategoryId: link }] }] };
+    const { ports, calls } = createStructurePorts(snapshot);
+    await assert.rejects(() => createMonthStructureUseCases(ports).updateMonthCategory({ monthId: "month-1", categoryId: "cat-food", name: "New", updateTemplate: true }), { statusCode: 409 });
+    await assert.rejects(() => createMonthStructureUseCases(ports).updateMonthSubcategory({ monthId: "month-1", subcategoryId: "sub-market", name: "New", plannedAmount: 10, updateTemplate: true }), { statusCode: 409 });
+    assert.equal(calls.some((call) => (call as string[])[0]!.startsWith("tx.structure.")), false);
+  }
+  const parent = templateCategories[0]!;
+  for (const template of [
+    [{ ...parent, subcategories: [{ ...parent.subcategories[0]!, active: false }] }],
+    [{ ...parent, subcategories: [] }, { ...parent, id: "other", subcategories: parent.subcategories }],
+    [{ ...parent, subcategories: [...parent.subcategories, { ...parent.subcategories[0]!, id: "other", name: "New" }] }],
+    [],
+  ]) {
+    const { ports, calls } = createStructurePorts(month, template);
+    await assert.rejects(() => createMonthStructureUseCases(ports).updateMonthSubcategory({ monthId: "month-1", subcategoryId: "sub-market", name: "New", plannedAmount: 10, updateTemplate: true }), { statusCode: 409 });
+    assert.equal(calls.some((call) => (call as string[])[0]!.startsWith("tx.structure.")), false);
+  }
+  const { ports, calls } = createStructurePorts(month, [...templateCategories, { ...parent, id: "other", name: "New" }]);
+  await assert.rejects(() => createMonthStructureUseCases(ports).updateMonthCategory({ monthId: "month-1", categoryId: "cat-food", name: " new ", updateTemplate: true }), { statusCode: 409 });
+  assert.equal(calls.some((call) => (call as string[])[0]!.startsWith("tx.structure.")), false);
+});
+
+test("explicit false leaves Template untouched even when links are missing", async () => {
+  const snapshot = { ...month, categories: [{ ...month.categories[0]!, templateCategoryId: null }] };
+  const { ports, calls } = createStructurePorts(snapshot, []);
+  await createMonthStructureUseCases(ports).updateMonthCategory({ monthId: "month-1", categoryId: "cat-food", name: "New", updateTemplate: false });
+  await createMonthStructureUseCases(ports).updateMonthSubcategory({ monthId: "month-1", subcategoryId: "sub-market", name: "New", plannedAmount: 10, updateTemplate: false });
+  assert.equal(calls.some((call) => (call as string[])[0]!.includes("Template") || (call as string[])[0]!.includes("templates")), false);
+});
 
 const month = {
   id: "month-1",
@@ -40,25 +97,25 @@ const templateCategories = [
   },
 ];
 
-const createStructurePorts = () => {
+const createStructurePorts = (snapshot: import("../../shared/service-types.js").MonthRecord = month, template: import("../../shared/service-types.js").TemplateCategoryRecord[] = templateCategories) => {
   const calls: unknown[] = [];
   let lockCalls = 0;
   const txPorts = {
     months: {
       async findById(monthId: string) {
         calls.push(["tx.months.findById", monthId]);
-        return month;
+        return snapshot;
       },
       async lockForMutation(monthId: string) {
         lockCalls += 1;
         calls.push(["tx.months.findById", monthId]);
-        return month;
+        return snapshot;
       },
     },
     templates: {
       async readCategories() {
         calls.push(["tx.templates.readCategories"]);
-        return templateCategories;
+        return template;
       },
     },
     structure: {
@@ -75,6 +132,12 @@ const createStructurePorts = () => {
       },
       async updateMonthCategory(input: { categoryId: string; name: string }) {
         calls.push(["tx.structure.updateMonthCategory", input.categoryId, input.name]);
+      },
+      async updateTemplateCategory(input: { categoryId: string; name: string }) {
+        calls.push(["tx.structure.updateTemplateCategory", input.categoryId, input.name]);
+      },
+      async updateTemplateSubcategory(input: { subcategoryId: string; name: string; plannedAmount: Prisma.Decimal; defaultPocketId: string | null }) {
+        calls.push(["tx.structure.updateTemplateSubcategory", input.subcategoryId, input.name, input.plannedAmount.toString(), input.defaultPocketId]);
       },
       async deleteMonthCategory(categoryId: string) {
         calls.push(["tx.structure.deleteMonthCategory", categoryId]);
@@ -111,6 +174,10 @@ const createStructurePorts = () => {
     structure: {},
     pockets: {},
     transactionRunner: {
+      async runSerializable<T>(work: (ports: Omit<MonthlyCyclePorts, "transactionRunner">) => Promise<T>) {
+        calls.push(["transactionRunner.runSerializable"]);
+        return work(txPorts as unknown as Omit<MonthlyCyclePorts, "transactionRunner">);
+      },
       async run<T>(work: (ports: Omit<MonthlyCyclePorts, "transactionRunner">) => Promise<T>) {
         calls.push(["transactionRunner.run"]);
         return work(txPorts as unknown as Omit<MonthlyCyclePorts, "transactionRunner">);

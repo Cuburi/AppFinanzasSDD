@@ -672,7 +672,7 @@ test("monthlyCycleRouter parses PATCH /api/months/:id/categories/:categoryId and
 
     assert.equal(response.status, 200);
     assert.equal(((await response.json()) as MonthView).categories[0]?.name, "Variables");
-    assert.deepEqual(calls, [{ monthId: "month-1", categoryId: "cat-food", name: "Variables" }]);
+    assert.deepEqual(calls, [{ monthId: "month-1", categoryId: "cat-food", name: "Variables", updateTemplate: false }]);
   } finally {
     server.close();
   }
@@ -705,14 +705,14 @@ test("monthlyCycleRouter parses PATCH /api/months/:id/subcategories/:subcategory
     const response = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/subcategories/sub-market`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Supermercado", plannedAmount: 300, defaultPocketId: "pocket-buffer" }),
+      body: JSON.stringify({ name: "Supermercado", plannedAmount: 300, defaultPocketId: "pocket-buffer", updateTemplate: true }),
     });
 
     const body = (await response.json()) as MonthView;
     assert.equal(response.status, 200);
     assert.equal(body.categories[0]?.subcategories[0]?.name, "Supermercado");
     assert.deepEqual(calls, [
-      { monthId: "month-1", subcategoryId: "sub-market", name: "Supermercado", plannedAmount: 300, defaultPocketId: "pocket-buffer" },
+      { monthId: "month-1", subcategoryId: "sub-market", name: "Supermercado", plannedAmount: 300, defaultPocketId: "pocket-buffer", updateTemplate: true },
     ]);
   } finally {
     server.close();
@@ -752,7 +752,7 @@ test("monthlyCycleRouter accepts zero plannedAmount for PATCH month subcategorie
     const body = (await response.json()) as MonthView;
     assert.equal(response.status, 200);
     assert.equal(body.categories[0]?.subcategories[0]?.plannedAmount, 0);
-    assert.deepEqual(calls, [{ monthId: "month-1", subcategoryId: "sub-market", name: "Supermercado", plannedAmount: 0 }]);
+    assert.deepEqual(calls, [{ monthId: "month-1", subcategoryId: "sub-market", name: "Supermercado", plannedAmount: 0, updateTemplate: false }]);
   } finally {
     server.close();
   }
@@ -971,8 +971,8 @@ test("monthlyCycleRouter maps month structure PATCH domain errors", async () => 
     assert.equal(subcategoryResponse.status, 409);
     assert.deepEqual(await subcategoryResponse.json(), { message: "Closed months are immutable." });
     assert.deepEqual(calls, [
-      { type: "category", input: { monthId: "month-1", categoryId: "missing-category", name: "Variables" } },
-      { type: "subcategory", input: { monthId: "month-1", subcategoryId: "sub-market", name: "Supermercado", plannedAmount: 300 } },
+      { type: "category", input: { monthId: "month-1", categoryId: "missing-category", name: "Variables", updateTemplate: false } },
+      { type: "subcategory", input: { monthId: "month-1", subcategoryId: "sub-market", name: "Supermercado", plannedAmount: 300, updateTemplate: false } },
     ]);
   } finally {
     server.close();

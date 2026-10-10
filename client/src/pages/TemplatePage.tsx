@@ -18,8 +18,10 @@ const toTemplateDraft = (template: Awaited<ReturnType<typeof api.getTemplate>>):
   categories:
     template.categories.length > 0
       ? template.categories.map((category) => ({
+          id: category.id,
           name: category.name,
           subcategories: category.subcategories.map((subcategory) => ({
+            id: subcategory.id,
             name: subcategory.name,
             plannedAmount: String(subcategory.plannedAmount),
             defaultPocketId: subcategory.defaultPocketId,
@@ -181,7 +183,7 @@ export const TemplatePage = () => {
       const nextTemplate = toTemplateDraft(savedTemplate);
       setTemplate(nextTemplate);
       setOpenCategories((open) => Object.fromEntries(nextTemplate.categories.map((_, index) => [index, open[index] ?? true])));
-      setMessage("Plantilla guardada. Los próximos meses usarán este snapshot; el mes activo conserva sus nombres hasta que lo corrijas desde Ajustes del mes.");
+      setMessage("Plantilla guardada. Los próximos meses usarán este snapshot; el mes activo conserva sus nombres hasta que lo corrijas desde Editar categorías de este mes.");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo guardar la plantilla.");
     } finally {
@@ -205,7 +207,7 @@ export const TemplatePage = () => {
           <p className="eyebrow">Base de presupuesto</p>
           <h1>Estructura para meses futuros</h1>
           <p>Definí las categorías y montos que se copiarán al abrir cada mes nuevo.</p>
-          <p className="template-structure-note">Los meses ya abiertos conservan su snapshot. Si querés renombrar algo del mes activo, hacelo desde Ajustes del mes en Mes activo.</p>
+          <p className="template-structure-note">Los meses ya abiertos conservan su snapshot. Si querés renombrar algo del mes activo, hacelo desde Editar categorías de este mes.</p>
         </div>
         <section aria-label="Plan total de próximos meses" className="template-total-kpi">
           <span>Plan total</span>

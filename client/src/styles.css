@@ -1846,7 +1846,25 @@ body {
 }
 
 
-/* Prototype D correction: month settings is maintenance, so it spans the workspace below the daily loop. */
+/* Month structure stays below the daily loop and reuses Template category cards. */
+.month-category-card { min-width: 0; }
+.month-category-header { align-items: start; display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: space-between; padding: 18px 22px 0; }
+.month-structure-edit { display: grid; flex: 1 1 20rem; gap: var(--space-3); min-width: 0; }
+.month-subcategory-fields, .month-subcategory-columns { align-items: center; display: grid; gap: var(--space-3); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.month-subcategory-columns { color: var(--ww-muted); font-size: 12px; font-weight: 750; }
+.month-subcategory-item { background: var(--ww-canvas); border: 1px solid var(--ww-line); border-radius: 12px; display: grid; gap: var(--space-3); min-width: 0; padding: var(--space-3); }
+.month-subcategory-item .field { min-width: 0; }
+.month-subcategory-item input, .month-subcategory-item select { min-width: 0; width: 100%; }
+.month-subcategory-fields > * { min-width: 0; overflow-wrap: anywhere; }
+.month-template-option { border-top: 1px solid var(--ww-line); padding-top: var(--space-3); }
+.month-template-option label { align-items: center; display: flex; gap: var(--space-2); min-height: 44px; }
+.month-template-option input { flex: 0 0 auto; min-height: 24px; width: auto; }
+.month-template-option p { color: var(--ww-muted); font-size: 13px; margin-top: var(--space-2); }
+.month-structure-create { border-top: 1px solid var(--ww-line); padding-top: var(--space-4); }
+.month-structure-create form { align-items: end; background: var(--ww-canvas); border: 1px solid var(--ww-line); border-radius: 12px; padding: var(--space-3); }
+.month-structure-create .field:has(input[type="checkbox"]) { align-items: center; display: flex; flex-direction: row-reverse; gap: var(--space-2); }
+.month-structure-create input[type="checkbox"] { min-height: 24px; width: auto; }
+
 .month-structure-card {
   grid-column: 1 / -1;
 }
@@ -1899,6 +1917,14 @@ body {
 .template-structure-actions { border-top: 1px solid var(--ww-line); padding-top: 20px; }
 
 @media (max-width: 760px) {
+  .month-subcategory-fields { grid-template-columns: 1fr; }
+  .month-subcategory-columns { display: none; }
+  .month-category-header { padding-inline: 16px; }
+  .month-category-card .template-category-disclosure > summary { flex-wrap: wrap; }
+  .month-category-card .template-category-summary { margin-left: 0; }
+  .month-category-card .template-subcategory-list { padding-inline: 16px; }
+  .month-structure-create form { align-items: stretch; flex-direction: column; }
+  .month-structure-create .field { min-width: 0; width: 100%; }
   .template-structure-header, .template-category-header { grid-template-columns: 1fr; }
   .template-category-disclosure > summary { align-items: flex-start; padding: 16px; }
   .template-category-disclosure > summary .template-category-summary { min-width: 0; }

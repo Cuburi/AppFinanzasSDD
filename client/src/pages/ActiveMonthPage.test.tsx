@@ -101,7 +101,7 @@ const activeCreditCards: CreditCardView[] = [
 ];
 
 async function openMonthStructure() {
-  const disclosure = (await screen.findByRole("region", { name: "Ajustes del mes" })).querySelector("details");
+  const disclosure = (await screen.findByRole("region", { name: "Editar categorías de este mes" })).querySelector("details");
   if (!disclosure) throw new Error("Missing month settings disclosure.");
   disclosure.open = true;
   fireEvent(disclosure, new Event("toggle", { bubbles: true }));
@@ -115,7 +115,7 @@ describe("ActiveMonthPage", () => {
   });
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     apiMock.getActiveMonth.mockResolvedValue(activeMonth);
     apiMock.getBasicReport.mockResolvedValue({});
     apiMock.getClosureReview.mockResolvedValue({});
@@ -238,19 +238,22 @@ describe("ActiveMonthPage", () => {
     expect(screen.queryByText("No se pudo registrar el gasto.")).not.toBeInTheDocument();
   });
 
-  it("keeps Ajustes del mes closed by default and exposes the month-only versus template-promotion guidance when expanded", async () => {
+  it("keeps the category editor closed by default and exposes Template-like guidance when expanded", async () => {
     render(<ActiveMonthPage />);
 
     await screen.findByRole("region", { name: "Resumen financiero" });
-    const disclosure = screen.getByRole("region", { name: "Ajustes del mes" }).querySelector("details");
+    const disclosure = screen.getByRole("region", { name: "Editar categorías de este mes" }).querySelector("details");
     expect(disclosure).not.toBeNull();
     expect(disclosure).not.toHaveAttribute("open");
-    expect(screen.getByText("Mantenimiento puntual de categorías y subcategorías de este mes; úsalo para renombres del mes activo porque la plantilla solo afecta meses futuros.")).toBeInTheDocument();
+    expect(screen.getByText("Organiza categorías, montos y bolsillos como en Plantilla, sin salir de este mes.")).toBeInTheDocument();
 
     await openMonthStructure();
     expect(disclosure).toHaveAttribute("open");
-    expect(screen.getByText("Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro. Si renombraste una categoría o subcategoría en Plantilla, el mes activo conserva su snapshot hasta que la corrijas aquí.")).toBeInTheDocument();
-    expect(screen.getByText(/Antes de promoverlas, marca la copia a plantilla/i)).toBeInTheDocument();
+    expect(screen.getByText("Los cambios se guardan solo en este mes. Marca la opción de Plantilla al guardar si también quieres usarlos en próximos meses. Eliminar nunca modifica la Plantilla.")).toBeInTheDocument();
+    const category = screen.getByRole("article", { name: "Categoría Ingresos" });
+    expect(category).toHaveClass("template-category-card");
+    expect(within(category).getByText("Subtotal de Ingresos")).toBeInTheDocument();
+    expect(within(category).getByText("$500 COP", { selector: ".template-category-summary strong" })).toBeInTheDocument();
   });
 
   it("opens the structure disclosure when an edit is initiated or a structural mutation fails", async () => {
@@ -259,7 +262,7 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await screen.findByRole("region", { name: "Resumen financiero" });
-    const disclosure = screen.getByRole("region", { name: "Ajustes del mes" }).querySelector("details");
+    const disclosure = screen.getByRole("region", { name: "Editar categorías de este mes" }).querySelector("details");
     if (!disclosure) throw new Error("Missing month settings disclosure.");
 
     await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos", hidden: true }));
@@ -335,7 +338,7 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
-    await user.click(within(ledger).getByRole("button", { name: "Editar ingreso Sueldo" }));
+    await user.click(await within(ledger).findByRole("button", { name: "Editar ingreso Sueldo" }));
     expect(screen.getByRole("region", { name: "Editar ingreso" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Retirar efectivo" }));
@@ -605,7 +608,7 @@ describe("ActiveMonthPage", () => {
     expect(heroDepth?.querySelectorAll(".financial-month-pulse-dot")).toHaveLength(2);
     expect(within(financialSurface).queryByRole("progressbar", { name: "Presupuesto utilizado" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
-    expect(screen.getByText("Sueldo")).toBeInTheDocument();
+    expect(await screen.findByText("Sueldo")).toBeInTheDocument();
   });
 
   it("derives budget utilization separately while displaying only actual expense history, excluding a pocket deposit reflected in availability", async () => {
@@ -967,6 +970,7 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
+    await within(ledger).findByText("Fuente: Nómina ACME");
     const notedIncome = ledger.querySelector('[data-entry-key="income-noted"]');
     expect(notedIncome).not.toBeNull();
     expect(within(notedIncome as HTMLElement).getByText("Fuente: Nómina ACME")).toBeInTheDocument();
@@ -985,6 +989,7 @@ describe("ActiveMonthPage", () => {
     apiMock.getActiveMonth.mockResolvedValue({ ...activeMonth, status: "CLOSED", closedAt: "2026-05-31T00:00:00.000Z", incomes }); vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ledgerResponse(...incomes.map((income) => ledgerEntry(income.id, "MONTHLY_INCOME", null))) }));
     render(<ActiveMonthPage />);
     const ledger = await screen.findByRole("region", { name: "Movimientos del mes" });
+    await within(ledger).findByText("Fuente: Nómina ACME");
     for (const income of incomes) expect(within(ledger.querySelector(`[data-entry-key="${income.id}"]`) as HTMLElement).getByText(`Fuente: ${income.sourceName}`)).toBeInTheDocument();
     expect(within(ledger).queryByRole("button", { name: /Editar|Eliminar/ })).not.toBeInTheDocument();
   });
@@ -1022,8 +1027,8 @@ describe("ActiveMonthPage", () => {
 
     expect(await screen.findByText("El mes está cerrado: los movimientos son de solo lectura.")).toBeInTheDocument();
 
-    fireEvent.submit(screen.getByRole("form", { name: "Editar categoría del mes activo" }));
-    fireEvent.submit(screen.getByRole("form", { name: "Editar subcategoría del mes activo" }));
+    expect(screen.queryByRole("form", { name: "Editar categoría del mes activo" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Editar subcategoría del mes activo" })).not.toBeInTheDocument();
 
     expect(apiMock.updateMonthCategory).not.toHaveBeenCalled();
     expect(apiMock.updateMonthSubcategory).not.toHaveBeenCalled();
@@ -1058,14 +1063,14 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await openMonthStructure();
-    expect(await screen.findByText("Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro. Si renombraste una categoría o subcategoría en Plantilla, el mes activo conserva su snapshot hasta que la corrijas aquí.")).toBeInTheDocument();
+    expect(await screen.findByText("Los cambios se guardan solo en este mes. Marca la opción de Plantilla al guardar si también quieres usarlos en próximos meses. Eliminar nunca modifica la Plantilla.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
     await user.clear(screen.getByLabelText("Nombre categoría"));
     await user.type(screen.getByLabelText("Nombre categoría"), "Ingresos activos");
     await user.click(screen.getByRole("button", { name: "Guardar categoría" }));
 
-    await waitFor(() => expect(apiMock.updateMonthCategory).toHaveBeenCalledWith({ monthId: "month-1", categoryId: "cat-income", name: "Ingresos activos" }));
+    await waitFor(() => expect(apiMock.updateMonthCategory).toHaveBeenCalledWith({ monthId: "month-1", categoryId: "cat-income", name: "Ingresos activos", updateTemplate: false }));
     expect(await screen.findByRole("button", { name: "Editar categoría Ingresos activos" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Editar subcategoría Bonus" }));
@@ -1081,6 +1086,7 @@ describe("ActiveMonthPage", () => {
         monthId: "month-1",
         subcategoryId: "sub-bonus",
         name: "Bonus activo",
+        updateTemplate: false,
         plannedAmount: 450,
         defaultPocketId: null,
       }),
@@ -1098,6 +1104,65 @@ describe("ActiveMonthPage", () => {
     expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(5);
   });
 
+  it("offers unchecked Template updates for linked edits and resets the opt-in on cancellation", async () => {
+    const user = userEvent.setup();
+    const linkedMonth = { ...activeMonth, categories: [{ ...activeMonth.categories[0], templateCategoryId: "tpl-category", subcategories: [{ ...activeMonth.categories[0].subcategories[0], templateSubcategoryId: "tpl-subcategory" }] }] };
+    apiMock.getActiveMonth.mockResolvedValue(linkedMonth);
+    apiMock.updateMonthCategory.mockResolvedValue(linkedMonth);
+    apiMock.updateMonthSubcategory.mockResolvedValue(linkedMonth);
+    render(<ActiveMonthPage />);
+    await openMonthStructure();
+    await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
+    const categoryForm = screen.getByRole("form", { name: "Editar categoría del mes activo" });
+    const categoryOptIn = within(categoryForm).getByLabelText("También actualizar Plantilla para próximos meses");
+    expect(categoryOptIn).not.toBeChecked();
+    await user.click(categoryOptIn);
+    await user.click(within(categoryForm).getByRole("button", { name: "Cancelar categoría" }));
+    await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
+    expect(screen.getByLabelText("También actualizar Plantilla para próximos meses")).not.toBeChecked();
+    await user.click(screen.getByLabelText("También actualizar Plantilla para próximos meses"));
+    await user.click(screen.getByRole("button", { name: "Guardar categoría" }));
+    await waitFor(() => expect(apiMock.updateMonthCategory).toHaveBeenCalledWith(expect.objectContaining({ updateTemplate: true })));
+    expect(await screen.findByText("Categoría actualizada en este mes y en la Plantilla para próximos meses.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Editar subcategoría Bonus" }));
+    const subcategoryForm = screen.getByRole("form", { name: "Editar subcategoría del mes activo" });
+    expect(within(subcategoryForm).getByLabelText("También actualizar Plantilla para próximos meses")).not.toBeChecked();
+    await user.click(within(subcategoryForm).getByLabelText("También actualizar Plantilla para próximos meses"));
+    await user.click(within(subcategoryForm).getByRole("button", { name: "Guardar subcategoría" }));
+    await waitFor(() => expect(apiMock.updateMonthSubcategory).toHaveBeenCalledWith(expect.objectContaining({ updateTemplate: true })));
+  });
+
+  it("keeps linked category and subcategory edits month-only without opt-in", async () => {
+    const user = userEvent.setup();
+    const linkedMonth = { ...activeMonth, categories: [{ ...activeMonth.categories[0], templateCategoryId: "tpl-category", subcategories: [{ ...activeMonth.categories[0].subcategories[0], templateSubcategoryId: "tpl-subcategory" }] }] };
+    apiMock.getActiveMonth.mockResolvedValue(linkedMonth);
+    apiMock.updateMonthCategory.mockResolvedValue(linkedMonth);
+    apiMock.updateMonthSubcategory.mockResolvedValue(linkedMonth);
+    render(<ActiveMonthPage />);
+    await openMonthStructure();
+    await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
+    expect(screen.getByLabelText("También actualizar Plantilla para próximos meses")).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Guardar categoría" }));
+    await waitFor(() => expect(apiMock.updateMonthCategory).toHaveBeenCalledWith(expect.objectContaining({ updateTemplate: false })));
+    await user.click(screen.getByRole("button", { name: "Editar subcategoría Bonus" }));
+    expect(screen.getByLabelText("También actualizar Plantilla para próximos meses")).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Guardar subcategoría" }));
+    await waitFor(() => expect(apiMock.updateMonthSubcategory).toHaveBeenCalledWith(expect.objectContaining({ updateTemplate: false })));
+  });
+
+  it("explains why unlinked month items cannot update Template", async () => {
+    const user = userEvent.setup();
+    render(<ActiveMonthPage />);
+    await openMonthStructure();
+    await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
+    await user.click(screen.getByRole("button", { name: "Editar subcategoría Bonus" }));
+    for (const name of ["Editar categoría del mes activo", "Editar subcategoría del mes activo"]) {
+      const form = screen.getByRole("form", { name });
+      expect(within(form).getByLabelText("También actualizar Plantilla para próximos meses")).toBeDisabled();
+      expect(within(form).getByText("Sin vínculo con Plantilla: puedes editar este elemento solo en este mes.")).toBeInTheDocument();
+    }
+  });
+
   it("creates a month-only category and refreshes the snapshot with explicit copy guidance", async () => {
     const user = userEvent.setup();
     const afterCreate: Month = {
@@ -1109,9 +1174,8 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await openMonthStructure();
-    expect(await screen.findByText(/Crea categorías y subcategorías solo para este mes/i)).toBeInTheDocument();
-    expect(screen.getByText(/la plantilla solo afecta meses futuros/i)).toBeInTheDocument();
-    expect(screen.getByText(/Copiar a plantilla también/i)).toBeInTheDocument();
+    expect(await screen.findByText("Agregar a la estructura de este mes")).toBeInTheDocument();
+    expect(screen.getAllByLabelText("También agregar a Plantilla para próximos meses")).toHaveLength(2);
 
     const categoryForm = screen.getByRole("form", { name: "Crear categoría del mes activo" });
     await user.type(within(categoryForm).getByLabelText("Nueva categoría"), "Regalos");
@@ -1163,7 +1227,7 @@ describe("ActiveMonthPage", () => {
     await user.type(within(subcategoryForm).getByLabelText("Nueva subcategoría"), "Reintegros");
     await user.type(within(subcategoryForm).getByLabelText("Planificado inicial", { selector: "input" }), "0");
     await user.selectOptions(within(subcategoryForm).getByLabelText("Bolsillo predeterminado inicial"), "pocket-emergency");
-    await user.click(within(subcategoryForm).getByLabelText("Copiar a plantilla también"));
+    await user.click(within(subcategoryForm).getByLabelText("También agregar a Plantilla para próximos meses"));
     await user.click(within(subcategoryForm).getByRole("button", { name: "Crear subcategoría" }));
 
     await waitFor(() =>
@@ -1192,6 +1256,9 @@ describe("ActiveMonthPage", () => {
     expect(screen.queryByRole("form", { name: "Crear subcategoría del mes activo" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Crear categoría" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Crear subcategoría" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Editar categoría|Editar subcategoría|Eliminar categoría|Eliminar subcategoría/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("También actualizar Plantilla para próximos meses")).not.toBeInTheDocument();
+    expect(screen.getByText("Subtotal de Ingresos")).toBeInTheDocument();
   });
 
   it("resets correction edit state when cancelling or refreshing the active month", async () => {

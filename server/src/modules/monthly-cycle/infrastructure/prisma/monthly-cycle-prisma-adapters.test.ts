@@ -8,6 +8,80 @@ import { createMonthlyCyclePrismaAdapters, createMonthlyCyclePrismaTransactionRu
 
 const amount = (value: number) => new Prisma.Decimal(value.toFixed(2));
 
+test("template propagation adapters update only editable fields by stored identity", async () => {
+  const { db, writes } = templateReconciliationDb();
+  const structure = createMonthlyCyclePrismaAdapters(db).structure;
+  await structure.updateTemplateCategory({ categoryId: "cat-1", name: "Food" });
+  await structure.updateTemplateSubcategory({ subcategoryId: "sub-1", name: "Market", plannedAmount: amount(125), defaultPocketId: null });
+  assert.deepEqual(writes, [
+    ["category.update", { where: { id: "cat-1" }, data: { name: "Food" } }],
+    ["subcategory.update", { where: { id: "sub-1" }, data: { name: "Market", plannedAmount: amount(125), defaultPocketId: null } }],
+  ]);
+});
+
+const templateReconciliationDb = () => {
+  const writes: unknown[] = [];
+  const db: any = {
+    templateCategory: {
+      async findMany() { return [
+        { id: "cat-1", subcategories: [{ id: "sub-1" }, { id: "sub-removed" }] },
+        { id: "cat-2", subcategories: [{ id: "sub-2" }] },
+      ]; },
+      async update(args: unknown) { writes.push(["category.update", args]); },
+      async create(args: unknown) { writes.push(["category.create", args]); return { id: "cat-new" }; },
+      async deleteMany(args: unknown) { writes.push(["category.deleteMany", args]); },
+    },
+    templateSubcategory: {
+      async update(args: unknown) { writes.push(["subcategory.update", args]); },
+      async create(args: unknown) { writes.push(["subcategory.create", args]); },
+      async deleteMany(args: unknown) { writes.push(["subcategory.deleteMany", args]); },
+    },
+  };
+  return { db, writes };
+};
+
+test("template reconciliation retains ids, creates id-less records, removes omissions and persists order", async () => {
+  const { db, writes } = templateReconciliationDb();
+  await createMonthlyCyclePrismaAdapters(db).templates.replaceCategories({ categories: [
+    { name: "New", subcategories: [{ name: "Fresh", plannedAmount: 10 }] },
+    { id: "cat-1", name: "Renamed", subcategories: [
+      { name: "New child", plannedAmount: 20 },
+      { id: "sub-1", name: "Renamed child", plannedAmount: 30, defaultPocketId: "pocket-1" },
+    ] },
+  ] } as any);
+  assert.deepEqual(writes, [
+    ["category.create", { data: { name: "New", sortOrder: 0, subcategories: { create: [] } } }],
+    ["subcategory.create", { data: { categoryId: "cat-new", name: "Fresh", plannedAmount: amount(10), defaultPocketId: null, sortOrder: 0 } }],
+    ["category.update", { where: { id: "cat-1" }, data: { name: "Renamed", sortOrder: 1 } }],
+    ["subcategory.create", { data: { categoryId: "cat-1", name: "New child", plannedAmount: amount(20), defaultPocketId: null, sortOrder: 0 } }],
+    ["subcategory.update", { where: { id: "sub-1" }, data: { name: "Renamed child", plannedAmount: amount(30), defaultPocketId: "pocket-1", sortOrder: 1 } }],
+    ["subcategory.deleteMany", { where: { categoryId: "cat-1", id: { in: ["sub-removed"] } } }],
+    ["category.deleteMany", { where: { id: { notIn: ["cat-1", "cat-new"] } } }],
+  ]);
+});
+
+test("template reconciliation clears all records for an empty template", async () => {
+  const { db, writes } = templateReconciliationDb();
+  await createMonthlyCyclePrismaAdapters(db).templates.replaceCategories({ categories: [] });
+  assert.deepEqual(writes, [["category.deleteMany", { where: { id: { notIn: [] } } }]]);
+});
+
+test("template reconciliation rejects unknown, repeated and wrong-parent ids before any write", async () => {
+  const child = { id: "sub-1", name: "Child", plannedAmount: 1 };
+  for (const categories of [
+    [{ id: "missing", name: "Name", subcategories: [] }],
+    [{ id: "cat-1", name: "Name", subcategories: [{ ...child, id: "missing" }] }],
+    [{ id: "cat-2", name: "Name", subcategories: [child] }],
+    [{ name: "New", subcategories: [child] }],
+    [{ id: "cat-1", name: "Name", subcategories: [child, child] }],
+    [{ id: "cat-1", name: "Name", subcategories: [] }, { id: "cat-1", name: "Again", subcategories: [] }],
+  ]) {
+    const { db, writes } = templateReconciliationDb();
+    await assert.rejects(() => createMonthlyCyclePrismaAdapters(db).templates.replaceCategories({ categories } as any), { name: "DomainError", statusCode: 400 });
+    assert.deepEqual(writes, []);
+  }
+});
+
 test("monthly-cycle Prisma adapters expose template reads and pocket validation through explicit ports", async () => {
   const templateCategories = [
     {

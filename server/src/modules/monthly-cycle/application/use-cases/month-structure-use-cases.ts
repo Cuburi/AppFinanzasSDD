@@ -42,9 +42,18 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
   },
 
   async updateMonthCategory(input) {
-    const month = await ports.transactionRunner.run(async (txPorts) => {
+    const run = input.updateTemplate ? ports.transactionRunner.runSerializable.bind(ports.transactionRunner) : ports.transactionRunner.run.bind(ports.transactionRunner);
+    const month = await run(async (txPorts) => {
       const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
-      assertMonthCategory(existingMonth, input.categoryId);
+      const category = assertMonthCategory(existingMonth, input.categoryId);
+
+      if (input.updateTemplate) {
+        const template = await txPorts.templates.readCategories();
+        const target = template.find((item) => item.id === category.templateCategoryId);
+        if (!target) throw new DomainError(409, "Linked template category is unavailable.");
+        assertUniqueStructureName(template.filter((item) => item.id !== target.id), input.name, "Category already exists in the template.");
+        await txPorts.structure.updateTemplateCategory({ categoryId: target.id, name: input.name });
+      }
 
       await txPorts.structure.updateMonthCategory({ categoryId: input.categoryId, name: input.name });
 
@@ -119,11 +128,29 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
   },
 
   async updateMonthSubcategory(input) {
-    const month = await ports.transactionRunner.run(async (txPorts) => {
+    const run = input.updateTemplate ? ports.transactionRunner.runSerializable.bind(ports.transactionRunner) : ports.transactionRunner.run.bind(ports.transactionRunner);
+    const month = await run(async (txPorts) => {
       const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
-      assertMonthSubcategory(existingMonth, input.subcategoryId);
+      const subcategory = assertMonthSubcategory(existingMonth, input.subcategoryId);
+      const defaultPocketId = input.defaultPocketId !== undefined ? input.defaultPocketId : subcategory.defaultPocketId;
 
       if (input.defaultPocketId) await txPorts.pockets.ensurePocketIsActive(input.defaultPocketId, "Default pocket");
+
+      if (input.updateTemplate) {
+        const parent = existingMonth.categories.find((category) => category.subcategories.some((item) => item.id === subcategory.id))!;
+        const template = await txPorts.templates.readCategories();
+        const targetParent = template.find((category) => category.id === parent.templateCategoryId);
+        const target = targetParent?.subcategories.find((item) => item.id === subcategory.templateSubcategoryId);
+        if (!target || !target.active) throw new DomainError(409, "Linked template subcategory is unavailable or belongs to another category.");
+        assertUniqueStructureName(targetParent!.subcategories.filter((item) => item.id !== target.id), input.name, "Subcategory already exists in the template category.");
+        if (defaultPocketId && input.defaultPocketId === undefined) await txPorts.pockets.ensurePocketIsActive(defaultPocketId, "Default pocket");
+        await txPorts.structure.updateTemplateSubcategory({
+          subcategoryId: target.id,
+          name: input.name,
+          plannedAmount: decimal(input.plannedAmount),
+          defaultPocketId,
+        });
+      }
 
       await txPorts.structure.updateMonthSubcategory({
         subcategoryId: input.subcategoryId,

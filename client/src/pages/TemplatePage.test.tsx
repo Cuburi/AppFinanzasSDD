@@ -50,12 +50,12 @@ describe("TemplatePage", () => {
     apiMock.getTemplate.mockResolvedValue(template);
     apiMock.getPockets.mockResolvedValue(activePockets);
     apiMock.updateTemplate.mockImplementation(async (input) => ({
-      categories: input.categories.map((category: { name: string; subcategories: Array<{ name: string; plannedAmount: number; defaultPocketId: string | null }> }) => ({
-        id: `saved-${category.name}`,
+      categories: input.categories.map((category: { id?: string; name: string; subcategories: Array<{ id?: string; name: string; plannedAmount: number; defaultPocketId: string | null }> }) => ({
+        id: category.id ?? `saved-${category.name}`,
         name: category.name,
         sortOrder: 0,
         subcategories: category.subcategories.map((subcategory, index) => ({
-          id: `saved-sub-${index}`,
+          id: subcategory.id ?? `saved-sub-${index}`,
           name: subcategory.name,
           plannedAmount: subcategory.plannedAmount,
           defaultPocketId: subcategory.defaultPocketId,
@@ -70,7 +70,7 @@ describe("TemplatePage", () => {
     render(<TemplatePage />);
 
     expect(await screen.findByRole("heading", { name: "Estructura para meses futuros" })).toBeInTheDocument();
-    expect(screen.getByText("Los meses ya abiertos conservan su snapshot. Si querés renombrar algo del mes activo, hacelo desde Ajustes del mes en Mes activo.")).toBeInTheDocument();
+    expect(screen.getByText("Los meses ya abiertos conservan su snapshot. Si querés renombrar algo del mes activo, hacelo desde Editar categorías de este mes.")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Plan total de próximos meses" })).toHaveTextContent("$300 COP");
     expect(screen.getByRole("article", { name: "Categoría Hogar" })).toHaveTextContent("Subtotal de Hogar$300 COP");
     expect(screen.getByLabelText("Subcategoría Supermercado")).toHaveValue("Supermercado");
@@ -132,7 +132,7 @@ describe("TemplatePage", () => {
 
     await user.click(await screen.findByRole("button", { name: "Guardar plantilla" }));
 
-    expect(await screen.findByText("Plantilla guardada. Los próximos meses usarán este snapshot; el mes activo conserva sus nombres hasta que lo corrijas desde Ajustes del mes.")).toBeInTheDocument();
+    expect(await screen.findByText("Plantilla guardada. Los próximos meses usarán este snapshot; el mes activo conserva sus nombres hasta que lo corrijas desde Editar categorías de este mes.")).toBeInTheDocument();
   });
 
   it("keeps the default pocket optional and saves an empty selection as no default", async () => {
@@ -151,12 +151,46 @@ describe("TemplatePage", () => {
       expect(apiMock.updateTemplate).toHaveBeenCalledWith({
         categories: [
           {
+            id: "cat-house",
             name: "Hogar",
-            subcategories: [{ name: "Supermercado", plannedAmount: 300, defaultPocketId: null }],
+            subcategories: [{ id: "sub-food", name: "Supermercado", plannedAmount: 300, defaultPocketId: null }],
           },
         ],
       }),
     );
+  });
+
+  it("preserves renamed record identities and omits ids for new entries", async () => {
+    const user = userEvent.setup();
+    render(<TemplatePage />);
+    fireEvent.change(await screen.findByLabelText("Categoría"), { target: { value: "Casa" } });
+    fireEvent.change(screen.getByLabelText("Subcategoría Supermercado"), { target: { value: "Comida" } });
+    await user.click(screen.getByRole("button", { name: "Agregar subcategoría" }));
+    await user.click(screen.getByRole("button", { name: "Agregar categoría" }));
+    await user.click(screen.getByRole("button", { name: "Guardar plantilla" }));
+    await waitFor(() => expect(apiMock.updateTemplate).toHaveBeenCalledWith({
+      categories: [
+        { id: "cat-house", name: "Casa", subcategories: [
+          { id: "sub-food", name: "Comida", plannedAmount: 300, defaultPocketId: null },
+          { name: "", plannedAmount: 0, defaultPocketId: null },
+        ] },
+        { name: "", subcategories: [{ name: "", plannedAmount: 0, defaultPocketId: null }] },
+      ],
+    }));
+  });
+
+  it("carries server-assigned ids into subsequent saves and omits removed entries", async () => {
+    const user = userEvent.setup();
+    render(<TemplatePage />);
+    await user.click(await screen.findByRole("button", { name: "Agregar subcategoría" }));
+    fireEvent.change(screen.getByLabelText("Subcategoría 2"), { target: { value: "Nueva" } });
+    await user.click(screen.getByRole("button", { name: "Guardar plantilla" }));
+    await screen.findByText(/Plantilla guardada/);
+    await user.click(screen.getByRole("button", { name: "Quitar subcategoría Supermercado" }));
+    await user.click(screen.getByRole("button", { name: "Guardar plantilla" }));
+    await waitFor(() => expect(apiMock.updateTemplate).toHaveBeenLastCalledWith({ categories: [
+      { id: "cat-house", name: "Hogar", subcategories: [{ id: "saved-sub-1", name: "Nueva", plannedAmount: 0, defaultPocketId: null }] },
+    ] }));
   });
 
   it("saves a selected active pocket as the optional default", async () => {
@@ -174,8 +208,9 @@ describe("TemplatePage", () => {
       expect(apiMock.updateTemplate).toHaveBeenCalledWith({
         categories: [
           {
+            id: "cat-house",
             name: "Hogar",
-            subcategories: [{ name: "Supermercado", plannedAmount: 300, defaultPocketId: "pocket-food" }],
+            subcategories: [{ id: "sub-food", name: "Supermercado", plannedAmount: 300, defaultPocketId: "pocket-food" }],
           },
         ],
       }),
