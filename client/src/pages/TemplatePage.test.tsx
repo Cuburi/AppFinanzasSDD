@@ -70,7 +70,7 @@ describe("TemplatePage", () => {
     render(<TemplatePage />);
 
     expect(await screen.findByRole("heading", { name: "Estructura para meses futuros" })).toBeInTheDocument();
-    expect(screen.getByText("Los meses ya abiertos no cambian.")).toBeInTheDocument();
+    expect(screen.getByText("Los meses ya abiertos conservan su snapshot. Si querés renombrar algo del mes activo, hacelo desde Ajustes del mes en Mes activo.")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Plan total de próximos meses" })).toHaveTextContent("$300 COP");
     expect(screen.getByRole("article", { name: "Categoría Hogar" })).toHaveTextContent("Subtotal de Hogar$300 COP");
     expect(screen.getByLabelText("Subcategoría Supermercado")).toHaveValue("Supermercado");
@@ -123,6 +123,16 @@ describe("TemplatePage", () => {
 
     fireEvent.change(amount, { target: { value: "000.50" } });
     expect(amount).toHaveValue(0.5);
+  });
+
+  it("confirms saved template changes affect future months while the active month keeps its snapshot", async () => {
+    const user = userEvent.setup();
+
+    render(<TemplatePage />);
+
+    await user.click(await screen.findByRole("button", { name: "Guardar plantilla" }));
+
+    expect(await screen.findByText("Plantilla guardada. Los próximos meses usarán este snapshot; el mes activo conserva sus nombres hasta que lo corrijas desde Ajustes del mes.")).toBeInTheDocument();
   });
 
   it("keeps the default pocket optional and saves an empty selection as no default", async () => {

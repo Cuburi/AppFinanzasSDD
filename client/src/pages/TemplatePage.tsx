@@ -181,7 +181,7 @@ export const TemplatePage = () => {
       const nextTemplate = toTemplateDraft(savedTemplate);
       setTemplate(nextTemplate);
       setOpenCategories((open) => Object.fromEntries(nextTemplate.categories.map((_, index) => [index, open[index] ?? true])));
-      setMessage("Plantilla guardada. Los próximos meses usarán este snapshot.");
+      setMessage("Plantilla guardada. Los próximos meses usarán este snapshot; el mes activo conserva sus nombres hasta que lo corrijas desde Ajustes del mes.");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo guardar la plantilla.");
     } finally {
@@ -205,7 +205,7 @@ export const TemplatePage = () => {
           <p className="eyebrow">Base de presupuesto</p>
           <h1>Estructura para meses futuros</h1>
           <p>Definí las categorías y montos que se copiarán al abrir cada mes nuevo.</p>
-          <p className="template-structure-note">Los meses ya abiertos no cambian.</p>
+          <p className="template-structure-note">Los meses ya abiertos conservan su snapshot. Si querés renombrar algo del mes activo, hacelo desde Ajustes del mes en Mes activo.</p>
         </div>
         <section aria-label="Plan total de próximos meses" className="template-total-kpi">
           <span>Plan total</span>

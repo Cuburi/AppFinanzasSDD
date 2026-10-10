@@ -822,7 +822,7 @@ export const ActiveMonthPage = () => {
           <summary>
             <span>
               <strong>Ajustes del mes</strong>
-              <span>Mantenimiento puntual de categorías y subcategorías de este mes; no hace parte del registro diario ni cambia la plantilla global.</span>
+              <span>Mantenimiento puntual de categorías y subcategorías de este mes; úsalo para renombres del mes activo porque la plantilla solo afecta meses futuros.</span>
             </span>
           </summary>
           <div className="month-structure-content stack-md">
@@ -841,11 +841,11 @@ export const ActiveMonthPage = () => {
               </strong>{" "}
               · estado {activeMonth.status}
             </p>
-            <p>Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro.</p>
+            <p>Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro. Si renombraste una categoría o subcategoría en Plantilla, el mes activo conserva su snapshot hasta que la corrijas aquí.</p>
 
             {canMutateActiveMonth ? (
               <div className="stack-md">
-                <p>Crea categorías y subcategorías solo para este mes. Antes de promoverlas, marca la copia a plantilla únicamente si quieres que aparezcan en próximos meses.</p>
+                <p>Crea categorías y subcategorías solo para este mes. Antes de promoverlas, marca la copia a plantilla únicamente si querés que aparezcan en próximos meses.</p>
 
                 <form aria-label="Crear categoría del mes activo" className="row gap-sm wrap" onSubmit={handleCreateCategory}>
                   <label className="field">

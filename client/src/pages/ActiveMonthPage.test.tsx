@@ -245,11 +245,11 @@ describe("ActiveMonthPage", () => {
     const disclosure = screen.getByRole("region", { name: "Ajustes del mes" }).querySelector("details");
     expect(disclosure).not.toBeNull();
     expect(disclosure).not.toHaveAttribute("open");
-    expect(screen.getByText("Mantenimiento puntual de categorías y subcategorías de este mes; no hace parte del registro diario ni cambia la plantilla global.")).toBeInTheDocument();
+    expect(screen.getByText("Mantenimiento puntual de categorías y subcategorías de este mes; úsalo para renombres del mes activo porque la plantilla solo afecta meses futuros.")).toBeInTheDocument();
 
     await openMonthStructure();
     expect(disclosure).toHaveAttribute("open");
-    expect(screen.getByText("Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro.")).toBeInTheDocument();
+    expect(screen.getByText("Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro. Si renombraste una categoría o subcategoría en Plantilla, el mes activo conserva su snapshot hasta que la corrijas aquí.")).toBeInTheDocument();
     expect(screen.getByText(/Antes de promoverlas, marca la copia a plantilla/i)).toBeInTheDocument();
   });
 
@@ -1058,7 +1058,7 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     await openMonthStructure();
-    expect(await screen.findByText("Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro.")).toBeInTheDocument();
+    expect(await screen.findByText("Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro. Si renombraste una categoría o subcategoría en Plantilla, el mes activo conserva su snapshot hasta que la corrijas aquí.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Editar categoría Ingresos" }));
     await user.clear(screen.getByLabelText("Nombre categoría"));
@@ -1110,6 +1110,7 @@ describe("ActiveMonthPage", () => {
 
     await openMonthStructure();
     expect(await screen.findByText(/Crea categorías y subcategorías solo para este mes/i)).toBeInTheDocument();
+    expect(screen.getByText(/la plantilla solo afecta meses futuros/i)).toBeInTheDocument();
     expect(screen.getByText(/Copiar a plantilla también/i)).toBeInTheDocument();
 
     const categoryForm = screen.getByRole("form", { name: "Crear categoría del mes activo" });
