@@ -286,7 +286,7 @@ export const api = {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ name: input.name }),
+      body: JSON.stringify({ name: input.name, updateTemplate: input.updateTemplate }),
     });
 
     return readJson<Month>(response);
@@ -322,6 +322,7 @@ export const api = {
         name: input.name,
         plannedAmount: input.plannedAmount,
         defaultPocketId: input.defaultPocketId,
+        updateTemplate: input.updateTemplate,
       }),
     });
 

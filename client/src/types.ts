@@ -18,9 +18,10 @@ export type Template = {
   categories: TemplateCategory[];
 };
 
-export type EditableTemplateSubcategory = Pick<TemplateSubcategory, "name" | "plannedAmount" | "defaultPocketId">;
+export type EditableTemplateSubcategory = Pick<TemplateSubcategory, "name" | "plannedAmount" | "defaultPocketId"> & { id?: string };
 
 export type EditableTemplateCategory = {
+  id?: string;
   name: string;
   subcategories: EditableTemplateSubcategory[];
 };
@@ -203,6 +204,7 @@ export type UpdateMonthCategoryInput = {
   monthId: string;
   categoryId: string;
   name: string;
+  updateTemplate?: boolean;
 };
 
 export type CreateMonthCategoryInput = {
@@ -226,6 +228,7 @@ export type UpdateMonthSubcategoryInput = {
   name: string;
   plannedAmount: number;
   defaultPocketId?: string | null;
+  updateTemplate?: boolean;
 };
 
 export type ExpenseHistoryFilters = {

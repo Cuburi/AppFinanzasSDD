@@ -40,6 +40,7 @@ export interface MonthRepositoryPort {
 
 export interface TemplateRepositoryPort {
   readCategories(): Promise<TemplateCategoryRecord[]>;
+  /** Reconcile the complete template: retain known ids, create id-less entries, delete omissions. */
   replaceCategories(input: TemplateInput): Promise<void>;
 }
 
@@ -102,6 +103,8 @@ export interface MonthStructureRepositoryPort {
   updateMonthSubcategory(input: { subcategoryId: string; name: string; plannedAmount: MonthlyCycleMoney; defaultPocketId?: string | null }): Promise<void>;
   linkMonthSubcategory(subcategoryId: string, templateSubcategoryId: string): Promise<void>;
   deleteMonthSubcategory(subcategoryId: string): Promise<void>;
+  updateTemplateCategory(input: { categoryId: string; name: string }): Promise<void>;
+  updateTemplateSubcategory(input: { subcategoryId: string; name: string; plannedAmount: MonthlyCycleMoney; defaultPocketId: string | null }): Promise<void>;
   createTemplateCategory(input: { name: string; sortOrder: number }): Promise<{ id: string }>;
   createTemplateSubcategory(input: { categoryId: string; name: string; plannedAmount: MonthlyCycleMoney; defaultPocketId: string | null; sortOrder: number }): Promise<{ id: string }>;
 }

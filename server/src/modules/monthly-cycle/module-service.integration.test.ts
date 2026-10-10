@@ -168,9 +168,23 @@ const createIntegrationDb = (
       async findMany() {
         return cloneTemplate(templateCategories);
       },
-      async deleteMany() {
-        templateCategories = [];
-        return { count: 0 };
+      async deleteMany(args: { where: { id: { notIn: string[] } } }) {
+        const removed = templateCategories.filter((category) => !args.where.id.notIn.includes(category.id));
+        const removedSubcategoryIds = removed.flatMap((category) => category.subcategories.map((subcategory) => subcategory.id));
+        for (const category of months.flatMap((month) => month.categories)) {
+          if (removed.some((candidate) => candidate.id === category.templateCategoryId)) category.templateCategoryId = null;
+          for (const subcategory of category.subcategories) {
+            if (removedSubcategoryIds.includes(subcategory.templateSubcategoryId ?? "")) subcategory.templateSubcategoryId = null;
+          }
+        }
+        templateCategories = templateCategories.filter((category) => args.where.id.notIn.includes(category.id));
+        return { count: removed.length };
+      },
+      async update(args: { where: { id: string }; data: { name: string; sortOrder: number } }) {
+        const category = templateCategories.find((candidate) => candidate.id === args.where.id);
+        if (!category) throw new Error("Template category missing in integration stub.");
+        Object.assign(category, args.data);
+        return category;
       },
       async create(args: {
         data: {
@@ -181,7 +195,7 @@ const createIntegrationDb = (
           };
         };
       }) {
-        const categoryId = `template-category-${nextId++}`;
+        const categoryId = `created-template-category-${nextId++}`;
         templateCategories.push({
           id: categoryId,
           name: args.data.name,
@@ -200,6 +214,21 @@ const createIntegrationDb = (
       },
     },
     templateSubcategory: {
+      async update(args: { where: { id: string }; data: { name: string; plannedAmount: Prisma.Decimal; defaultPocketId: string | null; sortOrder: number } }) {
+        const subcategory = templateCategories.flatMap((category) => category.subcategories).find((candidate) => candidate.id === args.where.id);
+        if (!subcategory) throw new Error("Template subcategory missing in integration stub.");
+        Object.assign(subcategory, args.data);
+        return subcategory;
+      },
+      async deleteMany(args: { where: { categoryId: string; id: { in: string[] } } }) {
+        const category = templateCategories.find((candidate) => candidate.id === args.where.categoryId);
+        if (!category) throw new Error("Template category missing in integration stub.");
+        category.subcategories = category.subcategories.filter((subcategory) => !args.where.id.in.includes(subcategory.id));
+        for (const subcategory of months.flatMap((month) => month.categories).flatMap((category) => category.subcategories)) {
+          if (args.where.id.in.includes(subcategory.templateSubcategoryId ?? "")) subcategory.templateSubcategoryId = null;
+        }
+        return { count: args.where.id.in.length };
+      },
       async create(args: {
         data: { categoryId: string; name: string; plannedAmount: Prisma.Decimal; defaultPocketId: string | null; sortOrder: number };
       }) {
@@ -528,17 +557,57 @@ const createIntegrationDb = (
   return { db, getCapturedMovements: () => capturedMovements };
 };
 
+test("service integration: explicit month edits update linked Template fields and retain identities", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleTestService(db);
+  const opened = await service.openMonth({ year: 2026, month: 5 });
+  const category = opened.categories[0]!;
+  const subcategory = category.subcategories[0]!;
+  await service.updateMonthCategory({ monthId: opened.id, categoryId: category.id, name: "Food", updateTemplate: true });
+  const updated = await service.updateMonthSubcategory({ monthId: opened.id, subcategoryId: subcategory.id, name: "Market", plannedAmount: 125, defaultPocketId: null, updateTemplate: true });
+  const template = await service.getTemplate();
+  assert.equal(template.categories[0]!.id, category.templateCategoryId);
+  assert.equal(template.categories[0]!.name, "Food");
+  assert.equal(template.categories[0]!.subcategories[0]!.id, subcategory.templateSubcategoryId);
+  assert.equal(template.categories[0]!.subcategories[0]!.name, "Market");
+  assert.equal(template.categories[0]!.subcategories[0]!.plannedAmount, 125);
+  assert.equal(template.categories[0]!.subcategories[0]!.defaultPocketId, null);
+  assert.equal(updated.categories[0]!.subcategories[0]!.plannedAmount, 125);
+});
+
+test("service integration: propagation rolls back Template and month when the second write fails", async () => {
+  for (const kind of ["category", "subcategory"] as const) {
+    const { db } = createIntegrationDb();
+    const service = createMonthlyCycleTestService(db);
+    const opened = await service.openMonth({ year: 2026, month: 5 });
+    const beforeTemplate = await service.getTemplate();
+    const repository = kind === "category" ? db.monthCategory : db.monthSubcategory;
+    const originalUpdate = repository.update.bind(repository);
+    repository.update = async (args: unknown) => {
+      await originalUpdate(args);
+      throw new Error("Month persistence failed.");
+    };
+    await assert.rejects(() => kind === "category"
+      ? service.updateMonthCategory({ monthId: opened.id, categoryId: opened.categories[0]!.id, name: "Food", updateTemplate: true })
+      : service.updateMonthSubcategory({ monthId: opened.id, subcategoryId: opened.categories[0]!.subcategories[0]!.id, name: "Market", plannedAmount: 125, defaultPocketId: null, updateTemplate: true }), /Month persistence failed/);
+    assert.deepEqual(await service.getTemplate(), beforeTemplate);
+    assert.deepEqual(await service.getActiveMonth(), opened);
+  }
+});
+
 test("service integration: opening a month snapshots the template and later template edits do not mutate it", async () => {
   const { db } = createIntegrationDb();
   const service = createMonthlyCycleTestService(db);
 
   const openedMonth = await service.openMonth({ year: 2026, month: 5 });
 
-  await service.updateTemplate({
+  const originalTemplate = await service.getTemplate();
+  const savedTemplate = await service.updateTemplate({
     categories: [
       {
+        id: originalTemplate.categories[0]!.id,
         name: "Base editada",
-        subcategories: [{ name: "Comida editada", plannedAmount: 999, defaultPocketId: "pocket-buffer" }],
+        subcategories: [{ id: originalTemplate.categories[0]!.subcategories[0]!.id, name: "Comida editada", plannedAmount: 999, defaultPocketId: "pocket-buffer" }],
       },
     ],
   });
@@ -549,6 +618,11 @@ test("service integration: opening a month snapshots the template and later temp
   assert.equal(activeMonth?.categories[0]?.name, "Base");
   assert.equal(activeMonth?.categories[0]?.subcategories[0]?.name, "Comida");
   assert.equal(activeMonth?.categories[0]?.subcategories[0]?.plannedAmount, 300);
+  assert.equal(activeMonth?.categories[0]?.subcategories[0]?.defaultPocketId, openedMonth.categories[0]?.subcategories[0]?.defaultPocketId);
+  assert.equal(savedTemplate.categories[0]?.id, originalTemplate.categories[0]?.id);
+  assert.equal(savedTemplate.categories[0]?.subcategories[0]?.id, originalTemplate.categories[0]?.subcategories[0]?.id);
+  assert.equal(activeMonth?.categories[0]?.templateCategoryId, originalTemplate.categories[0]?.id);
+  assert.equal(activeMonth?.categories[0]?.subcategories[0]?.templateSubcategoryId, originalTemplate.categories[0]?.subcategories[0]?.id);
 });
 
 test("service integration: promoted subcategory relinks stale parent template ids after a template rewrite", async () => {

@@ -451,11 +451,11 @@ test("updateTemplate keeps defaultPocketId optional when saving subcategories", 
       },
     ],
   });
-  const createArgs = dbStub.getCapturedCreateArgs() as {
-    data: { subcategories: { create: Array<{ defaultPocketId: string | null }> } };
+  const subcategoryCreate = dbStub.getCapturedTemplateSubcategoryCreates()[0] as {
+    data: { defaultPocketId: string | null };
   };
 
-  assert.equal(createArgs.data.subcategories.create[0]?.defaultPocketId, null);
+  assert.equal(subcategoryCreate.data.defaultPocketId, null);
 });
 
 test("updateTemplate rejects inactive or nonexistent default pockets", async () => {

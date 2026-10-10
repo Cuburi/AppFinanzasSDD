@@ -104,7 +104,8 @@ describe("visual system contracts", () => {
     expect(tabletRules).toContain(".app-shell { display: block; padding-inline: 0; }");
     expect(tabletRules).toContain(".app-header");
     expect(tabletRules).toContain("height: auto;");
-    expect(tabletRules).toContain(".menu-trigger { display: inline-flex;");
+    expect(tabletRules).toContain(".menu-trigger { align-items: center; display: inline-flex;");
+    expect(tabletRules).toContain("min-height: 44px;");
     expect(tabletRules).toContain("grid-template-columns: 1fr;");
     expect(tabletRules).toContain(".dashboard-runway");
   });
@@ -118,6 +119,9 @@ describe("visual system contracts", () => {
     expect(styles).toMatch(/\.dashboard-context\s*\{\s*align-items: center;\s*gap: var\(--space-2\);\s*grid-template-columns: minmax\(0, 1fr\) auto;/);
     expect(tabletRules).toContain(".navigation-drawer");
     expect(tabletRules).toContain("min-height: 100vh;");
+    expect(tabletRules).toContain("transform: translateX(1rem) scale(0.98);");
+    expect(tabletRules).toContain("transition: opacity 180ms ease, transform 220ms");
+    expect(tabletRules).toContain("@starting-style");
     expect(tabletRules).toContain(".navigation-drawer nav");
   });
 
@@ -128,8 +132,11 @@ describe("visual system contracts", () => {
     expect(compactShellRules).toContain(".app-header");
     expect(compactShellRules).toContain("flex-direction: row;");
     expect(compactShellRules).toContain(".app-header .eyebrow,");
-    expect(compactShellRules).toContain(".menu-trigger { display: inline-flex;");
+    expect(compactShellRules).toContain(".menu-trigger { align-items: center; display: inline-flex;");
+    expect(compactShellRules).toContain(".menu-trigger-icon");
     expect(compactShellRules).toContain(".navigation-drawer[open]");
+    expect(compactShellRules).toContain("opacity: 1; transform: translateX(0) scale(1);");
+    expect(compactShellRules).toContain("@starting-style");
     expect(compactShellRules).toContain(".dashboard-runway { grid-template-columns: 1fr; }");
   });
 
@@ -279,6 +286,14 @@ describe("visual system contracts", () => {
     expect(topLevelCssBlock(".template-category-disclosure[open] > summary::after")).toContain('content: "−";');
     expect(topLevelCssBlock(".template-category-content")).toContain("border-top: 1px solid var(--ww-line);");
     expect(compactRules).toContain(".template-category-disclosure > summary");
+  });
+
+  it("keeps month structure rows container-safe and Template options distinct from fields", () => {
+    expect(topLevelCssBlock(".month-subcategory-fields, .month-subcategory-columns")).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));");
+    expect(topLevelCssBlock(".month-template-option label")).toContain("display: flex;");
+    expect(topLevelCssBlock(".month-template-option input")).toContain("width: auto;");
+    expect(styles).toContain(".month-subcategory-fields { grid-template-columns: 1fr; }");
+    expect(styles).toContain(".month-subcategory-columns { display: none; }");
   });
 
   it("keeps pocket money flows, balances, and maintenance visually distinct at compact widths", () => {
