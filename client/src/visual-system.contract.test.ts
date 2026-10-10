@@ -104,7 +104,8 @@ describe("visual system contracts", () => {
     expect(tabletRules).toContain(".app-shell { display: block; padding-inline: 0; }");
     expect(tabletRules).toContain(".app-header");
     expect(tabletRules).toContain("height: auto;");
-    expect(tabletRules).toContain(".menu-trigger { display: inline-flex;");
+    expect(tabletRules).toContain(".menu-trigger { align-items: center; display: inline-flex;");
+    expect(tabletRules).toContain("min-height: 44px;");
     expect(tabletRules).toContain("grid-template-columns: 1fr;");
     expect(tabletRules).toContain(".dashboard-runway");
   });
@@ -128,7 +129,8 @@ describe("visual system contracts", () => {
     expect(compactShellRules).toContain(".app-header");
     expect(compactShellRules).toContain("flex-direction: row;");
     expect(compactShellRules).toContain(".app-header .eyebrow,");
-    expect(compactShellRules).toContain(".menu-trigger { display: inline-flex;");
+    expect(compactShellRules).toContain(".menu-trigger { align-items: center; display: inline-flex;");
+    expect(compactShellRules).toContain(".menu-trigger-icon");
     expect(compactShellRules).toContain(".navigation-drawer[open]");
     expect(compactShellRules).toContain(".dashboard-runway { grid-template-columns: 1fr; }");
   });

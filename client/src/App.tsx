@@ -72,12 +72,13 @@ export default function App() {
         <button
           aria-controls="app-navigation-drawer"
           aria-expanded={menuOpen}
-          className="menu-trigger"
+          className="button secondary menu-trigger"
           onClick={() => setMenuOpen(true)}
           ref={menuTriggerRef}
           type="button"
         >
-          Menú
+          <span aria-hidden="true" className="menu-trigger-icon">☰</span>
+          <span>Menú</span>
         </button>
       </header>
 
