@@ -15,6 +15,7 @@ Polish the remaining personal-use UI friction points as a coherent, reviewable U
 - Review and polish the Pockets UI around deposits, withdrawals, balances, and recent movements.
 - Add stable Template/budget card visual polish inspired by the Active Month 3D hover direction without reintroducing layout regressions.
 - Improve hero/card padding, borders, and spacing where content feels too close to edges.
+- Add responsive navigation polish follow-up: the mobile drawer is usable, but the open-menu trigger and responsive menu presentation need refinement based on the latest screenshot feedback.
 
 ## Non-goals
 
@@ -49,6 +50,7 @@ Polish the remaining personal-use UI friction points as a coherent, reviewable U
 - Pockets page presents deposit/withdrawal actions, balances, and movement history with production-minimum clarity.
 - Visual polish is stable, performant, and respects reduced-motion constraints where motion is added.
 - Focused tests or visual-system contract checks cover the main UI regressions, and relevant client checks pass.
+- Responsive navigation follow-up captures the mobile menu trigger problem explicitly: improve the button that opens the drawer, not only the drawer content.
 
 ## Evidence
 
@@ -83,3 +85,7 @@ Polish the remaining personal-use UI friction points as a coherent, reviewable U
 - #205 user-feedback correction: moved the template 3D/radial pointer treatment from category cards to the top `Estructura para meses futuros` hero only; category cards are again stable, simple budget disclosures. Pocket names now have a larger, heavier treatment while the compact header edit control and inline form remain unchanged.
 - Verification passed: `pnpm --dir client exec vitest run src/pages/TemplatePage.test.tsx src/pages/PocketsPage.test.tsx src/visual-system.contract.test.ts` (41 tests), `pnpm --dir client typecheck`, and `git diff --check`.
 - Commit `9697b18` — `feat(ui): polish personal-use workflows`.
+- #205 user-feedback follow-up: responsive navigation still needs polish. The screenshot shows the mobile drawer can be improved, especially the visible button that opens the menu; keep this as a follow-up target separate from the already-committed personal-use polish slice.
+- #205 responsive bug fix: the mobile/tablet workspace was still carrying desktop explicit grid-row placement, so the expense capture and monthly ledger could overlap in the single-column layout and make `Registrar gasto` effectively disappear. Reset workspace rows to `auto` below the desktop rail breakpoint in `client/src/styles.css`.
+- Verification passed: `git diff --check -- client/src/styles.css odd/tasks/personal-use-ui-polish.md` and `pnpm --dir client exec vitest run src/pages/ActiveMonthPage.test.tsx src/visual-system.contract.test.ts` (73 tests).
+- #205 issue note: all movement records appear with the same displayed time in the ledger. Treat as a separate investigation item; likely inspect whether the UI is formatting only the date/default midnight, whether backend timestamps are normalized, or whether fixture/demo data lacks distinct times. Do not fix as part of the responsive/menu note-only pass.
