@@ -92,8 +92,8 @@ export type MonthlyCycleDb = {
   $queryRaw<T>(query: unknown): Promise<T>;
   $queryRawUnsafe<T>(query: string): Promise<T>;
   templateCategory: {
-    findMany(args: { orderBy: { sortOrder: "asc" }; include: typeof templateInclude }): Promise<TemplateCategoryRecord[]>;
-    deleteMany(): Promise<unknown>;
+    findMany(args: { orderBy?: { sortOrder: "asc" }; include: typeof templateInclude }): Promise<TemplateCategoryRecord[]>;
+    deleteMany(args?: { where?: { id?: { notIn?: string[] } } }): Promise<unknown>;
     create(args: {
       data: {
         name: string;
@@ -108,6 +108,7 @@ export type MonthlyCycleDb = {
         };
       };
     }): Promise<{ id: string }>;
+    update(args: { where: { id: string }; data: { name: string; sortOrder: number } }): Promise<unknown>;
   };
   templateSubcategory: {
     create(args: {
@@ -119,6 +120,11 @@ export type MonthlyCycleDb = {
         sortOrder: number;
       };
     }): Promise<{ id: string }>;
+    update(args: {
+      where: { id: string };
+      data: { name: string; plannedAmount: MonthlyCycleMoney; defaultPocketId: string | null; sortOrder: number };
+    }): Promise<unknown>;
+    deleteMany(args: { where: { categoryId: string; id: { in: string[] } } }): Promise<unknown>;
   };
   month: {
     findFirst(args: unknown): Promise<MonthRecord | { id: string; year: number; month: number } | null>;

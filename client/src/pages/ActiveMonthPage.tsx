@@ -88,10 +88,12 @@ export const ActiveMonthPage = () => {
   const [editingIncomeId, setEditingIncomeId] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryName, setCategoryName] = useState("");
+  const [categoryUpdateTemplate, setCategoryUpdateTemplate] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryAddToTemplate, setNewCategoryAddToTemplate] = useState(false);
   const [editingSubcategoryId, setEditingSubcategoryId] = useState<string | null>(null);
   const [subcategoryName, setSubcategoryName] = useState("");
+  const [subcategoryUpdateTemplate, setSubcategoryUpdateTemplate] = useState(false);
   const [subcategoryPlannedAmount, setSubcategoryPlannedAmount] = useState("");
   const [subcategoryDefaultPocketId, setSubcategoryDefaultPocketId] = useState("");
   const [newSubcategoryParentId, setNewSubcategoryParentId] = useState("");
@@ -264,6 +266,7 @@ export const ActiveMonthPage = () => {
   const resetCategoryForm = () => {
     setEditingCategoryId(null);
     setCategoryName("");
+    setCategoryUpdateTemplate(false);
   };
 
   const resetCreateCategoryForm = () => {
@@ -274,6 +277,7 @@ export const ActiveMonthPage = () => {
   const resetSubcategoryForm = () => {
     setEditingSubcategoryId(null);
     setSubcategoryName("");
+    setSubcategoryUpdateTemplate(false);
     setSubcategoryPlannedAmount("");
     setSubcategoryDefaultPocketId("");
   };
@@ -398,12 +402,14 @@ export const ActiveMonthPage = () => {
     setStructureOpen(true);
     setEditingCategoryId(category.id);
     setCategoryName(category.name);
+    setCategoryUpdateTemplate(false);
   };
 
   const startEditingSubcategory = (subcategory: MonthSubcategory) => {
     setStructureOpen(true);
     setEditingSubcategoryId(subcategory.id);
     setSubcategoryName(subcategory.name);
+    setSubcategoryUpdateTemplate(false);
     setSubcategoryPlannedAmount(String(subcategory.plannedAmount));
     setSubcategoryDefaultPocketId(subcategory.defaultPocketId ?? "");
   };
@@ -456,9 +462,10 @@ export const ActiveMonthPage = () => {
   const handleCategory = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!activeMonth || !canMutateActiveMonth || !editingCategoryId) return;
+    const updateTemplate = categoryUpdateTemplate && Boolean(activeMonth.categories.find((category) => category.id === editingCategoryId)?.templateCategoryId);
     await applyActiveMonthCorrection(
-      () => api.updateMonthCategory({ monthId: activeMonth.id, categoryId: editingCategoryId, name: categoryName }),
-      "Categoría del mes activo actualizada sin modificar la plantilla global.",
+      () => api.updateMonthCategory({ monthId: activeMonth.id, categoryId: editingCategoryId, name: categoryName, updateTemplate }),
+      updateTemplate ? "Categoría actualizada en este mes y en la Plantilla para próximos meses." : "Categoría del mes activo actualizada sin modificar la plantilla global.",
       "No se pudo actualizar la categoría del mes activo.",
       () => resetCategoryForm(),
       undefined,
@@ -485,16 +492,18 @@ export const ActiveMonthPage = () => {
   const handleSubcategory = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!activeMonth || !canMutateActiveMonth || !editingSubcategoryId) return;
+    const updateTemplate = subcategoryUpdateTemplate && Boolean(subcategories.find((subcategory) => subcategory.id === editingSubcategoryId)?.templateSubcategoryId);
     await applyActiveMonthCorrection(
       () =>
         api.updateMonthSubcategory({
           monthId: activeMonth.id,
           subcategoryId: editingSubcategoryId,
+          updateTemplate,
           name: subcategoryName,
           plannedAmount: parseAmountInput(subcategoryPlannedAmount),
           defaultPocketId: subcategoryDefaultPocketId || null,
         }),
-      "Subcategoría del mes activo actualizada sin modificar la plantilla global.",
+      updateTemplate ? "Subcategoría actualizada en este mes y en la Plantilla para próximos meses." : "Subcategoría del mes activo actualizada sin modificar la plantilla global.",
       "No se pudo actualizar la subcategoría del mes activo.",
       () => resetSubcategoryForm(),
       undefined,
@@ -692,6 +701,82 @@ export const ActiveMonthPage = () => {
   };
   const resetHeroMotion = () => setHeroMotionStyle({});
 
+  const monthStructureCategories = (
+    <div className="stack-md">
+      {activeMonth?.categories.map((category) => (
+        <article aria-label={`Categoría ${category.name}`} className="card template-category-card month-category-card" key={category.id}>
+          <details className="template-category-disclosure" open>
+            <summary aria-label={`Alternar subcategorías de ${category.name}`}>
+              <span><strong>{category.name}</strong><small>{category.subcategories.length} subcategorías</small></span>
+              <span className="template-category-summary"><span>Subtotal de {category.name}</span><strong>{formatCop(category.subcategories.reduce((total, item) => total + item.plannedAmount, 0))}</strong></span>
+            </summary>
+            <div className="template-category-content">
+              <div className="month-category-header">
+                {canMutateActiveMonth && editingCategoryId === category.id ? (
+                  <form aria-label="Editar categoría del mes activo" className="month-structure-edit" onSubmit={handleCategory}>
+                    <label className="field"><span>Nombre categoría</span><input autoFocus value={categoryName} onChange={(event) => setCategoryName(event.target.value)} required /></label>
+                    <div className="month-template-option">
+                      <label><input type="checkbox" disabled={submitting || !category.templateCategoryId} checked={categoryUpdateTemplate} onChange={(event) => setCategoryUpdateTemplate(event.target.checked)} /> También actualizar Plantilla para próximos meses</label>
+                      {!category.templateCategoryId ? <p>Sin vínculo con Plantilla: puedes editar este elemento solo en este mes.</p> : null}
+                    </div>
+                    <div className="row gap-sm wrap">
+                      <Button disabled={submitting} type="submit">Guardar categoría</Button>
+                      <Button variant="secondary" disabled={submitting} onClick={resetCategoryForm} type="button">Cancelar categoría</Button>
+                    </div>
+                  </form>
+                ) : canMutateActiveMonth ? (
+                  <div className="row gap-sm wrap">
+                    <Button variant="secondary" disabled={submitting} onClick={() => startEditingCategory(category)} type="button">Editar categoría {category.name}</Button>
+                  </div>
+                ) : null}
+                {canMutateActiveMonth ? <Button variant="tertiary" disabled={submitting} onClick={() => void handleDeleteCategory(category)} type="button">Eliminar categoría {category.name}</Button> : null}
+              </div>
+              <div className="template-subcategory-list">
+                <div aria-hidden="true" className="month-subcategory-columns"><span>Subcategoría</span><span>Monto planificado</span><span>Bolsillo por defecto</span></div>
+                {category.subcategories.map((subcategory) => (
+                  <div className="month-subcategory-item" key={subcategory.id}>
+                    {canMutateActiveMonth && editingSubcategoryId === subcategory.id ? (
+                      <form aria-label="Editar subcategoría del mes activo" className="month-structure-edit" onSubmit={handleSubcategory}>
+                        <div className="month-subcategory-fields">
+                          <label className="field"><span>Nombre subcategoría</span><input autoFocus value={subcategoryName} onChange={(event) => setSubcategoryName(event.target.value)} required /></label>
+                          <label className="field field-amount"><span>Planificado</span><input min="0" step="0.01" type="number" value={subcategoryPlannedAmount} onChange={(event) => setSubcategoryPlannedAmount(normalizeAmountInput(event.target.value))} required /></label>
+                          <label className="field"><span>Bolsillo predeterminado</span><select value={subcategoryDefaultPocketId} onChange={(event) => setSubcategoryDefaultPocketId(event.target.value)}><option value="">Sin bolsillo predeterminado</option>{subcategoryDefaultPocketId && !activePockets.some((pocket) => pocket.id === subcategoryDefaultPocketId) ? <option value={subcategoryDefaultPocketId}>Bolsillo no disponible (conservar)</option> : null}{activePockets.map((pocket) => <option key={pocket.id} value={pocket.id}>{pocket.name} ({formatCop(pocket.balance)})</option>)}</select></label>
+                        </div>
+                        <div className="month-template-option">
+                          <label><input type="checkbox" disabled={submitting || !subcategory.templateSubcategoryId} checked={subcategoryUpdateTemplate} onChange={(event) => setSubcategoryUpdateTemplate(event.target.checked)} /> También actualizar Plantilla para próximos meses</label>
+                          {!subcategory.templateSubcategoryId ? <p>Sin vínculo con Plantilla: puedes editar este elemento solo en este mes.</p> : null}
+                        </div>
+                        <div className="row gap-sm wrap">
+                          <Button disabled={submitting} type="submit">Guardar subcategoría</Button>
+                          <Button variant="secondary" disabled={submitting} onClick={resetSubcategoryForm} type="button">Cancelar subcategoría</Button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="month-subcategory-fields">
+                        <strong>{subcategory.name}</strong>
+                        <span><span className="sr-only">Planificado: </span>{formatCop(subcategory.plannedAmount)}</span>
+                        <span>{subcategory.defaultPocketId ? activePockets.find((pocket) => pocket.id === subcategory.defaultPocketId)?.name ?? "Bolsillo no disponible" : "Sin bolsillo por defecto"}</span>
+                      </div>
+                    )}
+                    <div className="row between gap-sm wrap">
+                      <StatusPill aria-label={`Disponible: ${formatCop(subcategory.available)}`} tone={subcategory.available < 0 ? "danger" : "success"}>Disponible: {formatCop(subcategory.available)}</StatusPill>
+                      {canMutateActiveMonth ? <div className="row gap-sm wrap">
+                        {editingSubcategoryId !== subcategory.id ? <Button variant="secondary" disabled={submitting} onClick={() => startEditingSubcategory(subcategory)} type="button">Editar subcategoría {subcategory.name}</Button> : null}
+                        <Button variant="tertiary" disabled={submitting} onClick={() => void handleDeleteSubcategory(subcategory)} type="button">Eliminar subcategoría {subcategory.name}</Button>
+                      </div> : null}
+                    </div>
+                  </div>
+                ))}
+                {category.subcategories.length === 0 ? <p>Esta categoría aún no tiene subcategorías.</p> : null}
+              </div>
+            </div>
+          </details>
+        </article>
+      ))}
+      {activeMonth?.categories.length === 0 ? <p>Este mes aún no tiene categorías. Agrega la primera para organizar tu presupuesto.</p> : null}
+    </div>
+  );
+
   const financialSummary = activeMonth ? (
     <Card
       aria-label="Resumen financiero del mes"
@@ -817,17 +902,17 @@ export const ActiveMonthPage = () => {
         </>
       ) : null}
 
-      <Card aria-label="Ajustes del mes" className="month-structure-card">
+      <Card aria-label="Editar categorías de este mes" className="month-structure-card">
         <details className="month-structure-disclosure" onToggle={(event) => setStructureOpen(event.currentTarget.open)} open={structureOpen}>
           <summary>
             <span>
-              <strong>Ajustes del mes</strong>
-              <span>Mantenimiento puntual de categorías y subcategorías de este mes; no hace parte del registro diario ni cambia la plantilla global.</span>
+              <strong>Editar categorías de este mes</strong>
+              <span>Organiza categorías, montos y bolsillos como en Plantilla, sin salir de este mes.</span>
             </span>
           </summary>
           <div className="month-structure-content stack-md">
             <div className="row between wrap">
-              <h2>Ajustes del mes</h2>
+              <h2>Editar categorías de este mes</h2>
               <Button variant="secondary" onClick={() => void refresh()} type="button">
                 Refrescar
               </Button>
@@ -841,11 +926,15 @@ export const ActiveMonthPage = () => {
               </strong>{" "}
               · estado {activeMonth.status}
             </p>
-            <p>Estos ajustes corrigen solo este mes; no modifican la plantilla global ni el flujo diario de registro.</p>
+            <p>Los cambios se guardan solo en este mes. Marca la opción de Plantilla al guardar si también quieres usarlos en próximos meses. Eliminar nunca modifica la Plantilla.</p>
+            <section aria-label="Plan total de este mes" className="template-total-kpi">
+              <span>Plan total de este mes</span><strong>{formatCop(plannedBudget)}</strong>
+            </section>
+            {monthStructureCategories}
 
             {canMutateActiveMonth ? (
-              <div className="stack-md">
-                <p>Crea categorías y subcategorías solo para este mes. Antes de promoverlas, marca la copia a plantilla únicamente si quieres que aparezcan en próximos meses.</p>
+              <section className="month-structure-create stack-md" aria-label="Agregar a la estructura de este mes">
+                <h3>Agregar a la estructura de este mes</h3>
 
                 <form aria-label="Crear categoría del mes activo" className="row gap-sm wrap" onSubmit={handleCreateCategory}>
                   <label className="field">
@@ -853,7 +942,7 @@ export const ActiveMonthPage = () => {
                     <input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} required />
                   </label>
                   <label className="field">
-                    <span>Copiar categoría a plantilla</span>
+                    <span>También agregar a Plantilla para próximos meses</span>
                     <input type="checkbox" checked={newCategoryAddToTemplate} onChange={(event) => setNewCategoryAddToTemplate(event.target.checked)} />
                   </label>
                   <Button disabled={submitting} type="submit">
@@ -893,109 +982,18 @@ export const ActiveMonthPage = () => {
                     </select>
                   </label>
                   <label className="field">
-                    <span>Copiar a plantilla también</span>
+                    <span>También agregar a Plantilla para próximos meses</span>
                     <input type="checkbox" checked={newSubcategoryAddToTemplate} onChange={(event) => setNewSubcategoryAddToTemplate(event.target.checked)} />
                   </label>
                   <Button disabled={submitting} type="submit">
                     Crear subcategoría
                   </Button>
                 </form>
-              </div>
+              </section>
             ) : (
               <p className="error">El mes está cerrado: la estructura es de solo lectura y no se pueden crear categorías ni subcategorías.</p>
             )}
 
-            {editingCategoryId ? (
-              <form aria-label="Editar categoría del mes activo" className="row gap-sm wrap" onSubmit={handleCategory}>
-                <label className="field">
-                  <span>Nombre categoría</span>
-                  <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} required />
-                </label>
-                <Button disabled={submitting} type="submit">
-                  Guardar categoría
-                </Button>
-                <Button variant="secondary" disabled={submitting} onClick={resetCategoryForm} type="button">
-                  Cancelar categoría
-                </Button>
-              </form>
-            ) : null}
-
-            {editingSubcategoryId ? (
-              <form aria-label="Editar subcategoría del mes activo" className="row gap-sm wrap" onSubmit={handleSubcategory}>
-                <label className="field">
-                  <span>Nombre subcategoría</span>
-                  <input value={subcategoryName} onChange={(event) => setSubcategoryName(event.target.value)} required />
-                </label>
-                <label className="field small-field">
-                  <span>Planificado</span>
-                  <input min="0" step="0.01" type="number" value={subcategoryPlannedAmount} onChange={(event) => setSubcategoryPlannedAmount(normalizeAmountInput(event.target.value))} required />
-                </label>
-                <label className="field">
-                  <span>Bolsillo predeterminado</span>
-                  <select value={subcategoryDefaultPocketId} onChange={(event) => setSubcategoryDefaultPocketId(event.target.value)}>
-                    <option value="">Sin bolsillo predeterminado</option>
-                    {activePockets.map((pocket) => (
-                      <option key={pocket.id} value={pocket.id}>
-                        {pocket.name} ({formatCop(pocket.balance)})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <Button disabled={submitting} type="submit">
-                  Guardar subcategoría
-                </Button>
-                <Button variant="secondary" disabled={submitting} onClick={resetSubcategoryForm} type="button">
-                  Cancelar subcategoría
-                </Button>
-              </form>
-            ) : null}
-
-            <div className="stack-md">
-              {activeMonth.categories.map((category) => (
-                <section className="stack-sm" key={category.id}>
-                  <div className="row between wrap align-start">
-                    <h3>{category.name}</h3>
-                    {canMutateActiveMonth ? (
-                      <div className="row gap-sm wrap">
-                        <Button variant="secondary" disabled={submitting} onClick={() => startEditingCategory(category)} type="button">
-                          Editar categoría {category.name}
-                        </Button>
-                        <Button variant="tertiary" disabled={submitting} onClick={() => void handleDeleteCategory(category)} type="button">
-                          Eliminar categoría {category.name}
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="stack-sm">
-                    {category.subcategories.map((subcategory) => (
-                      <div className="budget-line align-start" key={subcategory.id}>
-                        <div>
-                          <strong>{subcategory.name}</strong>
-                          <p>Planificado: {formatCop(subcategory.plannedAmount)}</p>
-                        </div>
-
-                        <div className="row gap-sm wrap">
-                          <StatusPill aria-label={`Disponible: ${formatCop(subcategory.available)}`} tone={subcategory.available < 0 ? "danger" : "success"}>
-                            Disponible: {formatCop(subcategory.available)}
-                          </StatusPill>
-                          {canMutateActiveMonth ? (
-                            <>
-                              <Button variant="secondary" disabled={submitting} onClick={() => startEditingSubcategory(subcategory)} type="button">
-                                Editar subcategoría {subcategory.name}
-                              </Button>
-                              <Button variant="tertiary" disabled={submitting} onClick={() => void handleDeleteSubcategory(subcategory)} type="button">
-                                Eliminar subcategoría {subcategory.name}
-                              </Button>
-                            </>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
           </>
         ) : (
             <p>Todavía no hay un mes activo.</p>

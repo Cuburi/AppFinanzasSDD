@@ -124,24 +124,59 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       return db.templateCategory.findMany({ orderBy: { sortOrder: "asc" }, include: templateInclude });
     },
     async replaceCategories(input: TemplateInput) {
-      await db.templateCategory.deleteMany();
+      const existing = await db.templateCategory.findMany({ include: templateInclude });
+      const knownCategories = new Map(existing.map((category) => [category.id, category]));
+      const subcategoryParents = new Map(existing.flatMap((category) => category.subcategories.map((subcategory) => [subcategory.id, category.id] as const)));
+      const retainedCategories = new Set<string>();
+      const retainedSubcategories = new Set<string>();
+
+      // Validate the complete identity graph before mutating anything. Names are not identities.
+      for (const category of input.categories) {
+        if (category.id !== undefined) {
+          if (!knownCategories.has(category.id) || retainedCategories.has(category.id)) {
+            throw new DomainError(400, "Template category id must be known and unique.");
+          }
+          retainedCategories.add(category.id);
+        }
+        for (const subcategory of category.subcategories) {
+          if (subcategory.id === undefined) continue;
+          if (!subcategoryParents.has(subcategory.id) || retainedSubcategories.has(subcategory.id) || subcategoryParents.get(subcategory.id) !== category.id) {
+            throw new DomainError(400, "Template subcategory id must be known, unique, and belong to its category.");
+          }
+          retainedSubcategories.add(subcategory.id);
+        }
+      }
 
       for (const [categoryIndex, category] of input.categories.entries()) {
-        await db.templateCategory.create({
-          data: {
-            name: category.name,
-            sortOrder: categoryIndex,
-            subcategories: {
-              create: category.subcategories.map((subcategory, subcategoryIndex) => ({
-                name: subcategory.name,
-                plannedAmount: toPrismaDecimal(decimal(subcategory.plannedAmount)),
-                defaultPocketId: subcategory.defaultPocketId ?? null,
-                sortOrder: subcategoryIndex,
-              })),
-            },
-          },
-        });
+        const data = { name: category.name, sortOrder: categoryIndex };
+        let categoryId = category.id;
+        if (categoryId !== undefined) {
+          await db.templateCategory.update({ where: { id: categoryId }, data });
+        } else {
+          const created = await db.templateCategory.create({ data: { ...data, subcategories: { create: [] } } });
+          categoryId = created.id;
+          retainedCategories.add(categoryId);
+        }
+        for (const [subcategoryIndex, subcategory] of category.subcategories.entries()) {
+          const subcategoryData = {
+            name: subcategory.name,
+            plannedAmount: toPrismaDecimal(decimal(subcategory.plannedAmount)),
+            defaultPocketId: subcategory.defaultPocketId ?? null,
+            sortOrder: subcategoryIndex,
+          };
+          if (subcategory.id !== undefined) {
+            await db.templateSubcategory.update({ where: { id: subcategory.id }, data: subcategoryData });
+          } else {
+            await db.templateSubcategory.create({ data: { ...subcategoryData, categoryId } });
+          }
+        }
+        const removedIds = (knownCategories.get(categoryId)?.subcategories ?? [])
+          .filter((subcategory) => !retainedSubcategories.has(subcategory.id)).map((subcategory) => subcategory.id);
+        if (removedIds.length > 0) {
+          await db.templateSubcategory.deleteMany({ where: { categoryId, id: { in: removedIds } } });
+        }
       }
+      await db.templateCategory.deleteMany({ where: { id: { notIn: [...retainedCategories] } } });
     },
   },
   movements: {
@@ -272,6 +307,21 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
     },
     async deleteMonthSubcategory(subcategoryId) {
       await db.monthSubcategory.delete({ where: { id: subcategoryId } });
+    },
+    async updateTemplateCategory(input) {
+      const repository = db.templateCategory as typeof db.templateCategory & {
+        update(args: { where: { id: string }; data: { name: string } }): Promise<unknown>;
+      };
+      await repository.update({ where: { id: input.categoryId }, data: { name: input.name } });
+    },
+    async updateTemplateSubcategory(input) {
+      const repository = db.templateSubcategory as typeof db.templateSubcategory & {
+        update(args: { where: { id: string }; data: { name: string; plannedAmount: Prisma.Decimal; defaultPocketId: string | null } }): Promise<unknown>;
+      };
+      await repository.update({
+        where: { id: input.subcategoryId },
+        data: { name: input.name, plannedAmount: toPrismaDecimal(input.plannedAmount), defaultPocketId: input.defaultPocketId },
+      });
     },
     createTemplateCategory(input) {
       return db.templateCategory.create({ data: { name: input.name, sortOrder: input.sortOrder, subcategories: { create: [] } } });

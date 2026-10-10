@@ -12,6 +12,12 @@ const readBoolean = (value: unknown, label: string): boolean => {
   return value;
 };
 
+const rejectTemplateIds = (payload: object) => {
+  if ("templateCategoryId" in payload || "templateSubcategoryId" in payload) {
+    throw new Error("Template identities cannot be supplied for month edits.");
+  }
+};
+
 export type CreateMonthCategoryInput = {
   monthId: string;
   name: string;
@@ -31,6 +37,7 @@ export type UpdateMonthCategoryInput = {
   monthId: string;
   categoryId: string;
   name: string;
+  updateTemplate?: boolean;
 };
 
 export type DeleteMonthCategoryInput = {
@@ -44,6 +51,7 @@ export type UpdateMonthSubcategoryInput = {
   name: string;
   plannedAmount: number;
   defaultPocketId?: string | null;
+  updateTemplate?: boolean;
 };
 
 export type DeleteMonthSubcategoryInput = {
@@ -101,12 +109,14 @@ export const parseUpdateMonthCategoryInput = (monthId: string, categoryId: strin
     throw new Error("Category payload is required.");
   }
 
-  const rawPayload = payload as { name?: unknown };
+  const rawPayload = payload as { name?: unknown; updateTemplate?: unknown };
+  rejectTemplateIds(payload);
 
   return {
     monthId: readNonEmptyString(monthId, "Month id"),
     categoryId: readNonEmptyString(categoryId, "Category id"),
     name: readNonEmptyString(rawPayload.name, "Category name"),
+    updateTemplate: rawPayload.updateTemplate === undefined ? false : readBoolean(rawPayload.updateTemplate, "updateTemplate"),
   };
 };
 
@@ -124,7 +134,8 @@ export const parseUpdateMonthSubcategoryInput = (
     throw new Error("Subcategory payload is required.");
   }
 
-  const rawPayload = payload as { name?: unknown; plannedAmount?: unknown; defaultPocketId?: unknown };
+  const rawPayload = payload as { name?: unknown; plannedAmount?: unknown; defaultPocketId?: unknown; updateTemplate?: unknown };
+  rejectTemplateIds(payload);
   const plannedAmount = toNumber(rawPayload.plannedAmount);
 
   if (plannedAmount < 0) {
@@ -136,6 +147,7 @@ export const parseUpdateMonthSubcategoryInput = (
     subcategoryId: readNonEmptyString(subcategoryId, "Subcategory id"),
     name: readNonEmptyString(rawPayload.name, "Subcategory name"),
     plannedAmount,
+    updateTemplate: rawPayload.updateTemplate === undefined ? false : readBoolean(rawPayload.updateTemplate, "updateTemplate"),
   };
 
   if (rawPayload.defaultPocketId !== undefined) {

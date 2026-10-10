@@ -2,6 +2,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "./api";
 
+describe("month edit template propagation", () => {
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it.each([undefined, false, true])("serializes the optional flag %s without accepting template identities", async (updateTemplate) => {
+    vi.mocked(fetch).mockImplementation(async () => new Response(JSON.stringify({ id: "month-1" }), { status: 200 }));
+    const category = { monthId: "month-1", categoryId: "cat-1", name: "Food", updateTemplate, templateCategoryId: "injected" };
+    const subcategory = { monthId: "month-1", subcategoryId: "sub-1", name: "Market", plannedAmount: 125, defaultPocketId: null, updateTemplate, templateSubcategoryId: "injected" };
+    await expect(api.updateMonthCategory(category)).resolves.toEqual({ id: "month-1" });
+    await expect(api.updateMonthSubcategory(subcategory)).resolves.toEqual({ id: "month-1" });
+    expect(fetch).toHaveBeenNthCalledWith(1, "/api/months/month-1/categories/cat-1", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Food", updateTemplate }),
+    });
+    expect(fetch).toHaveBeenNthCalledWith(2, "/api/months/month-1/subcategories/sub-1", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Market", plannedAmount: 125, defaultPocketId: null, updateTemplate }),
+    });
+  });
+});
+
 const pocketPayload = {
   id: "pocket-emergency",
   name: "Emergencias",

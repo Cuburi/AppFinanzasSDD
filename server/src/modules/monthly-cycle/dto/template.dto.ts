@@ -1,12 +1,14 @@
 import { readNonEmptyString, readOptionalString, toNumber } from "./shared-parsers.js";
 
 export type TemplateSubcategoryInput = {
+  id?: string;
   name: string;
   plannedAmount: number;
   defaultPocketId?: string | null;
 };
 
 export type TemplateCategoryInput = {
+  id?: string;
   name: string;
   subcategories: TemplateSubcategoryInput[];
 };
@@ -47,9 +49,10 @@ export const parseTemplateInput = (payload: unknown): TemplateInput => {
       throw new Error(`Category ${categoryIndex + 1} must include subcategories.`);
     }
 
-    const rawCategory = category as { name?: unknown; subcategories: unknown[] };
+    const rawCategory = category as { id?: unknown; name?: unknown; subcategories: unknown[] };
 
     return {
+      ...(rawCategory.id !== undefined ? { id: readNonEmptyString(rawCategory.id, `Category ${categoryIndex + 1} id`) } : {}),
       name: readNonEmptyString(rawCategory.name, `Category ${categoryIndex + 1} name`),
       subcategories: rawCategory.subcategories.map((subcategory, subcategoryIndex) => {
         if (!subcategory || typeof subcategory !== "object") {
@@ -57,6 +60,7 @@ export const parseTemplateInput = (payload: unknown): TemplateInput => {
         }
 
         const rawSubcategory = subcategory as {
+          id?: unknown;
           name?: unknown;
           plannedAmount?: unknown;
           defaultPocketId?: unknown;
@@ -69,6 +73,7 @@ export const parseTemplateInput = (payload: unknown): TemplateInput => {
         }
 
         return {
+          ...(rawSubcategory.id !== undefined ? { id: readNonEmptyString(rawSubcategory.id, `Subcategory ${categoryIndex + 1}.${subcategoryIndex + 1} id`) } : {}),
           name: readNonEmptyString(rawSubcategory.name, `Subcategory ${categoryIndex + 1}.${subcategoryIndex + 1} name`),
           plannedAmount,
           defaultPocketId: readOptionalDefaultPocketId(rawSubcategory.defaultPocketId),

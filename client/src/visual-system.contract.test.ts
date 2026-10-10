@@ -288,6 +288,14 @@ describe("visual system contracts", () => {
     expect(compactRules).toContain(".template-category-disclosure > summary");
   });
 
+  it("keeps month structure rows container-safe and Template options distinct from fields", () => {
+    expect(topLevelCssBlock(".month-subcategory-fields, .month-subcategory-columns")).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));");
+    expect(topLevelCssBlock(".month-template-option label")).toContain("display: flex;");
+    expect(topLevelCssBlock(".month-template-option input")).toContain("width: auto;");
+    expect(styles).toContain(".month-subcategory-fields { grid-template-columns: 1fr; }");
+    expect(styles).toContain(".month-subcategory-columns { display: none; }");
+  });
+
   it("keeps pocket money flows, balances, and maintenance visually distinct at compact widths", () => {
     expect(topLevelCssBlock(".pockets-action-grid")).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
     expect(topLevelCssBlock(".pockets-page")).toContain("max-width: none;");
