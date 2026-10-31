@@ -1,11 +1,15 @@
 import { useId, useState } from "react";
 
+import type { ExpenseHistoryItem } from "../../../../types";
+import { ExpenseLedgerFilters, emptyExpenseLedgerFilter } from "./ExpenseLedgerFilters";
 import { Button, Card, SectionHeader } from "../../../../components/ui";
 import { formatCop } from "../../../../lib/money";
 import type { LedgerDay, LedgerViewEntry } from "../model/monthlyLedger";
 
 type MonthlyLedgerProps = {
   days: LedgerDay[];
+  expenseHistory?: ExpenseHistoryItem[];
+  expenseHistoryReady?: boolean;
   actionLabel?: (entry: LedgerViewEntry) => string;
   identityLabel?: (entry: LedgerViewEntry) => string | undefined;
   isActionable?: (entry: LedgerViewEntry) => boolean;
@@ -20,7 +24,7 @@ const eventLabels: Record<string, string> = { MONTHLY_INCOME: "Ingreso", CASH_EX
 const entityLabels: Record<string, string> = { MONTH: "Mes", SUBCATEGORY: "Subcategoría", POCKET: "Bolsillo", CASH: "Efectivo", EXTERNAL: "Externo", EXPENSE: "Gasto" };
 const directionLabels = { INFLOW: "Entrada", OUTFLOW: "Salida", TRANSFER: "Transferencia" };
 const money = formatCop;
-const time = (value: string) => new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit" }).format(new Date(value));
+const time = (value: string) => new Intl.DateTimeFormat("es-CO", { year: "numeric", month: "2-digit", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 const day = (value: string) => new Intl.DateTimeFormat("es-CO", { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
 const readOnlyReason = (entry: LedgerViewEntry, actionable: boolean, unavailableActionReason?: string) => {
   if (entry.metadata.isSystemEvent) return "Este movimiento fue generado automáticamente y no se puede editar ni eliminar.";
@@ -67,15 +71,34 @@ function SystemRun({ actionLabel, entries, isActionable, onDelete, onEdit, unava
   return <section className="monthly-ledger-system-run" data-ledger-item={entries[0].entryKey}><button aria-controls={id} aria-expanded={open} className="monthly-ledger-disclosure" onClick={() => setOpen(!open)} type="button">{count} {count === 1 ? "movimiento automático" : "movimientos automáticos"}</button>{open ? <div id={id}>{entries.map((entry) => <LedgerEntry actionLabel={actionLabel} entry={entry} isActionable={isActionable} key={entry.entryKey} onDelete={onDelete} onEdit={onEdit} unavailableActionReason={unavailableActionReason} />)}</div> : null}</section>;
 }
 
-export function MonthlyLedger({ actionLabel, days, identityLabel, isActionable, onDelete, onEdit, onRetry, status, unavailableActionReason }: MonthlyLedgerProps) {
+export function MonthlyLedger({ actionLabel, days, expenseHistory, expenseHistoryReady = true, identityLabel, isActionable, onDelete, onEdit, onRetry, status, unavailableActionReason }: MonthlyLedgerProps) {
   const [managerOpen, setManagerOpen] = useState(false);
-  const displayedDays = managerOpen ? days : previewDays(days, 5);
+  const [filters, setFilters] = useState(emptyExpenseLedgerFilter);
+  const filtering = expenseHistory !== undefined && Object.values(filters).some(Boolean);
+  const invalidRange = Boolean(filters.from && filters.to && filters.from > filters.to);
+  const expensesById = new Map(expenseHistory?.map((expense) => [expense.id, expense]));
+  const filteredDays = !filtering ? days : !expenseHistoryReady || invalidRange ? [] : days.map((ledgerDay) => ({
+    ...ledgerDay,
+    items: ledgerDay.items.filter((item) => {
+      if (item.kind !== "entry" || !["CASH_EXPENSE", "NON_CASH_EXPENSE"].includes(item.entry.eventType)) return false;
+      const expense = expensesById.get(item.entry.entryKey);
+      if (filters.from && ledgerDay.key < filters.from || filters.to && ledgerDay.key > filters.to) return false;
+      if (filters.paymentMethod && item.entry.metadata.paymentMethod !== filters.paymentMethod) return false;
+      if (filters.categoryId === "uncategorized" && (!expense || expense.category !== null)) return false;
+      if (filters.categoryId && filters.categoryId !== "uncategorized" && expense?.category?.id !== filters.categoryId) return false;
+      return !filters.subcategoryId || expense?.subcategory?.id === filters.subcategoryId;
+    }),
+  })).filter((ledgerDay) => ledgerDay.items.length > 0);
+  const displayedDays = managerOpen || filtering ? filteredDays : previewDays(filteredDays, 5);
 
   return <Card aria-label="Movimientos del mes" className={`monthly-ledger${managerOpen ? " monthly-ledger-expanded" : ""}`} role="region"><SectionHeader description="Actividad completa del mes en el orden registrado." title="Movimientos del mes" />
+    {expenseHistory !== undefined ? <ExpenseLedgerFilters expenses={expenseHistory} ready={expenseHistoryReady} value={filters} onChange={setFilters} /> : null}
+    {filtering && invalidRange ? <p role="alert">La fecha desde no puede ser posterior a la fecha hasta.</p> : null}
+    {filtering && !invalidRange && expenseHistoryReady && status === "ready" ? <p role="status">{filteredDays.length === 0 ? "No hay gastos que coincidan con los filtros." : `Gastos encontrados: ${filteredDays.reduce((count, ledgerDay) => count + ledgerDay.items.length, 0)}`}</p> : null}
     {status === "loading" || status === "refreshing" ? <p role="status">{status === "loading" ? "Cargando movimientos del mes." : "Actualizando movimientos del mes."}</p> : null}
     {status === "error" ? <div role="alert">No se pudieron cargar los movimientos del mes. {onRetry ? <Button onClick={onRetry} type="button" variant="secondary">Reintentar carga</Button> : null}</div> : null}
     {status === "ready" && days.length === 0 ? <p>No hay movimientos registrados para este mes.</p> : null}
     {displayedDays.map((ledgerDay) => <section aria-labelledby={`ledger-day-${ledgerDay.key}`} className="monthly-ledger-day" key={ledgerDay.key}><h3 id={`ledger-day-${ledgerDay.key}`}>{day(ledgerDay.key)}</h3>{ledgerDay.items.map((item, index) => item.kind === "entry" ? <div data-ledger-item={item.entry.entryKey} key={item.entry.entryKey}><LedgerEntry actionLabel={actionLabel} entry={item.entry} identityLabel={identityLabel} isActionable={isActionable} onDelete={onDelete} onEdit={onEdit} unavailableActionReason={unavailableActionReason} /></div> : <SystemRun actionLabel={actionLabel} entries={item.entries} isActionable={isActionable} key={`${item.entries[0].entryKey}-${index}`} onDelete={onDelete} onEdit={onEdit} unavailableActionReason={unavailableActionReason} />)}</section>)}
-    {days.some((ledgerDay) => ledgerDay.items.length > 0) ? <button className="manage-trigger monthly-ledger-manage-trigger" onClick={() => setManagerOpen((open) => !open)} type="button">{managerOpen ? "Ocultar gestión de movimientos" : "Ver y gestionar movimientos"}</button> : null}
+    {!filtering && days.some((ledgerDay) => ledgerDay.items.length > 0) ? <button className="manage-trigger monthly-ledger-manage-trigger" onClick={() => setManagerOpen((open) => !open)} type="button">{managerOpen ? "Ocultar gestión de movimientos" : "Ver y gestionar movimientos"}</button> : null}
   </Card>;
 }

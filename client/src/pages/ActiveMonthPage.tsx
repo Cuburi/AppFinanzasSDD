@@ -855,6 +855,9 @@ export const ActiveMonthPage = () => {
       {activeMonth ? (
         <>
           <MonthlyLedger
+            key={activeMonth.id}
+            expenseHistory={hasCurrentMonthlyExpenseHistory ? monthlyExpenseHistory : []}
+            expenseHistoryReady={hasCurrentMonthlyExpenseHistory}
             days={ledger.monthId === activeMonth.id ? buildMonthlyLedgerViewModel({ monthId: activeMonth.id, status: activeMonth.status, entries: ledger.entries }).days : []}
             actionLabel={(entry) => { const income = activeMonth.incomes.find((item) => item.id === entry.entryKey); return income ? `ingreso ${income.sourceName}` : `gasto ${entry.metadata.description ?? "sin descripción"}`; }}
             identityLabel={(entry) => { const income = activeMonth.incomes.find((item) => item.id === entry.entryKey); if (income) return `Fuente: ${income.sourceName}`; const expense = monthlyExpenseHistory.find((item) => item.id === entry.entryKey); return expense ? expense.category && expense.subcategory ? `Categoría: ${expense.category.name} / ${expense.subcategory.name}` : "Categoría: Uncategorized" : undefined; }}
