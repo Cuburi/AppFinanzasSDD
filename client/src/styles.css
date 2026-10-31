@@ -1809,15 +1809,16 @@ body {
   height: auto;
 }
 
+/* Expense capture keeps its intrinsic size when the adjacent ledger expands. */
 .dashboard-expense-capture {
-  align-self: stretch;
+  align-self: start;
 }
 
 .dashboard-expense-capture > .registration-slip {
-  align-self: stretch;
+  align-self: start;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
 }
 
 .monthly-ledger {

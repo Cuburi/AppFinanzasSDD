@@ -6,9 +6,10 @@ Use this file to capture real-use frictions and follow-up ideas before they beco
 
 - [ ] Recurring expenses.
 - [ ] Add a “use maximum available” shortcut when depositing to a pocket from a subcategory.
-- [ ] Prevent the expense registration form layout from breaking when expenses are expanded.
 
 ## Recently resolved / no longer pending
+
+- [x] Prevent the expense registration form layout from breaking when expenses are expanded. The expense form keeps its intrinsic height and draft values through ledger expansion, entry details, and collapse. Verified with Chromium at 320px and 1280px, existing expense filters, 21 visual contracts, TypeScript, and production build. Full client suite was not rerun after its earlier timeout. Native read-only assessment subsequently passed with explicit intended-untracked scope: medium risk, 10 paths / 320 changed lines, review not due (under budget).
 
 - [x] Add filters for the expense list and clearly show the date each expense occurred, not just the time. Verified with 66 focused tests, TypeScript, production build, and a Chromium browser test at 320px and 1280px. Full client suite timed out. Native read-only assessment subsequently passed with explicit intended-untracked scope: medium risk, 10 paths / 320 changed lines, review not due (under budget).
 

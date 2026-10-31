@@ -199,10 +199,10 @@ describe("visual system contracts", () => {
     expect(styles).toContain(".expense-capture-form .expense-category-fields,\n  .expense-capture-form .registration-slip-supporting-fields {\n    grid-template-columns: 1fr;");
   });
 
-  it("keeps the expense card stretched so its primary CTA aligns with the ledger CTA", () => {
-    expect(effectiveDeclaration(styles, ".dashboard-expense-capture", "align-self")).toBe("stretch");
-    expect(effectiveDeclaration(styles, ".dashboard-expense-capture > .registration-slip", "height")).toBe("100%");
-    expect(effectiveDeclaration(styles, ".dashboard-expense-capture > .registration-slip", "align-self")).toBe("stretch");
+  it("keeps expense capture intrinsically sized independently of ledger expansion", () => {
+    expect(effectiveDeclaration(styles, ".dashboard-expense-capture", "align-self")).toBe("start");
+    expect(effectiveDeclaration(styles, ".dashboard-expense-capture > .registration-slip", "height")).toBe("auto");
+    expect(effectiveDeclaration(styles, ".dashboard-expense-capture > .registration-slip", "align-self")).toBe("start");
     expect(effectiveDeclaration(styles, ".dashboard-expense-capture > .registration-slip", "display")).toBe("flex");
     expect(effectiveDeclaration(styles, ".dashboard-expense-capture > .registration-slip", "flex-direction")).toBe("column");
     expect(topLevelCssBlock(".expense-capture-form")).toContain("display: flex;");
