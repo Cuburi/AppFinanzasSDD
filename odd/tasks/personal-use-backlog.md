@@ -6,10 +6,11 @@ Use this file to capture real-use frictions and follow-up ideas before they beco
 
 - [ ] Recurring expenses.
 - [ ] Add a “use maximum available” shortcut when depositing to a pocket from a subcategory.
-- [ ] Add filters for the expense list.
 - [ ] Prevent the expense registration form layout from breaking when expenses are expanded.
 
 ## Recently resolved / no longer pending
+
+- [x] Add filters for the expense list and clearly show the date each expense occurred, not just the time. Verified with 66 focused tests, TypeScript, production build, and a Chromium browser test at 320px and 1280px. Full client suite timed out. Native read-only assessment subsequently passed with explicit intended-untracked scope: medium risk, 10 paths / 320 changed lines, review not due (under budget).
 
 - [x] Active Month layout regression.
 - [x] Basic COP amount normalization and formatting.
