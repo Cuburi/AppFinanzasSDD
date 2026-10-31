@@ -231,6 +231,12 @@ Ejemplos del dominio:
 
 El mes activo expone saldos calculados por backend: ingresos del mes, dinero disponible y efectivo físico. El efectivo no se guarda como saldo mutable; se deriva de movimientos de retiro, arrastre y gastos pagados en efectivo.
 
+### Filtros del historial en Mes activo
+
+En **Movimientos del mes**, los filtros de gastos se pueden combinar por rango de fechas (`Desde` / `Hasta`, ambos inclusive), categoría, subcategoría y medio de pago (efectivo o no efectivo). La opción **Sin categoría** permite encontrar gastos no clasificados; al cambiar de categoría se limpia la subcategoría seleccionada.
+
+Sin filtros se mantiene el historial completo, incluidos ingresos y otros movimientos. Con algún filtro activo se muestran todos los gastos coincidentes, sin el límite de la vista reciente. **Limpiar filtros** restaura el historial completo. Cada movimiento muestra fecha y hora de ocurrencia en la zona horaria del dispositivo, la misma usada para agrupar y filtrar por día. Los filtros son locales: no modifican gastos, saldos ni presupuestos. Se habilitan cuando termina de cargar el historial de gastos y se reinician al cambiar de mes.
+
 ### Endpoints principales
 
 | Endpoint | Semántica |

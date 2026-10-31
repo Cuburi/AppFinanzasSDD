@@ -829,6 +829,19 @@ body { background: var(--color-bg); }
 }
 
 /* Canonical ledger stays structural: ruled rows, semantic states, and stable actions. */
+.expense-ledger-filters {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  margin: 0;
+  min-width: 0;
+  padding: var(--space-3);
+}
+.expense-ledger-filters .field { min-width: 0; }
+.expense-ledger-filters input,
+.expense-ledger-filters select { box-sizing: border-box; min-width: 0; width: 100%; }
 .monthly-ledger { display: grid; gap: var(--space-4); }
 .monthly-ledger-day { border-top: 1px solid var(--color-border-strong); display: grid; min-width: 0; }
 .monthly-ledger-day h3 { font-size: 1rem; margin: var(--space-3) 0 var(--space-1); }
@@ -1796,15 +1809,16 @@ body {
   height: auto;
 }
 
+/* Expense capture keeps its intrinsic size when the adjacent ledger expands. */
 .dashboard-expense-capture {
-  align-self: stretch;
+  align-self: start;
 }
 
 .dashboard-expense-capture > .registration-slip {
-  align-self: stretch;
+  align-self: start;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
 }
 
 .monthly-ledger {

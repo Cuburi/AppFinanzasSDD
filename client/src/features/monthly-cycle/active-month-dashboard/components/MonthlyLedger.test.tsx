@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -33,6 +33,50 @@ const days: LedgerDay[] = [{
 afterEach(cleanup);
 
 describe("MonthlyLedger", () => {
+  it("combines inclusive expense filters, excludes other movements, and restores the full ledger on reset", async () => {
+    const user = userEvent.setup();
+    const history = [
+      { id: "cash", occurredAt: "2026-08-02T14:30:00Z", amount: 12000, description: "Cash food", paymentMethod: "CASH" as const, creditCardId: null, category: { id: "food", name: "Alimentación" }, subcategory: { id: "market", name: "Mercado" } },
+      { id: "card", occurredAt: "2026-08-03T14:30:00Z", amount: 12000, description: "Card food", paymentMethod: "NON_CASH" as const, creditCardId: null, category: { id: "food", name: "Alimentación" }, subcategory: { id: "restaurant", name: "Restaurantes" } },
+      { id: "other", occurredAt: "2026-08-04T14:30:00Z", amount: 12000, description: "Other expense", paymentMethod: "CASH" as const, creditCardId: null, category: null, subcategory: null },
+    ];
+    const filterDays: LedgerDay[] = history.map((expense) => ({ key: expense.occurredAt.slice(0, 10), items: [{ kind: "entry", entry: entry(expense.id, expense.paymentMethod === "CASH" ? "CASH_EXPENSE" : "NON_CASH_EXPENSE", { occurredAt: expense.occurredAt, metadata: { description: expense.description, paymentMethod: expense.paymentMethod, isSystemEvent: false } }) }] }));
+    filterDays[0].items.unshift({ kind: "entry", entry: entry("income", "MONTHLY_INCOME", { metadata: { description: "Salary", paymentMethod: null, isSystemEvent: false } }) });
+    render(<MonthlyLedger days={filterDays} expenseHistory={history} status="ready" />);
+    expect(screen.getByText("Salary")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-08-02" } });
+    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-08-03" } });
+    expect(screen.queryByText("Salary")).not.toBeInTheDocument();
+    expect(screen.queryByText("Other expense")).not.toBeInTheDocument();
+    expect(screen.getByText("Cash food")).toBeInTheDocument();
+    expect(screen.getByText("Card food")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Filtrar por categoría"), "food");
+    await user.selectOptions(screen.getByLabelText("Filtrar por subcategoría"), "market");
+    expect(screen.queryByText("Card food")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Filtrar por medio de pago"), "NON_CASH");
+    expect(screen.getByText("No hay gastos que coincidan con los filtros.")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Filtrar por categoría"), "");
+    expect(screen.getByLabelText("Filtrar por subcategoría")).toHaveValue("");
+    expect(screen.getByText("Card food")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Limpiar filtros" }));
+    expect(screen.getByText("Salary")).toBeInTheDocument();
+    expect(screen.getByText("Other expense")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Filtrar por categoría"), "uncategorized");
+    expect(screen.getByText("Other expense")).toBeInTheDocument();
+    expect(screen.queryByText("Cash food")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-08-05" } });
+    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-08-01" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("La fecha desde no puede ser posterior a la fecha hasta.");
+    expect(screen.queryByText("Other expense")).not.toBeInTheDocument();
+  });
+
+  it("keeps expense filters disabled until classification data is available", () => {
+    render(<MonthlyLedger days={days} expenseHistory={[]} expenseHistoryReady={false} status="ready" />);
+    expect(screen.getByLabelText("Filtrar por categoría")).toBeDisabled();
+    expect(screen.getByText("Market groceries")).toBeInTheDocument();
+    expect(screen.getByText("Los filtros estarán disponibles cuando se cargue el historial de gastos.")).toBeInTheDocument();
+  });
+
   it("does not present an empty ledger while its first load is pending", () => {
     render(<MonthlyLedger days={[]} status="loading" />);
 
@@ -70,7 +114,8 @@ describe("MonthlyLedger", () => {
       render(<MonthlyLedger days={colombianDay} status="ready" />);
 
       expect(screen.getByRole("heading", { name: "1 de agosto de 2026" })).toBeInTheDocument();
-      expect(screen.getByText("7:30 p. m.")).toBeInTheDocument();
+      expect(document.querySelector("time")).toHaveTextContent("1/08/2026");
+      expect(document.querySelector("time")).toHaveTextContent("7:30 p. m.");
       expect(document.querySelector("time")).toHaveAttribute("dateTime", "2026-08-02T00:30:00.000Z");
     } finally {
       process.env.TZ = originalTimeZone;
