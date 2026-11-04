@@ -2,6 +2,18 @@
 
 El cierre revisa gastos, efectivo y diferencias de presupuesto antes de elegir el destino del disponible real. Los saldos positivos de categorías son informativos, no dinero adicional. Los déficits de categorías deben cubrirse y el disponible no puede ser negativo.
 
+## Pantalla de cierre
+
+La ruta `/close-month` ofrece tres pasos: **Revisar → Destino → Confirmar**, con progreso lateral en escritorio y horizontal en móvil. Los paneles comparten tamaño intrínseco sin mostrar ni enfocar pasos inactivos. El detalle nativo de efectivo, bolsillos y presupuesto se cierra al avanzar de revisión a destino. Volver conserva la selección y los textos de división mientras no se refresque la revisión.
+
+**Revisar** muestra saldo inicial + ingresos − salidas netas = disponible real. Las salidas netas se reconcilian desde los saldos del backend: incluyen retiros de efectivo y depósitos a bolsillos con sus ajustes, no solo gastos. El efectivo físico y el margen del presupuesto son contexto, nunca sumandos adicionales. Los desfalcos conservan la cobertura desde otra subcategoría; la disponibilidad negativa exige corregir movimientos antes de avanzar.
+
+**Destino** solo despliega campos al dividir. Escribí números completos sin separadores de miles, con punto decimal opcional y hasta dos decimales. No se aceptan negativos, exponentes, NaN, infinito, prefijos numéricos con texto ni sumas incorrectas. Se comparan centavos enteros exactos antes de habilitar el siguiente paso. Con disponible cero no hace falta elegir una distribución.
+
+**Confirmar** presenta ambos destinos y el total antes de la acción financiera irreversible. Durante el envío se bloquean acciones duplicadas. Si falla el cierre, se vuelve a consultar el estado persistido y se exige revisar los nuevos totales; si también falla la consulta, se conservan ambos errores y no se permite cerrar con la revisión anterior. Refrescar permite reintentar las consultas fallidas.
+
+El cierre correcto guarda su identidad en `?closedMonthId=…` mediante el historial del navegador, sin localStorage. Al recargar se consulta ese mes exacto antes de buscar el activo; una identidad o estado incompatible se muestra como error, nunca como otro cierre. Sin selector se busca el activo o el último cerrado. Los cierres antiguos indican que no tienen distribución registrada. Abrir el siguiente mes limpia el selector y muestra el saldo inicial devuelto por la API separado de ingresos, incluso si falla la posterior revisión.
+
 ## Destino del sobrante
 
 - **Pasar todo al siguiente mes:** `carryAmount` igual al disponible, `excludedAmount: 0`.

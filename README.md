@@ -255,6 +255,14 @@ Reglas clave:
 - `EXPENSE` con `paymentMethod: "NON_CASH"` baja la subcategoría y el dinero disponible.
 - Al abrir un mes nuevo, el efectivo positivo remanente del último mes cerrado se arrastra como efectivo inicial.
 
+## Cierre mensual guiado
+
+En **Cierre**, seguí **Revisar → Destino → Confirmar**. La revisión separa saldo inicial, ingresos y salidas netas reales del presupuesto planeado. El detalle de efectivo, bolsillos y presupuesto se colapsa automáticamente al avanzar; volver conserva el destino y los montos elegidos.
+
+Podés pasar todo el sobrante al siguiente mes, dejarlo fuera del seguimiento o dividirlo. Solo la división muestra campos: montos COP no negativos con hasta dos decimales (punto decimal, sin separadores de miles), cuya suma debe coincidir exactamente con el disponible. El traspaso es saldo inicial, no ingreso nuevo; lo excluido queda en el historial del cierre, no como gasto. El efectivo físico se arrastra por separado y no se suma otra vez al disponible.
+
+Los desfalcos y el disponible negativo bloquean el cierre; un disponible cero permite confirmar sin distribución. **Confirmar cierre** deja el mes de solo lectura. El resultado se recupera al recargar mediante `closedMonthId` en la URL, y desde allí podés abrir el mes siguiente. Si una operación falla, revisá el error y refrescá antes de continuar con datos desactualizados. [Reglas y contrato HTTP](docs/product/monthly-closure.md).
+
 ## Nota de aprendizaje
 
 Este repositorio está pensado como proyecto de aprendizaje técnico. Las decisiones se documentan de forma incremental para entender no solo qué se implementa, sino por qué se implementa de esa manera.
