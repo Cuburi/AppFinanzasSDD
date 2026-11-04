@@ -231,6 +231,8 @@ Ejemplos del dominio:
 
 El mes activo expone saldos calculados por backend: ingresos del mes, dinero disponible y efectivo físico. El efectivo no se guarda como saldo mutable; se deriva de movimientos de retiro, arrastre y gastos pagados en efectivo.
 
+Al registrar gastos, la fecha seleccionada se envía con la hora real y el desfase horario local explícito. El mes vinculado se valida con ese calendario local, incluso al final del mes cuando el instante UTC ya cae en el mes siguiente. Se conserva el instante real almacenado; una corrección sin cambiar la fecha de ese gasto conserva ese instante. Las entradas antiguas con `Z` o solo fecha mantienen la validación UTC. Esto no cambia las reglas de retiros, depósitos ni los períodos UTC de las tarjetas.
+
 ### Filtros del historial en Mes activo
 
 En **Movimientos del mes**, los filtros de gastos se pueden combinar por rango de fechas (`Desde` / `Hasta`, ambos inclusive), categoría, subcategoría y medio de pago (efectivo o no efectivo). La opción **Sin categoría** permite encontrar gastos no clasificados; al cambiar de categoría se limpia la subcategoría seleccionada.
