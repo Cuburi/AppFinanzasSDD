@@ -30,9 +30,9 @@ export const assertMonthIsMutable = (month: MonthRecord) => {
   }
 };
 
-export const lockMutableMonthForMutation = async (months: Pick<MonthRepositoryPort, "lockForMutation">, monthId: string): Promise<MonthRecord> => {
+export const lockMutableMonthForMutation = async (months: Pick<MonthRepositoryPort, "lockForMutation">, monthId: string, allowClosedRetry = false): Promise<MonthRecord> => {
   const month = await months.lockForMutation(monthId);
-  assertMonthIsMutable(month);
+  if (!allowClosedRetry) assertMonthIsMutable(month);
   return month;
 };
 
