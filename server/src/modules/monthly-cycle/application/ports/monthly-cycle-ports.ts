@@ -1,4 +1,4 @@
-import type { ExpenseHistoryQueryInput, TemplateInput } from "../../dto/index.js";
+import type { CloseMonthInput, ExpenseHistoryQueryInput, TemplateInput } from "../../dto/index.js";
 import type { MonthlyCycleMoney } from "../../shared/money.js";
 import type { MonthRecord, MonthlyIncomeRecord, TemplateCategoryRecord } from "../../shared/service-types.js";
 import type { MonthStatus as MonthlyCycleMonthStatus, MovementType as MonthlyCycleMovementType, PaymentMethod as MonthlyCyclePaymentMethod } from "../monthly-cycle-types.js";
@@ -24,6 +24,8 @@ export type ActiveMonthSummary = { id: string; year: number; month: number };
 
 export interface MonthRepositoryPort {
   findActive(): Promise<MonthRecord | null>;
+  findLatestClosed(): Promise<MonthRecord | null>;
+  findOpeningRecipient(sourceMonthId: string): Promise<MonthRecord | null>;
   findActiveSummary(status: MonthlyCycleMonthStatus): Promise<ActiveMonthSummary | null>;
   findById(monthId: string): Promise<MonthRecord>;
   lockForMutation(monthId: string): Promise<MonthRecord>;
@@ -34,8 +36,10 @@ export interface MonthRepositoryPort {
     month: number;
     status: MonthlyCycleMonthStatus;
     template: TemplateCategoryRecord[];
+    openingBalance?: MonthlyCycleMoney;
+    openingSourceMonthId?: string | null;
   }): Promise<MonthRecord>;
-  close(monthId: string): Promise<MonthRecord>;
+  close(monthId: string, allocation?: CloseMonthInput): Promise<MonthRecord>;
 }
 
 export interface TemplateRepositoryPort {

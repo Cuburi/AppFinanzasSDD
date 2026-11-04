@@ -238,7 +238,7 @@ test("unchanged expense instants still require ownership and changed wrong-month
   await assert.rejects(() => useCases.updateExpense(input), { statusCode: 404, message: "Expense was not found in this month." });
   setStoredExpense({ id: "expense-1", type: MovementType.EXPENSE, monthId: "month-1", occurredAt: new Date(occurredAt) });
   await assert.rejects(() => useCases.updateExpense({ ...input, occurredAt: "2026-11-01T02:00:00.000Z" }), { statusCode: 400, message: "Expense date must be inside the linked month." });
-  assert.deepEqual(updated, []);
+  assert.equal(updated.length, 0);
   await useCases.updateExpense(input);
   assert.equal(updated[0]!.occurredAt.toISOString(), occurredAt);
 });

@@ -1,4 +1,5 @@
 import { toNumber } from "./shared-parsers.js";
+import type { ClosureAllocationView } from "./closure.dto.js";
 import type { MonthlyIncomeView } from "./incomes.dto.js";
 
 export type MonthSubcategoryView = {
@@ -29,6 +30,9 @@ export type MonthView = {
   incomes: MonthlyIncomeView[];
   monthlyIncomeTotal: number;
   availableMoney: number;
+  openingBalance?: number;
+  openingSourceMonthId?: string | null;
+  closureAllocation?: ClosureAllocationView | null;
   cashBalance: number;
   categories: MonthCategoryView[];
 };

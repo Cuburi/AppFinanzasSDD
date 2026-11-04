@@ -37,6 +37,10 @@ type MonthState = {
   status: MonthStatus;
   openedAt: Date;
   closedAt: Date | null;
+  openingBalance?: Prisma.Decimal;
+  openingSourceMonthId?: string | null;
+  closureCarryAmount?: Prisma.Decimal | null;
+  closureExcludedAmount?: Prisma.Decimal | null;
   incomes: Array<{
     id: string;
     monthId: string;
@@ -251,8 +255,12 @@ const createIntegrationDb = (
       },
     },
     month: {
-      async findFirst(args: { where?: { status?: MonthStatus }; select?: unknown }) {
-        const found = months.find((month) => !args.where?.status || month.status === args.where.status) ?? null;
+      async findFirst(args: { where?: { status?: MonthStatus; OR?: [{ year: { lt: number } }, { year: number; month: { lt: number } }]; openingSourceMonthId?: string }; select?: unknown; orderBy?: unknown }) {
+        const candidates = months.filter((month) => (!args.where?.status || month.status === args.where.status) &&
+          (!args.where?.openingSourceMonthId || month.openingSourceMonthId === args.where.openingSourceMonthId) &&
+          (!args.where?.OR || month.year < args.where.OR[0].year.lt || (month.year === args.where.OR[1].year && month.month < args.where.OR[1].month.lt)));
+        if (args.orderBy) candidates.sort((a, b) => b.year - a.year || b.month - a.month);
+        const found = candidates[0] ?? null;
         if (!found) return null;
 
         if (args.select) {
@@ -278,6 +286,8 @@ const createIntegrationDb = (
           year: number;
           month: number;
           status: MonthStatus;
+          openingBalance?: Prisma.Decimal;
+          openingSourceMonthId?: string | null;
           categories: {
             create: Array<{
               name: string;
@@ -301,6 +311,10 @@ const createIntegrationDb = (
           year: args.data.year,
           month: args.data.month,
           status: args.data.status,
+          openingBalance: args.data.openingBalance ?? money(0),
+          openingSourceMonthId: args.data.openingSourceMonthId ?? null,
+          closureCarryAmount: null,
+          closureExcludedAmount: null,
           openedAt: new Date("2026-05-01T00:00:00.000Z"),
           closedAt: null,
           incomes: [],
@@ -324,12 +338,11 @@ const createIntegrationDb = (
         months.push(month);
         return cloneMonth(month);
       },
-      async update(args: { where: { id: string }; data: { status: MonthStatus; closedAt: Date } }) {
+      async update(args: { where: { id: string }; data: { status: MonthStatus; closedAt: Date; closureCarryAmount?: Prisma.Decimal; closureExcludedAmount?: Prisma.Decimal } }) {
         const found = months.find((month) => month.id === args.where.id);
         if (!found) throw new Error("Month missing in integration stub.");
 
-        found.status = args.data.status;
-        found.closedAt = args.data.closedAt;
+        Object.assign(found, args.data);
         return cloneMonth(found);
       },
     },

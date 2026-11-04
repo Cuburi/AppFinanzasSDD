@@ -45,6 +45,10 @@ export type MonthRecord = {
   status: MonthStatus;
   openedAt: Date;
   closedAt: Date | null;
+  openingBalance?: MonthlyCycleMoney;
+  openingSourceMonthId?: string | null;
+  closureCarryAmount?: MonthlyCycleMoney | null;
+  closureExcludedAmount?: MonthlyCycleMoney | null;
   incomes?: Array<{
     id: string;
     monthId: string;
@@ -134,6 +138,8 @@ export type MonthlyCycleDb = {
         year: number;
         month: number;
         status: MonthStatus;
+        openingBalance?: MonthlyCycleMoney;
+        openingSourceMonthId?: string | null;
         categories: {
           create: Array<{
             name: string;
@@ -156,7 +162,7 @@ export type MonthlyCycleDb = {
     }): Promise<MonthRecord>;
     update(args: {
       where: { id: string };
-      data: { status: MonthStatus; closedAt: Date };
+      data: { status: MonthStatus; closedAt: Date; closureCarryAmount?: MonthlyCycleMoney; closureExcludedAmount?: MonthlyCycleMoney };
       include: typeof monthInclude;
     }): Promise<MonthRecord>;
   };
