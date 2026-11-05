@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { Card, KpiCard, SectionHeader, StatusPill } from "../components/ui";
+import { Card, FeedbackBanner, KpiCard, SectionHeader, StatusPill } from "../components/ui";
 import { api } from "../lib/api";
 import type { BasicMonthlyReport, BasicReportSubcategory, Month } from "../types";
 
@@ -80,7 +80,7 @@ export const ReportsPage = () => {
   }
 
   if (error) {
-    return <p role="alert" className="error">{error}</p>;
+    return <FeedbackBanner tone="error">{error}</FeedbackBanner>;
   }
 
   if (!activeMonth || !report) {

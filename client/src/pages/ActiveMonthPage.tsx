@@ -3,7 +3,7 @@ import type { CSSProperties, PointerEvent } from "react";
 
 import { api } from "../lib/api";
 import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
-import { Button, Card, StatusPill } from "../components/ui";
+import { Button, Card, FeedbackBanner, StatusPill } from "../components/ui";
 import { ActiveMonthDashboard } from "../features/monthly-cycle/active-month-dashboard/components/ActiveMonthDashboard";
 import { RegistrationSlip } from "../features/monthly-cycle/active-month-dashboard/components/RegistrationSlip";
 import { MonthlyLedger } from "../features/monthly-cycle/active-month-dashboard/components/MonthlyLedger";
@@ -857,7 +857,7 @@ export const ActiveMonthPage = () => {
   const expenseCapture = activeMonth ? (
     <RegistrationSlip
       actions={<><Button disabled={submitting || !canMutateActiveMonth} type="submit">{expenseSubmitting ? editingExpenseId ? "Guardando corrección..." : "Guardando gasto..." : editingExpenseId ? "Guardar corrección" : "Registrar gasto"}</Button>{editingExpenseId ? <Button variant="secondary" disabled={submitting} onClick={() => resetExpenseForm()} type="button">Cancelar corrección</Button> : null}</>}
-      feedback={<>{expenseFeedback ? <p className={expenseFeedback.kind} role={expenseFeedback.kind === "error" ? "alert" : "status"}>{expenseFeedback.text}</p> : null}{!canMutateActiveMonth ? <p className="error">El mes está cerrado: los gastos son de solo lectura.</p> : null}</>}
+      feedback={<>{expenseFeedback ? <FeedbackBanner tone={expenseFeedback.kind}>{expenseFeedback.text}</FeedbackBanner> : null}{!canMutateActiveMonth ? <FeedbackBanner live={false} title="Mes cerrado" tone="error">El mes está cerrado: los gastos son de solo lectura.</FeedbackBanner> : null}</>}
       formClassName="expense-capture-form"
       formId="expense-form"
       mode={editingExpenseId ? "edit" : "create"}
@@ -874,8 +874,8 @@ export const ActiveMonthPage = () => {
   return (
     <ActiveMonthDashboard expenseContent={expenseCapture} financialContent={financialSummary} input={openMonthInput} onInputChange={setOpenMonthInput} onOpenMonth={(input) => void handleOpenMonth(input)} onRefresh={() => void refresh()} onRetry={() => void dashboard.refresh()} onRetryOpenMonth={(input) => void handleOpenMonth(input)} onRetrySupport={(source) => void dashboard.retrySupport(source)} pending={submitting} viewModel={dashboard.viewModel}>
     <section className="page stack-lg">
-      {message ? <p className="success">{message}</p> : null}
-      {error ? <p className="error" role="alert">{error}</p> : null}
+      {message ? <FeedbackBanner tone="success">{message}</FeedbackBanner> : null}
+      {error ? <FeedbackBanner tone="error">{error}</FeedbackBanner> : null}
 
       {activeMonth ? (
         <>
@@ -907,17 +907,17 @@ export const ActiveMonthPage = () => {
               ? "No se puede editar ni eliminar este gasto hasta que se actualice el historial de gastos del mes."
               : undefined}
           />
-          {creditCardLoadError ? <p className="error" role="alert">{creditCardLoadError}</p> : null}
+          {creditCardLoadError ? <FeedbackBanner tone="error">{creditCardLoadError}</FeedbackBanner> : null}
           <section aria-label="Acciones secundarias" className="secondary-action-strip">
             <Button disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("income")} type="button" variant="secondary">Registrar ingreso</Button>
             <Button disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("withdrawal")} type="button" variant="secondary">Retirar efectivo</Button>
             <Button aria-label="Depositar en bolsillo" disabled={!canMutateActiveMonth || submitting} onClick={() => openSecondaryForm("deposit")} type="button" variant="secondary">Depositar bolsillo</Button>
           </section>
-          {incomeFeedback && secondaryForm !== "income" ? <p className={incomeFeedback.kind} role={incomeFeedback.kind === "error" ? "alert" : "status"}>{incomeFeedback.text}</p> : null}
-          {!canMutateActiveMonth ? <p className="error">El mes está cerrado: los movimientos son de solo lectura.</p> : null}
+          {incomeFeedback && secondaryForm !== "income" ? <FeedbackBanner tone={incomeFeedback.kind}>{incomeFeedback.text}</FeedbackBanner> : null}
+          {!canMutateActiveMonth ? <FeedbackBanner live={false} title="Mes cerrado" tone="error">El mes está cerrado: los movimientos son de solo lectura.</FeedbackBanner> : null}
           {secondaryForm === "income" && canMutateActiveMonth ? <div className="secondary-form-panel"><RegistrationSlip
             actions={<><Button disabled={submitting} type="submit">{incomeSubmitting ? editingIncomeId ? "Actualizando ingreso..." : "Guardando ingreso..." : editingIncomeId ? "Actualizar ingreso" : "Registrar ingreso"}</Button><Button variant="secondary" disabled={submitting} onClick={() => resetIncomeForm()} type="button">{editingIncomeId ? "Cancelar edición de ingreso" : "Cancelar ingreso"}</Button></>}
-            feedback={incomeFeedback ? <p className={incomeFeedback.kind} role={incomeFeedback.kind === "error" ? "alert" : "status"}>{incomeFeedback.text}</p> : null}
+            feedback={incomeFeedback ? <FeedbackBanner tone={incomeFeedback.kind}>{incomeFeedback.text}</FeedbackBanner> : null}
             formClassName="income-capture-form" mode={editingIncomeId ? "edit" : "create"} onSubmit={handleIncome}
             primaryFields={<><label className="field income-source-field"><span>Fuente del ingreso</span><input ref={incomeSourceInputRef} value={incomeSourceName} onChange={(event) => setIncomeSourceName(event.target.value)} required /></label><label className="field income-amount-field"><span>Monto</span><input min="0.01" step="0.01" type="number" value={incomeAmount} onChange={(event) => setIncomeAmount(normalizeAmountInput(event.target.value))} required /></label></>}
             purpose="Entrada del mes" slipRef={incomeSlipRef}
@@ -1019,7 +1019,7 @@ export const ActiveMonthPage = () => {
                 </form>
               </section>
             ) : (
-              <p className="error">El mes está cerrado: la estructura es de solo lectura y no se pueden crear categorías ni subcategorías.</p>
+              <FeedbackBanner live={false} title="Mes cerrado" tone="error">El mes está cerrado: la estructura es de solo lectura y no se pueden crear categorías ni subcategorías.</FeedbackBanner>
             )}
 
           </>

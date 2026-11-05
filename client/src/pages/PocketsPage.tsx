@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
 import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
-import { Button, Card, SectionHeader, StatusPill } from "../components/ui";
+import { Button, Card, FeedbackBanner, SectionHeader, StatusPill } from "../components/ui";
 import type { PocketListFilter, SavingsPocket } from "../types";
 import { PocketRecentMovements } from "../features/pockets/components/PocketRecentMovements";
 
@@ -384,8 +384,8 @@ export const PocketsPage = () => {
         </Card>
       </div>
 
-      {message ? <p className="success">{message}</p> : null}
-      {error ? <div className="stack-sm" role="alert"><p className="error">{error}</p><Button onClick={() => void retryPockets()} type="button" variant="tertiary">Reintentar bolsillos</Button></div> : null}
+      {message ? <FeedbackBanner tone="success">{message}</FeedbackBanner> : null}
+      {error ? <div className="stack-sm" role="alert"><FeedbackBanner live={false} tone="error">{error}</FeedbackBanner><Button onClick={() => void retryPockets()} type="button" variant="tertiary">Reintentar bolsillos</Button></div> : null}
 
       <Card aria-label="Listado de bolsillos" className="stack-md">
         <div className="row between wrap">

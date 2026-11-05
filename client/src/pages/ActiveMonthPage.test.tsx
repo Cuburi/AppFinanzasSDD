@@ -708,7 +708,7 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     expect(await screen.findByRole("region", { name: "Efectivo físico" })).toHaveTextContent("$80 COP");
-    expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1");
+    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1"));
     expect(await screen.findByText("Café")).toBeInTheDocument();
     expect(await screen.findByRole("region", { name: "Movimientos del mes" })).toHaveTextContent("Café");
   });
