@@ -11,7 +11,10 @@ const assertIsolatedDev = () => {
   assert.ok(["localhost", "127.0.0.1"].includes(url.hostname));
   assert.equal(url.port, "5433");
   assert.equal(url.pathname, "/appfinanzas_dev");
-  assert.match(url.searchParams.get("schema") ?? "", /^guided_closure_t1_[a-z0-9_]+$/);
+  // These tests reset the Template, so locally they need a disposable schema; CI uses an ephemeral database.
+  const schema = url.searchParams.get("schema") ?? "";
+  if (process.env.CI === "true" && schema === "public") return;
+  assert.match(schema, /^guided_closure_t1_[a-z0-9_]+$/);
 };
 test.after(() => prisma.$disconnect());
 
