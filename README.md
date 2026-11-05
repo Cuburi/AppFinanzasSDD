@@ -26,7 +26,6 @@ Los artefactos existentes en `openspec/` se conservan como referencia histórica
 ├── prisma/                 # Schema y migraciones Prisma
 ├── scripts/                # Scripts de desarrollo
 ├── alcance.md              # Problema, solución y funcionalidades
-├── plan-implementacion.md  # Plan incremental
 ├── tech-stack.md           # Stack técnico propuesto
 └── user-stories.md         # Historias de usuario
 ```
