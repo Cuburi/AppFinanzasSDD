@@ -691,6 +691,9 @@ body { background: var(--color-bg); }
 .registration-slip-primary-fields, .registration-slip-supporting-fields { display: grid; gap: var(--space-3); min-width: 0; }
 .registration-slip-primary-fields { border-bottom: 1px solid var(--color-border-strong); padding-bottom: var(--space-3); }
 .registration-slip-primary-fields .field { min-width: 0; }
+.registration-slip-primary-fields .deposit-amount-group { align-content: start; display: grid; gap: var(--space-2); min-width: 0; }
+.registration-slip-primary-fields .deposit-maximum-button { justify-self: start; }
+.registration-slip-primary-fields:has(.deposit-amount-group) { align-items: start; }
 .registration-slip-primary-fields .field > span { color: var(--color-text); font-weight: 650; }
 .registration-slip-supporting-fields { border-bottom: 1px solid var(--color-border); grid-template-columns: repeat(2, minmax(0, 1fr)); padding-bottom: var(--space-3); }
 .registration-slip-supporting-fields .field { min-width: 0; }

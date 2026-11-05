@@ -5,8 +5,6 @@ Use this file to capture real-use frictions and follow-up ideas before they beco
 ## Inbox
 
 - [ ] Recurring expenses.
-- [ ] Add a “use maximum available” shortcut when depositing to a pocket from a subcategory.
-- [ ] Make the pocket-deposit amount field consistent in size with the other form fields; the user reports it is smaller.
 - [ ] Improve success and error feedback beyond plain colored text.
 - [ ] Improve the credit-card screen and logic after reviewing its current capabilities and defining the desired changes.
 
@@ -20,6 +18,8 @@ Additional report: "Me falto algo, el hacer un deposito a un bolsillo el campo d
 4. "Mejorar pantalla de cierre de mes y lógica porque no se si siempre convenga que el mes quede en 0, me refiero si me sobro plata pero que no ira a ningun bolsillo"
 
 ## Recently resolved / no longer pending
+
+- [x] Pocket deposit form: amount field at full field width (withdrawal amount too) and a “Usar máximo disponible” shortcut that fills the selected subcategory or month available amount without saving. Issue #223, PR #224. Client 267/267, TypeScript, build, Playwright 8/8 and Chromium 1440/320 passed; CI green.
 
 - [x] Implement guided monthly closure with carry-all, exclude-all or exact split of surplus, persisted closure history and one-time opening balance distinct from income; preserve physical cash separately. Approved artboard: `design/monthly-closure/02-guided.html`; implementation/evidence: `odd/tasks/guided-monthly-closure.md`. Full server 353/353, full client suite, TypeScript/build and Chromium 1440/320 passed. Independent verification PASS: 50 focused tests, 15 PostgreSQL/HTTP probe groups and 19 baseline response comparisons; no blockers. Canvas handoff implemented. Delivered on `feat/guided-monthly-closure` in four commits; native review approved the three code commits with exact acknowledgement, and the evidence-only commit was approved but its acknowledgement was blocked by a review-tool defect (accepted by user disposition). No personal database migration.
 
