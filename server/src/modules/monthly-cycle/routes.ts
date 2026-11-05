@@ -19,6 +19,7 @@ import {
   type UpdateMonthlyIncomeInput,
   parseCreateMonthlyIncomeInput,
   parseClosureActionInput,
+  parseCloseMonthInput,
   parseCreateMonthCategoryInput,
   parseCreateMonthSubcategoryInput,
   parseCashSummaryInput,
@@ -117,6 +118,18 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
   router.get("/months/active", async (_request, response) => {
     const month = await service.getActiveMonth();
     response.json({ month });
+  });
+
+  router.get("/months/latest-closed", async (_request, response) => {
+    response.json({ month: await service.getLatestClosedMonth() });
+  });
+
+  router.get("/months/:id", async (request, response) => {
+    try {
+      response.json(await service.getMonth(request.params.id));
+    } catch (error) {
+      response.status(isDomainError(error) ? error.statusCode : 400).json({ message: readMessage(error) });
+    }
   });
 
   router.post("/months/:id/expenses", async (request, response) => {
@@ -438,7 +451,10 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
 
   router.post("/months/:id/close", async (request, response) => {
     try {
-      const month = await service.closeMonth(request.params.id);
+      const allocation = parseCloseMonthInput(request.body);
+      const month = allocation
+        ? await service.closeMonth(request.params.id, allocation)
+        : await service.closeMonth(request.params.id);
       response.json(month);
     } catch (error) {
       if (isDomainError(error)) {

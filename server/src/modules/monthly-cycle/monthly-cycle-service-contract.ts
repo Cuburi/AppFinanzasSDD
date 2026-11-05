@@ -60,6 +60,8 @@ export const composeMonthlyCycleService = ({
   getClosureReview: closureUseCases.getClosureReview,
   applyClosureAction: closureUseCases.applyClosureAction,
   closeMonth: closureUseCases.closeMonth,
+  getMonth: closureUseCases.getMonth,
+  getLatestClosedMonth: closureUseCases.getLatestClosedMonth,
 });
 
 export type MonthlyCycleService = ReturnType<typeof composeMonthlyCycleService>;

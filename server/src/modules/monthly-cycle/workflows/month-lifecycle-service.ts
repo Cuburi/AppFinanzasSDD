@@ -23,7 +23,7 @@ export const createMonthLifecycleService = (dependencies: MonthlyCycleWorkflowDe
 
   return {
     async openMonth(input: OpenMonthInput): Promise<MonthView> {
-      const month = await ports.transactionRunner.run(async (txPorts) => {
+      const month = await ports.transactionRunner.runSerializable(async (txPorts) => {
         const activeMonth = await txPorts.months.findActiveSummary(MonthStatus.ACTIVE);
 
         if (activeMonth) {
@@ -50,14 +50,24 @@ export const createMonthLifecycleService = (dependencies: MonthlyCycleWorkflowDe
         assertTemplateHasSubcategories(templateInput);
         await txPorts.pockets.ensureTemplateDefaultPocketsAreActive(templateInput);
 
+        const priorClosedMonth = await txPorts.months.findPriorClosedBefore(input.year, input.month);
+        if (priorClosedMonth) {
+          await txPorts.months.lockForMutation(priorClosedMonth.id);
+          if (await txPorts.months.findOpeningRecipient(priorClosedMonth.id)) {
+            throw new DomainError(409, "Previous closed month has already funded another month.");
+          }
+        }
+
         const createdMonth = await txPorts.months.createFromTemplate({
           year: input.year,
           month: input.month,
           status: MonthStatus.ACTIVE,
           template,
+          ...(priorClosedMonth ? {
+            openingBalance: priorClosedMonth.closureCarryAmount ?? decimal(0),
+            openingSourceMonthId: priorClosedMonth.id,
+          } : {}),
         });
-
-        const priorClosedMonth = await txPorts.months.findPriorClosedBefore(input.year, input.month);
 
         if (priorClosedMonth) {
           const carryover = calculateCashBalance(priorClosedMonth.movements);

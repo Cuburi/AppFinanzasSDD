@@ -1,3 +1,4 @@
+import { DomainError } from "../shared/service-errors.js";
 import { readNonEmptyString, readOptionalString, readPositiveAmount } from "./shared-parsers.js";
 
 export type ClosurePendingSurplusView = {
@@ -22,6 +23,25 @@ export type ClosureCategoryVarianceView = {
   informational: true;
 };
 
+export type CloseMonthInput = { carryAmount: number; excludedAmount: number };
+export type ClosureAllocationView = CloseMonthInput & { availableMoney: number };
+
+/** Strict cents, not coercion or rounding: validate direct use-case callers too. */
+export const parseCloseMonthInput = (payload: unknown): CloseMonthInput | undefined => {
+  if (payload === undefined) return undefined;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new DomainError(400, "Closure allocation must contain carryAmount and excludedAmount.");
+  }
+  const { carryAmount, excludedAmount } = payload as CloseMonthInput;
+  for (const value of [carryAmount, excludedAmount]) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 9_999_999_999.99 ||
+        !/^(?:\d+)(?:\.\d{1,2})?$/.test(String(value))) {
+      throw new DomainError(400, "Closure amounts must be finite nonnegative numbers with at most two decimals.");
+    }
+  }
+  return { carryAmount, excludedAmount };
+};
+
 export type ClosureReviewView = {
   monthId: string;
   status: "ACTIVE" | "CLOSED";
@@ -31,6 +51,8 @@ export type ClosureReviewView = {
   availableMoney: number;
   availableMoneyBlocker: "SURPLUS" | "DEFICIT" | null;
   canClose: boolean;
+  requiresDisposition?: boolean;
+  closureAllocation?: ClosureAllocationView | null;
 };
 
 export type ClosureActionInput = {

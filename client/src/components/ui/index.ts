@@ -2,6 +2,8 @@ export { Button } from "./Button";
 export type { ButtonProps, ButtonVariant } from "./Button";
 export { Card } from "./Card";
 export type { CardProps, Tone } from "./Card";
+export { FeedbackBanner } from "./FeedbackBanner";
+export type { FeedbackBannerProps } from "./FeedbackBanner";
 export { KpiCard } from "./KpiCard";
 export type { KpiCardProps, KpiTrend } from "./KpiCard";
 export { SectionHeader } from "./SectionHeader";

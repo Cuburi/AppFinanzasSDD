@@ -1,6 +1,7 @@
 import { MovementType, PaymentMethod } from "../application/monthly-cycle-types.js";
 
 import type { DepositToPocketInput, MonthView, RecordExpenseInput, UpdateExpenseInput } from "../dto/index.js";
+import { readIsoDateString } from "../dto/shared-parsers.js";
 import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
 import { assertOccurredAtWithinMonth, calculateCashBalance } from "../shared/cash-ledger.js";
 import { decimal } from "../shared/money.js";
@@ -11,9 +12,19 @@ import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from 
 
 const SINGLE_USER_OWNER_ID = "single-user";
 
-const assertExpenseDateWithinMonth = (occurredAt: Date, month: Parameters<typeof assertOccurredAtWithinMonth>[1]) => {
+const assertExpenseDateWithinMonth = (value: string, month: Parameters<typeof assertOccurredAtWithinMonth>[1], unchangedInstant?: Date) => {
+  const validated = readIsoDateString(value, "Expense date");
+  const occurredAt = new Date(validated);
+  // History returns UTC instants, so an owned expense may retain its original instant on edit.
+  if (unchangedInstant?.getTime() === occurredAt.getTime()) return;
   try {
-    assertOccurredAtWithinMonth(occurredAt, month);
+    if (/^\d{4}-\d{2}-\d{2}T.*[+-]\d{2}:\d{2}$/.test(validated)) {
+      if (Number(validated.slice(0, 4)) !== month.year || Number(validated.slice(5, 7)) !== month.month) {
+        throw new RangeError("Expense calendar month does not match.");
+      }
+    } else {
+      assertOccurredAtWithinMonth(occurredAt, month);
+    }
   } catch (error) {
     if (error instanceof RangeError) {
       throw new DomainError(400, "Expense date must be inside the linked month.");
@@ -47,7 +58,7 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
         }
 
         const occurredAt = new Date(input.occurredAt);
-        assertExpenseDateWithinMonth(occurredAt, existingMonth);
+        assertExpenseDateWithinMonth(input.occurredAt, existingMonth);
 
         if (input.paymentMethod === PaymentMethod.CASH && calculateCashBalance(existingMonth.movements) < input.amount) {
           throw new DomainError(409, "Insufficient cash for this expense.");
@@ -85,7 +96,7 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
         }
 
         const occurredAt = new Date(input.occurredAt);
-        assertExpenseDateWithinMonth(occurredAt, existingMonth);
+        assertExpenseDateWithinMonth(input.occurredAt, existingMonth, existingExpense.occurredAt);
 
         const movementsWithoutCurrentExpense = existingMonth.movements.filter((movement) => movement.id !== existingExpense.id);
         if (input.paymentMethod === PaymentMethod.CASH && calculateCashBalance(movementsWithoutCurrentExpense) < input.amount) {

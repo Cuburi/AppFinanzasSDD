@@ -2,6 +2,7 @@ import { MovementType, PaymentMethod } from "./application/monthly-cycle-types.j
 import { decimalToNumber, roundMoney, type MonthlyCycleMoney } from "./shared/money.js";
 
 type MonthShape = {
+  openingBalance?: MonthlyCycleMoney;
   incomes?: Array<{
     amount: MonthlyCycleMoney;
   }>;
@@ -106,6 +107,6 @@ export const calculateMonthBalances = (month: MonthShape) => {
     subcategoryBalances,
     pocketBalances,
     monthlyIncomeTotal,
-    availableMoney: roundMoney(monthlyIncomeTotal - monthOutflows),
+    availableMoney: roundMoney(decimalToNumber(month.openingBalance ?? { toString: () => "0" }) + monthlyIncomeTotal - monthOutflows),
   };
 };

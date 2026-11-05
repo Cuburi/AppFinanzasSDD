@@ -112,6 +112,7 @@ describe("ActiveMonthPage", () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    vi.unstubAllEnvs();
   });
 
   beforeEach(() => {
@@ -500,6 +501,71 @@ describe("ActiveMonthPage", () => {
     expect(within(depositForm).queryByLabelText("Subcategoría de origen")).not.toBeInTheDocument();
   });
 
+  it("fills the deposit amount with the selected subcategory maximum without saving", async () => {
+    const user = userEvent.setup();
+    apiMock.getActiveMonth.mockResolvedValueOnce({
+      ...activeMonth,
+      categories: [{ ...activeMonth.categories[0], subcategories: [{ ...activeMonth.categories[0].subcategories[0], available: 500.25 }] }],
+    });
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    const depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+    const useMaximum = within(depositForm).getByRole("button", { name: "Usar máximo disponible" });
+
+    expect(useMaximum).toBeDisabled();
+    await user.selectOptions(within(depositForm).getByLabelText("Categoría de origen"), "cat-income");
+    expect(useMaximum).toBeDisabled();
+    await user.selectOptions(within(depositForm).getByLabelText("Subcategoría de origen"), "sub-bonus");
+    expect(useMaximum).toBeEnabled();
+    await user.click(useMaximum);
+
+    expect(within(depositForm).getByLabelText("Monto", { selector: "input" })).toHaveValue(500.25);
+    expect(apiMock.depositToPocket).not.toHaveBeenCalled();
+
+    await user.selectOptions(within(depositForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
+    await user.click(within(depositForm).getByRole("button", { name: "Depositar en bolsillo" }));
+    await waitFor(() => expect(apiMock.depositToPocket).toHaveBeenCalledWith(expect.objectContaining({ sourceKind: "SUBCATEGORY", sourceSubcategoryId: "sub-bonus", amount: 500.25 })));
+  });
+
+  it("fills the deposit amount with the month available money and disables the shortcut when nothing is available", async () => {
+    const user = userEvent.setup();
+    apiMock.getActiveMonth.mockResolvedValueOnce({ ...activeMonth, availableMoney: 375 }).mockResolvedValueOnce({ ...activeMonth, availableMoney: 0 });
+    const { unmount } = render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    let depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+    await user.selectOptions(within(depositForm).getByLabelText("Origen de los fondos"), "MONTH_AVAILABLE");
+    await user.click(within(depositForm).getByRole("button", { name: "Usar máximo disponible" }));
+    expect(within(depositForm).getByLabelText("Monto", { selector: "input" })).toHaveValue(375);
+    expect(apiMock.depositToPocket).not.toHaveBeenCalled();
+    unmount();
+
+    render(<ActiveMonthPage />);
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+    await user.selectOptions(within(depositForm).getByLabelText("Origen de los fondos"), "MONTH_AVAILABLE");
+    expect(within(depositForm).getByRole("button", { name: "Usar máximo disponible" })).toBeDisabled();
+  });
+
+  it("renders the deposit and withdrawal amount fields at full field width", async () => {
+    const user = userEvent.setup();
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    const depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+    expect(within(depositForm).getByLabelText("Monto", { selector: "input" }).closest("label")).not.toHaveClass("small-field");
+
+    await user.click(screen.getByRole("button", { name: "Retirar efectivo" }));
+    const withdrawalForm = screen.getByRole("region", { name: "Retirar efectivo" }).querySelector("form");
+    if (!withdrawalForm) throw new Error("Missing withdrawal form.");
+    expect(within(withdrawalForm).getByLabelText("Monto a retirar").closest("label")).not.toHaveClass("small-field");
+  });
+
   it("refreshes the visible destination pocket balance from the server after a successful deposit", async () => {
     const user = userEvent.setup();
     apiMock.getPockets.mockResolvedValueOnce(activePockets).mockResolvedValueOnce([
@@ -642,7 +708,7 @@ describe("ActiveMonthPage", () => {
     render(<ActiveMonthPage />);
 
     expect(await screen.findByRole("region", { name: "Efectivo físico" })).toHaveTextContent("$80 COP");
-    expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1");
+    await waitFor(() => expect(apiMock.getExpenseHistory).toHaveBeenCalledWith("month-1"));
     expect(await screen.findByText("Café")).toBeInTheDocument();
     expect(await screen.findByRole("region", { name: "Movimientos del mes" })).toHaveTextContent("Café");
   });
@@ -801,6 +867,54 @@ describe("ActiveMonthPage", () => {
     expect(occurredAt.getDate()).toBe(14);
     expect(occurredAt.getHours()).toBe(21);
     expect(occurredAt.getMinutes()).toBe(14);
+  });
+
+  it("submits month-end expenses with a local offset and the exact real instant", async () => {
+    vi.stubEnv("TZ", "America/Bogota");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const instant = new Date("2026-11-01T01:14:15.250Z");
+    vi.setSystemTime(instant);
+    const october = { ...activeMonth, month: 10 };
+    apiMock.getActiveMonth.mockResolvedValue(october);
+    apiMock.recordExpense.mockResolvedValue(october);
+    render(<ActiveMonthPage />);
+
+    const date = await screen.findByLabelText("Fecha del gasto");
+    expect(date).toHaveValue("2026-10-31");
+    fireEvent.change(screen.getByLabelText("Monto", { selector: "input" }), { target: { value: "20" } });
+    fireEvent.submit(date.closest("form")!);
+
+    await waitFor(() => expect(apiMock.recordExpense).toHaveBeenCalledTimes(1));
+    const payload = apiMock.recordExpense.mock.calls[0][0];
+    expect(payload.occurredAt).toBe("2026-10-31T20:14:15.250-05:00");
+    expect(new Date(payload.occurredAt).getTime()).toBe(instant.getTime());
+    expect(apiMock.updateExpense).not.toHaveBeenCalled();
+    expect(await screen.findByText("Gasto registrado y saldos recalculados.")).toBeInTheDocument();
+  });
+
+  it("edits a month-end expense using its linked-month local date without changing its instant", async () => {
+    vi.stubEnv("TZ", "America/Bogota");
+    const october = { ...activeMonth, month: 10 };
+    const occurredAt = "2026-11-01T01:14:15.250Z";
+    apiMock.getActiveMonth.mockResolvedValue(october);
+    apiMock.updateExpense.mockResolvedValue(october);
+    apiMock.getExpenseHistory.mockResolvedValue([{
+      id: "expense-1", occurredAt, paymentMethod: "NON_CASH", amount: 20,
+      description: "Café", creditCardId: null, category: null, subcategory: null,
+    }]);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true, json: async () => ledgerResponse(ledgerEntry("expense-1", "NON_CASH_EXPENSE", "Café", occurredAt)),
+    }));
+    render(<ActiveMonthPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Editar gasto Café" }));
+    const date = screen.getByLabelText("Fecha del gasto");
+    expect(date).toHaveValue("2026-10-31");
+    fireEvent.change(screen.getByLabelText(/Descripción/), { target: { value: "Corregido" } });
+    fireEvent.submit(date.closest("form")!);
+    await waitFor(() => expect(apiMock.updateExpense).toHaveBeenCalledWith(expect.objectContaining({
+      expenseId: "expense-1", occurredAt, description: "Corregido",
+    })));
+    expect(await screen.findByText("Gasto actualizado en el mes activo y saldos recalculados.")).toBeInTheDocument();
   });
 
   it("records an uncategorized expense without a synthetic subcategory", async () => {

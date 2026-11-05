@@ -50,30 +50,33 @@ const month = {
   movements: [],
 };
 
-const createMovementPorts = () => {
-  const calls: unknown[] = [], created: unknown[] = [];
+const createMovementPorts = (period = { year: 2026, month: 5 }) => {
+  const calls: unknown[] = [], created: unknown[] = [], updated: { occurredAt: Date }[] = [];
+  let storedExpense = { id: "expense-1", type: MovementType.EXPENSE, monthId: month.id, occurredAt: new Date("2026-05-10T00:00:00.000Z") };
   let lockCalls = 0;
   const txPorts = {
     months: {
       async findById(monthId: string) {
         calls.push(["tx.months.findById", monthId]);
-        return month;
+        return { ...month, ...period };
       },
       async lockForMutation(monthId: string) {
         lockCalls += 1;
         calls.push(["tx.months.findById", monthId]);
-        return month;
+        return { ...month, ...period };
       },
     },
     movements: {
       async findById(movementId: string) {
         calls.push(["tx.movements.findById", movementId]);
-        return { id: movementId, type: MovementType.EXPENSE, monthId: month.id };
+        return { ...storedExpense, id: movementId };
       },
       async create(args: { type: MovementType; amount: Prisma.Decimal; targetPocketId?: string | null; creditCardId?: string | null }) {
         created.push(args); calls.push(["tx.movements.create", args.type, args.amount.toString(), args.targetPocketId ?? null, args.creditCardId ?? null]);
       },
-      async updateExpense(input: { expenseId: string; amount: Prisma.Decimal; creditCardId?: string | null }) {
+      async updateExpense(input: { expenseId: string; amount: Prisma.Decimal; occurredAt: Date; creditCardId?: string | null }) {
+        updated.push(input);
+        storedExpense = { ...storedExpense, occurredAt: input.occurredAt };
         calls.push(["tx.movements.updateExpense", input.expenseId, input.amount.toString(), input.creditCardId ?? null]);
       },
       async delete(movementId: string) {
@@ -116,7 +119,7 @@ const createMovementPorts = () => {
     },
   } as unknown as MonthlyCyclePorts;
 
-  return { calls, created, ports, getLockCalls: () => lockCalls };
+  return { calls, created, updated, ports, setStoredExpense: (expense: typeof storedExpense) => { storedExpense = expense; }, getLockCalls: () => lockCalls };
 };
 
 test("movement mutations lock the owning month before evaluating mutable state", async () => {
@@ -199,6 +202,58 @@ test("withdrawFromPocket rejects inactive, missing, insufficient, and invalid so
     { code: "INVALID_AMOUNT" },
   );
   assert.deepEqual(created, []);
+});
+
+test("expense month validation respects explicit offsets without changing the stored instant", async () => {
+  for (const occurredAt of [
+    "2026-10-30T20:00:00.000-05:00",
+    "2026-10-31T18:00:00.000-05:00",
+    "2026-10-31T19:00:00.000-05:00",
+    "2026-10-31T20:00:00.250-05:00",
+    "2026-11-30T20:00:00.000-05:00",
+    "2026-02-28T20:00:00.000-05:00",
+    "2028-02-29T20:00:00.000-05:00",
+    "2026-01-01T01:00:00.000+05:00",
+  ]) {
+    const { ports, created, updated } = createMovementPorts({ year: Number(occurredAt.slice(0, 4)), month: Number(occurredAt.slice(5, 7)) });
+    const useCases = createMovementUseCases(ports);
+    const input = { monthId: "month-1", sourceSubcategoryId: null, amount: 20, occurredAt, paymentMethod: PaymentMethod.NON_CASH };
+    const result = await useCases.recordExpense(input);
+    assert.equal(result.id, "month-1");
+    assert.equal(created.length, 1);
+    assert.equal((created[0] as { occurredAt: Date }).occurredAt.getTime(), Date.parse(occurredAt));
+    await useCases.updateExpense({ ...input, expenseId: "expense-1" });
+    assert.equal(updated[0]!.occurredAt.getTime(), Date.parse(occurredAt));
+    await useCases.updateExpense({ ...input, expenseId: "expense-1", description: "Metadata only", occurredAt: new Date(occurredAt).toISOString() });
+    assert.equal(updated[1]!.occurredAt.getTime(), Date.parse(occurredAt));
+  }
+});
+
+test("unchanged expense instants still require ownership and changed wrong-month instants do not write", async () => {
+  const { ports, updated, setStoredExpense } = createMovementPorts({ year: 2026, month: 10 });
+  const occurredAt = "2026-11-01T01:00:00.000Z";
+  const input = { monthId: "month-1", expenseId: "expense-1", sourceSubcategoryId: null, amount: 20, occurredAt, paymentMethod: PaymentMethod.NON_CASH };
+  const useCases = createMovementUseCases(ports);
+  setStoredExpense({ id: "expense-1", type: MovementType.EXPENSE, monthId: "other-month", occurredAt: new Date(occurredAt) });
+  await assert.rejects(() => useCases.updateExpense(input), { statusCode: 404, message: "Expense was not found in this month." });
+  setStoredExpense({ id: "expense-1", type: MovementType.EXPENSE, monthId: "month-1", occurredAt: new Date(occurredAt) });
+  await assert.rejects(() => useCases.updateExpense({ ...input, occurredAt: "2026-11-01T02:00:00.000Z" }), { statusCode: 400, message: "Expense date must be inside the linked month." });
+  assert.equal(updated.length, 0);
+  await useCases.updateExpense(input);
+  assert.equal(updated[0]!.occurredAt.toISOString(), occurredAt);
+});
+
+test("expense month validation still rejects dates outside the submitted month without writes", async () => {
+  for (const occurredAt of ["2026-06-01T00:00:00.000+05:00", "2026-04-30T23:00:00.000-05:00", "2026-06-01T00:00:00.000Z", "2026-06-01"]) {
+    const { ports, calls, created } = createMovementPorts();
+    const useCases = createMovementUseCases(ports);
+    const input = { monthId: "month-1", sourceSubcategoryId: null, amount: 20, occurredAt, paymentMethod: PaymentMethod.NON_CASH };
+    for (const action of [() => useCases.recordExpense(input), () => useCases.updateExpense({ ...input, expenseId: "expense-1" })]) {
+      await assert.rejects(action, { statusCode: 400, message: "Expense date must be inside the linked month." });
+    }
+    assert.deepEqual(created, []);
+    assert.equal(calls.some((call) => Array.isArray(call) && ["tx.movements.create", "tx.movements.updateExpense"].includes(call[0])), false);
+  }
 });
 
 test("recordExpense persists an expense inside the transaction runner and returns the mapped month", async () => {

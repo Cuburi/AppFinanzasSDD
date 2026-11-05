@@ -26,7 +26,6 @@ Los artefactos existentes en `openspec/` se conservan como referencia histórica
 ├── prisma/                 # Schema y migraciones Prisma
 ├── scripts/                # Scripts de desarrollo
 ├── alcance.md              # Problema, solución y funcionalidades
-├── plan-implementacion.md  # Plan incremental
 ├── tech-stack.md           # Stack técnico propuesto
 └── user-stories.md         # Historias de usuario
 ```
@@ -231,6 +230,8 @@ Ejemplos del dominio:
 
 El mes activo expone saldos calculados por backend: ingresos del mes, dinero disponible y efectivo físico. El efectivo no se guarda como saldo mutable; se deriva de movimientos de retiro, arrastre y gastos pagados en efectivo.
 
+Al registrar gastos, la fecha seleccionada se envía con la hora real y el desfase horario local explícito. El mes vinculado se valida con ese calendario local, incluso al final del mes cuando el instante UTC ya cae en el mes siguiente. Se conserva el instante real almacenado; una corrección sin cambiar la fecha de ese gasto conserva ese instante. Las entradas antiguas con `Z` o solo fecha mantienen la validación UTC. Esto no cambia las reglas de retiros, depósitos ni los períodos UTC de las tarjetas.
+
 ### Filtros del historial en Mes activo
 
 En **Movimientos del mes**, los filtros de gastos se pueden combinar por rango de fechas (`Desde` / `Hasta`, ambos inclusive), categoría, subcategoría y medio de pago (efectivo o no efectivo). La opción **Sin categoría** permite encontrar gastos no clasificados; al cambiar de categoría se limpia la subcategoría seleccionada.
@@ -252,6 +253,14 @@ Reglas clave:
 - `EXPENSE` con `paymentMethod: "CASH"` baja la subcategoría y el efectivo físico, pero no vuelve a bajar el dinero disponible.
 - `EXPENSE` con `paymentMethod: "NON_CASH"` baja la subcategoría y el dinero disponible.
 - Al abrir un mes nuevo, el efectivo positivo remanente del último mes cerrado se arrastra como efectivo inicial.
+
+## Cierre mensual guiado
+
+En **Cierre**, seguí **Revisar → Destino → Confirmar**. La revisión separa saldo inicial, ingresos y salidas netas reales del presupuesto planeado. El detalle de efectivo, bolsillos y presupuesto se colapsa automáticamente al avanzar; volver conserva el destino y los montos elegidos.
+
+Podés pasar todo el sobrante al siguiente mes, dejarlo fuera del seguimiento o dividirlo. Solo la división muestra campos: montos COP no negativos con hasta dos decimales (punto decimal, sin separadores de miles), cuya suma debe coincidir exactamente con el disponible. El traspaso es saldo inicial, no ingreso nuevo; lo excluido queda en el historial del cierre, no como gasto. El efectivo físico se arrastra por separado y no se suma otra vez al disponible.
+
+Los desfalcos y el disponible negativo bloquean el cierre; un disponible cero permite confirmar sin distribución. **Confirmar cierre** deja el mes de solo lectura. El resultado se recupera al recargar mediante `closedMonthId` en la URL, y desde allí podés abrir el mes siguiente. Si una operación falla, revisá el error y refrescá antes de continuar con datos desactualizados. [Reglas y contrato HTTP](docs/product/monthly-closure.md).
 
 ## Nota de aprendizaje
 

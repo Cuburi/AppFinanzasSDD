@@ -6,7 +6,7 @@ export type MonthlyLedger = { monthId: string; status: "ACTIVE" | "CLOSED"; entr
 export type LedgerViewEntry = MonthlyLedgerEntry & { typeLabel: string; isReadOnly: boolean };
 export type LedgerDay = { key: string; items: ({ kind: "entry"; entry: LedgerViewEntry } | { kind: "system-run"; entries: LedgerViewEntry[] })[] };
 
-const knownTypes: Record<string, string> = { MONTHLY_INCOME: "Income", CASH_EXPENSE: "Expense", NON_CASH_EXPENSE: "Expense", CASH_WITHDRAWAL: "Cash withdrawal", POCKET_DEPOSIT_FROM_SUBCATEGORY: "Pocket deposit", POCKET_DEPOSIT_FROM_AVAILABLE: "Pocket deposit", CASH_CARRYOVER: "Cash carryover", CLOSURE_SURPLUS: "Closure surplus", DEFICIT_RESOLUTION: "Deficit resolution" };
+const knownTypes: Record<string, string> = { OPENING_BALANCE: "Saldo inicial del cierre anterior", MONTHLY_INCOME: "Income", CASH_EXPENSE: "Expense", NON_CASH_EXPENSE: "Expense", CASH_WITHDRAWAL: "Cash withdrawal", POCKET_DEPOSIT_FROM_SUBCATEGORY: "Pocket deposit", POCKET_DEPOSIT_FROM_AVAILABLE: "Pocket deposit", CASH_CARRYOVER: "Cash carryover", CLOSURE_SURPLUS: "Closure surplus", DEFICIT_RESOLUTION: "Deficit resolution" };
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
 const sourceEntity = (value: unknown): value is SourceEntity => isObject(value) && ["MONTH", "SUBCATEGORY", "POCKET", "CASH", "EXTERNAL"].includes(String(value.kind)) && (typeof value.id === "string" || value.id === null);
 const destinationEntity = (value: unknown): value is DestinationEntity => isObject(value) && ["MONTH", "SUBCATEGORY", "POCKET", "CASH", "EXPENSE"].includes(String(value.kind)) && (typeof value.id === "string" || value.id === null);

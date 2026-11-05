@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, PointerEvent } from "react";
 
+import { FeedbackBanner } from "../components/ui";
 import { api } from "../lib/api";
 import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
 import type { EditableTemplate, EditableTemplateCategory, SavingsPocket } from "../types";
@@ -337,8 +338,8 @@ export const TemplatePage = () => {
           </button>
         </div>
 
-        {message ? <p className="success">{message}</p> : null}
-        {error ? <p className="error">{error}</p> : null}
+        {message ? <FeedbackBanner tone="success">{message}</FeedbackBanner> : null}
+        {error ? <FeedbackBanner tone="error">{error}</FeedbackBanner> : null}
       </form>
     </section>
   );

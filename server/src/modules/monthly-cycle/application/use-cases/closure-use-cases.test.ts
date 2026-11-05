@@ -132,8 +132,8 @@ test("closure mutations lock the owning month before evaluating mutable state", 
 });
 
 test("closure use cases expose only the closure public surface", () => {
-  assert.deepEqual(CLOSURE_USE_CASE_NAMES, ["getClosureReview", "applyClosureAction", "closeMonth"]);
-  assert.deepEqual(Object.keys(createClosureUseCases(createClosurePorts().ports)), ["getClosureReview", "applyClosureAction", "closeMonth"]);
+  assert.deepEqual(CLOSURE_USE_CASE_NAMES, ["getClosureReview", "applyClosureAction", "closeMonth", "getMonth", "getLatestClosedMonth"]);
+  assert.deepEqual(Object.keys(createClosureUseCases(createClosurePorts().ports)).sort(), [...CLOSURE_USE_CASE_NAMES].sort());
 });
 
 test("getClosureReview reads the month through the month repository port and reports pending balances", async () => {

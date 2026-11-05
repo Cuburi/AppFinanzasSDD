@@ -331,7 +331,13 @@ export type UpdateMonthlyIncomeInput = {
   notes?: string | null;
 };
 
+export type ClosureAllocation = { availableMoney: number; carryAmount: number; excludedAmount: number };
+export type CloseMonthInput = Pick<ClosureAllocation, "carryAmount" | "excludedAmount">;
+
 export type Month = {
+  openingBalance?: number;
+  openingSourceMonthId?: string | null;
+  closureAllocation?: ClosureAllocation | null;
   id: string;
   year: number;
   month: number;
@@ -368,6 +374,8 @@ export type ClosureBudgetVariance = {
 };
 
 export type ClosureReview = {
+  requiresDisposition?: boolean;
+  closureAllocation?: ClosureAllocation | null;
   monthId: string;
   status: "ACTIVE" | "CLOSED";
   pendingSurpluses: ClosurePendingSurplus[];

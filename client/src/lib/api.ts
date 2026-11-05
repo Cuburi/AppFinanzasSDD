@@ -1,5 +1,6 @@
 import type {
   ClosureActionInput,
+  CloseMonthInput,
   ClosureReview,
   BasicMonthlyReport,
   CashSummary,
@@ -222,6 +223,13 @@ export const api = {
   async getActiveMonth(): Promise<Month | null> {
     const response = await fetch("/api/months/active");
     const payload = await readJson<{ month: Month | null }>(response);
+    return payload.month;
+  },
+  async getMonth(monthId: string): Promise<Month> {
+    return readJson<Month>(await fetch(`/api/months/${encodeURIComponent(monthId)}`));
+  },
+  async getLatestClosedMonth(): Promise<Month | null> {
+    const payload = await readJson<{ month: Month | null }>(await fetch("/api/months/latest-closed"));
     return payload.month;
   },
   async recordExpense(input: RecordExpenseInput, options: IdempotencyOptions = {}): Promise<Month> {
@@ -461,9 +469,10 @@ export const api = {
 
     return readJson<ClosureReview>(response);
   },
-  async closeMonth(monthId: string): Promise<Month> {
+  async closeMonth(monthId: string, input?: CloseMonthInput): Promise<Month> {
     const response = await fetch(`/api/months/${monthId}/close`, {
       method: "POST",
+      ...(input === undefined ? {} : { headers: jsonHeaders(), body: JSON.stringify(input) }),
     });
 
     return readJson<Month>(response);

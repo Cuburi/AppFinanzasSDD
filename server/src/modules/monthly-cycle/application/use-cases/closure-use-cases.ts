@@ -1,3 +1,4 @@
+import { parseCloseMonthInput, type CloseMonthInput } from "../../dto/closure.dto.js";
 import type { ClosureActionInput, ClosureReviewView, MonthView } from "../../dto/index.js";
 import { mapMonth } from "../../mappers/monthly-cycle-mappers.js";
 import { calculateMonthBalances } from "../../balance-calculator.js";
@@ -7,12 +8,14 @@ import { DomainError } from "../../shared/service-errors.js";
 import type { MonthRecord } from "../../shared/service-types.js";
 import { MonthStatus, MovementType, type MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 
-export const CLOSURE_USE_CASE_NAMES = ["getClosureReview", "applyClosureAction", "closeMonth"] as const;
+export const CLOSURE_USE_CASE_NAMES = ["getClosureReview", "applyClosureAction", "closeMonth", "getMonth", "getLatestClosedMonth"] as const;
 
 export type ClosureUseCases = {
   getClosureReview(monthId: string): Promise<ClosureReviewView>;
   applyClosureAction(input: ClosureActionInput): Promise<ClosureReviewView>;
-  closeMonth(monthId: string): Promise<MonthView>;
+  closeMonth(monthId: string, allocation?: CloseMonthInput): Promise<MonthView>;
+  getMonth(monthId: string): Promise<MonthView>;
+  getLatestClosedMonth(): Promise<MonthView | null>;
 };
 
 export const buildClosureReview = (month: MonthRecord): ClosureReviewView => {
@@ -70,6 +73,8 @@ export const buildClosureReview = (month: MonthRecord): ClosureReviewView => {
         : balances.availableMoney < 0 && !isZero(balances.availableMoney)
           ? "DEFICIT"
           : null,
+    requiresDisposition: balances.availableMoney > 0 && !isZero(balances.availableMoney),
+    closureAllocation: mapMonth(month).closureAllocation ?? null,
     canClose:
       month.status === MonthStatus.ACTIVE &&
        pendingDeficits.length === 0 &&
@@ -92,6 +97,13 @@ const readActionAmount = (requestedAmount: number | null | undefined, pendingAmo
 };
 
 export const createClosureUseCases = (ports: MonthlyCyclePorts): ClosureUseCases => ({
+  async getMonth(monthId) {
+    return mapMonth(await ports.months.findById(monthId));
+  },
+  async getLatestClosedMonth() {
+    const month = await ports.months.findLatestClosed();
+    return month ? mapMonth(month) : null;
+  },
   async getClosureReview(monthId) {
     const month = await ports.months.findById(monthId);
     return buildClosureReview(month);
@@ -185,16 +197,25 @@ export const createClosureUseCases = (ports: MonthlyCyclePorts): ClosureUseCases
     return buildClosureReview(month);
   },
 
-  async closeMonth(monthId) {
+  async closeMonth(monthId, requestedAllocation) {
+    const allocation = parseCloseMonthInput(requestedAllocation);
     const month = await ports.transactionRunner.run(async (txPorts) => {
-      const existingMonth = await lockMutableMonthForMutation(txPorts.months, monthId);
+      const existingMonth = await lockMutableMonthForMutation(txPorts.months, monthId, true);
       const review = buildClosureReview(existingMonth);
-
-      if (!review.canClose) {
+      if (existingMonth.status === MonthStatus.CLOSED) {
+        const stored = mapMonth(existingMonth).closureAllocation;
+        if ((allocation && stored && allocation.carryAmount === stored.carryAmount && allocation.excludedAmount === stored.excludedAmount) ||
+            (!allocation && (!stored || stored.availableMoney === 0))) return existingMonth;
+        throw new DomainError(409, "Month was already closed with a different allocation.");
+      }
+      if (review.pendingDeficits.length > 0 || review.availableMoney < 0 || (!allocation && !review.canClose)) {
         throw new DomainError(409, "Month cannot be closed while pending subcategory balances or available money remain unresolved.");
       }
-
-      return txPorts.months.close(monthId);
+      // Integer cents prevent 0.1 + 0.2 floating-point mismatch. Recompute only under the owner lock.
+      if (allocation && Math.round(allocation.carryAmount * 100) + Math.round(allocation.excludedAmount * 100) !== Math.round(review.availableMoney * 100)) {
+        throw new DomainError(409, "Closure allocation must equal current available money. Refresh the closure review.");
+      }
+      return txPorts.months.close(monthId, allocation ?? { carryAmount: 0, excludedAmount: 0 });
     });
 
     return mapMonth(month);

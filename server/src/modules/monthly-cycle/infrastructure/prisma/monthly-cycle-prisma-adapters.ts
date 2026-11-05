@@ -54,6 +54,12 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
 
       return month ? (month as MonthRecord) : null;
     },
+    async findLatestClosed() {
+      return await db.month.findFirst({ where: { status: MonthStatus.CLOSED }, orderBy: [{ year: "desc" }, { month: "desc" }], include: monthInclude }) as MonthRecord | null;
+    },
+    async findOpeningRecipient(sourceMonthId) {
+      return await db.month.findFirst({ where: { openingSourceMonthId: sourceMonthId }, include: monthInclude }) as MonthRecord | null;
+    },
     async findActiveSummary(status) {
       return (await db.month.findFirst({
         where: { status },
@@ -91,6 +97,8 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
           year: input.year,
           month: input.month,
           status: input.status,
+          ...(input.openingBalance ? { openingBalance: toPrismaDecimal(input.openingBalance) } : {}),
+          ...(input.openingSourceMonthId ? { openingSourceMonthId: input.openingSourceMonthId } : {}),
           categories: {
             create: input.template.map((category, categoryIndex) => ({
               name: category.name,
@@ -111,10 +119,16 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
         include: monthInclude,
       });
     },
-    close(monthId) {
+    close(monthId, allocation) {
       return db.month.update({
         where: { id: monthId },
-        data: { status: MonthStatus.CLOSED, closedAt: new Date() },
+        data: {
+          status: MonthStatus.CLOSED, closedAt: new Date(),
+          ...(allocation ? {
+            closureCarryAmount: toPrismaDecimal(decimal(allocation.carryAmount)),
+            closureExcludedAmount: toPrismaDecimal(decimal(allocation.excludedAmount)),
+          } : {}),
+        },
         include: monthInclude,
       });
     },

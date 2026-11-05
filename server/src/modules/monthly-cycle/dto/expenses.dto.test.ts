@@ -22,6 +22,19 @@ test("expense DTO parsing rejects malformed record and history dates", () => {
   );
 });
 
+test("expense DTO parsing preserves explicit offsets and rejects impossible calendar dates", () => {
+  for (const occurredAt of ["2026-10-31T20:14:15.250-05:00", "2026-01-01T01:00:00.000+05:30", "2028-02-29T20:00:00.000-05:00"]) {
+    const payload = { amount: 20, occurredAt, paymentMethod: PaymentMethod.NON_CASH };
+    assert.equal(parseRecordExpenseInput("month-1", payload).occurredAt, occurredAt);
+    assert.equal(parseUpdateExpenseInput("month-1", "expense-1", payload).occurredAt, occurredAt);
+  }
+  for (const occurredAt of ["2026-02-29T20:00:00.000-05:00", "2026-04-31T20:00:00.000-05:00", "2026-10-31T20:00:00.000-25:00"]) {
+    const payload = { amount: 20, occurredAt, paymentMethod: PaymentMethod.NON_CASH };
+    assert.throws(() => parseRecordExpenseInput("month-1", payload), { message: "Expense date must be a valid date." });
+    assert.throws(() => parseUpdateExpenseInput("month-1", "expense-1", payload), { message: "Expense date must be a valid date." });
+  }
+});
+
 test("expense DTO parsing accepts optional credit-card references on record, update, and history filters", () => {
   const recordInput = parseRecordExpenseInput("month-1", {
     sourceSubcategoryId: "subcategory-1",
