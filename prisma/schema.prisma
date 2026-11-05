@@ -101,6 +101,12 @@ model Month {
   status    MonthStatus   @default(ACTIVE)
   openedAt  DateTime      @default(now())
   closedAt  DateTime?
+  openingBalance Decimal @default(0) @db.Decimal(12, 2)
+  openingSourceMonthId String? @unique
+  openingSourceMonth Month? @relation("MonthOpeningSource", fields: [openingSourceMonthId], references: [id], onDelete: Restrict)
+  openingRecipient Month? @relation("MonthOpeningSource")
+  closureCarryAmount Decimal? @db.Decimal(12, 2)
+  closureExcludedAmount Decimal? @db.Decimal(12, 2)
   categories MonthCategory[]
   incomes   MonthlyIncome[]
   movements Movement[]

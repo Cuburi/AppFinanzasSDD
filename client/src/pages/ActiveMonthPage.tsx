@@ -27,6 +27,21 @@ const timestampForMovementDate = (dateValue: string, reference = new Date()) => 
   if (!year || !month || !day) return dateValue;
   return new Date(year, month - 1, day, reference.getHours(), reference.getMinutes(), reference.getSeconds(), reference.getMilliseconds()).toISOString();
 };
+// Keep the selected local calendar date and its offset without changing the real clock time.
+const timestampForExpenseDate = (dateValue: string, reference = new Date()) => {
+  const instant = new Date(timestampForMovementDate(dateValue, reference));
+  const offset = -instant.getTimezoneOffset();
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const time = `${pad(instant.getHours())}:${pad(instant.getMinutes())}:${pad(instant.getSeconds())}.${String(instant.getMilliseconds()).padStart(3, "0")}`;
+  return `${localCalendarDate(instant)}T${time}${offset < 0 ? "-" : "+"}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
+};
+const expenseEditDate = (value: string, month: Month) => {
+  const utcDate = value.slice(0, 10);
+  const linkedPeriod = `${month.year}-${String(month.month).padStart(2, "0")}`;
+  const localDate = localCalendarDate(new Date(value));
+  // Preserve legacy date-only edits; recover the local date only across a month boundary.
+  return !utcDate.startsWith(linkedPeriod) && localDate.startsWith(linkedPeriod) ? localDate : utcDate;
+};
 const formatDisplayDate = (value: string) => new Date(value).toLocaleDateString("es-CO", { timeZone: "UTC" });
 const formatPaymentMethod = (paymentMethod: PaymentMethod) => (paymentMethod === "CASH" ? "Efectivo" : "No efectivo");
 const balanceTrend = (amount: number) => (amount < 0 ? "negative" : amount > 0 ? "positive" : "neutral");
@@ -42,6 +57,7 @@ export const ActiveMonthPage = () => {
   const historyRequestId = useRef(0);
   const monthlyHistoryRequestId = useRef(0);
   const expenseAmountInputRef = useRef<HTMLInputElement>(null);
+  const boundaryExpenseEdit = useRef<{ occurredAt: string; date: string } | null>(null);
   const expenseSlipRef = useRef<HTMLElement>(null);
   const incomeSourceInputRef = useRef<HTMLInputElement>(null);
   const incomeSlipRef = useRef<HTMLElement>(null);
@@ -253,6 +269,7 @@ export const ActiveMonthPage = () => {
   };
 
   const resetExpenseForm = (monthData = activeMonth) => {
+    boundaryExpenseEdit.current = null;
     setExpenseCategoryId("");
     setExpenseSubcategoryId("");
     setExpenseAmount("");
@@ -343,7 +360,9 @@ export const ActiveMonthPage = () => {
     setExpenseSubcategoryId(categoryId ? expense.subcategory?.id ?? "" : "");
     setExpenseAmount(String(expense.amount));
     setExpenseDescription(expense.description ?? "");
-    setExpenseOccurredAt(expense.occurredAt.slice(0, 10));
+    const editDate = activeMonth ? expenseEditDate(expense.occurredAt, activeMonth) : expense.occurredAt.slice(0, 10);
+    boundaryExpenseEdit.current = editDate !== expense.occurredAt.slice(0, 10) ? { occurredAt: expense.occurredAt, date: editDate } : null;
+    setExpenseOccurredAt(editDate);
     setExpensePaymentMethod(expense.paymentMethod);
     setExpenseCreditCardId(expense.paymentMethod === "CASH" ? "" : expense.creditCardId ?? "");
     setEditingExpenseId(expense.id);
@@ -422,7 +441,9 @@ export const ActiveMonthPage = () => {
       sourceSubcategoryId: expenseSubcategoryId || null,
       amount: parseAmountInput(expenseAmount),
       description: expenseDescription,
-      occurredAt: editingExpenseId ? expenseOccurredAt || formatMonthDate(activeMonth) : timestampForMovementDate(expenseOccurredAt || defaultMovementDate(activeMonth)),
+      occurredAt: editingExpenseId
+        ? boundaryExpenseEdit.current?.date === expenseOccurredAt ? boundaryExpenseEdit.current.occurredAt : expenseOccurredAt || formatMonthDate(activeMonth)
+        : timestampForExpenseDate(expenseOccurredAt || defaultMovementDate(activeMonth)),
       paymentMethod: expenseCreditCardId ? "NON_CASH" : expensePaymentMethod,
       creditCardId: expensePaymentMethod === "CASH" ? null : expenseCreditCardId || null,
     };

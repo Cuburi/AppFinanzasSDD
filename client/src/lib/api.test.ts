@@ -2,6 +2,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "./api";
 
+describe("guided closure API", () => {
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+  it("reads persisted and latest closed months through their exact envelopes", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ id: "closed" }))).mockResolvedValueOnce(new Response(JSON.stringify({ month: null })));
+    await expect(api.getMonth("closed")).resolves.toEqual({ id: "closed" });
+    await expect(api.getLatestClosedMonth()).resolves.toBeNull();
+    expect(fetch).toHaveBeenNthCalledWith(1, "/api/months/closed");
+    expect(fetch).toHaveBeenNthCalledWith(2, "/api/months/latest-closed");
+  });
+  it("adds explicit disposition without changing bodyless close", async () => {
+    vi.mocked(fetch).mockImplementation(async () => new Response(JSON.stringify({ id: "closed" })));
+    await api.closeMonth("m1");
+    await api.closeMonth("m1", { carryAmount: 100000.01, excludedAmount: 199999.99 });
+    expect(fetch).toHaveBeenNthCalledWith(1, "/api/months/m1/close", { method: "POST" });
+    expect(fetch).toHaveBeenNthCalledWith(2, "/api/months/m1/close", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ carryAmount: 100000.01, excludedAmount: 199999.99 }) });
+  });
+});
+
 describe("month edit template propagation", () => {
   beforeEach(() => { vi.stubGlobal("fetch", vi.fn()); });
   afterEach(() => { vi.unstubAllGlobals(); });

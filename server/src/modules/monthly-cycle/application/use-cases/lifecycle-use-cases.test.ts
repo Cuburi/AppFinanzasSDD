@@ -117,6 +117,10 @@ const createLifecyclePorts = () => {
     structure: {},
     pockets: {},
     transactionRunner: {
+      async runSerializable<T>(work: (ports: Omit<MonthlyCyclePorts, "transactionRunner">) => Promise<T>) {
+        calls.push("transactionRunner.runSerializable");
+        return work(txPorts as unknown as Omit<MonthlyCyclePorts, "transactionRunner">);
+      },
       async run<T>(work: (ports: Omit<MonthlyCyclePorts, "transactionRunner">) => Promise<T>) {
         calls.push("transactionRunner.run");
         return work(txPorts as unknown as Omit<MonthlyCyclePorts, "transactionRunner">);
@@ -141,13 +145,13 @@ test("openMonth snapshots template data through transaction-scoped ports", async
   assert.equal(month.id, "month-1");
   assert.equal(month.categories[0]?.subcategories[0]?.plannedAmount, 250);
   assert.deepEqual(calls, [
-    "transactionRunner.run",
+    "transactionRunner.runSerializable",
     "tx.months.findActiveSummary:ACTIVE",
     "tx.months.findByYearMonth:2026-5",
     "tx.templates.readCategories",
     "tx.pockets.ensureTemplateDefaultPocketsAreActive",
-    "tx.months.createFromTemplate",
     "tx.months.findPriorClosedBefore:2026-5",
+    "tx.months.createFromTemplate",
   ]);
 });
 

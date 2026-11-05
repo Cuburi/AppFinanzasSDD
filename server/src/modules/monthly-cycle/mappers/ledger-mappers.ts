@@ -8,7 +8,7 @@ type Movement = MonthRecord["movements"][number];
 const entity = <T extends Entry["source"]["kind"] | Entry["destination"]["kind"]>(kind: T, id: string | null) => ({ kind, id });
 const effects = (availableMoney: number, cashBalance: number, subcategoryAvailable: number, pocketBalance: number) => ({ availableMoney, cashBalance, subcategoryAvailable, pocketBalance });
 const systemTypes = new Set<MovementType>([MovementType.CASH_CARRYOVER_IN, MovementType.SURPLUS_TO_POCKET_ON_CLOSE, MovementType.DEFICIT_COVER_FROM_SUBCATEGORY, MovementType.DEFICIT_COVER_FROM_POCKET]);
-const ranks: Record<Entry["eventType"], number> = { MONTHLY_INCOME: 0, CASH_EXPENSE: 1, NON_CASH_EXPENSE: 2, CASH_WITHDRAWAL: 3, POCKET_DEPOSIT_FROM_SUBCATEGORY: 4, POCKET_DEPOSIT_FROM_AVAILABLE: 5, CASH_CARRYOVER: 6, CLOSURE_SURPLUS: 7, DEFICIT_RESOLUTION: 8 };
+const ranks: Record<Entry["eventType"], number> = { OPENING_BALANCE: -1, MONTHLY_INCOME: 0, CASH_EXPENSE: 1, NON_CASH_EXPENSE: 2, CASH_WITHDRAWAL: 3, POCKET_DEPOSIT_FROM_SUBCATEGORY: 4, POCKET_DEPOSIT_FROM_AVAILABLE: 5, CASH_CARRYOVER: 6, CLOSURE_SURPLUS: 7, DEFICIT_RESOLUTION: 8 };
 
 const mapMovement = (movement: Movement): Entry | null => {
   const amount = decimalToNumber(movement.amount);
@@ -39,6 +39,13 @@ const mapMovement = (movement: Movement): Entry | null => {
 
 export const mapMonthlyLedger = (month: MonthRecord, includeSystemEvents: boolean): MonthlyLedgerView => {
   const incomeEntries: Entry[] = (month.incomes ?? []).map((income) => ({ entryKey: income.id, occurredAt: income.receivedAt.toISOString(), eventType: "MONTHLY_INCOME", direction: "INFLOW", source: entity("EXTERNAL", null), destination: entity("MONTH", month.id), amount: decimalToNumber(income.amount), balanceEffects: effects(decimalToNumber(income.amount), 0, 0, 0), metadata: { description: income.notes, paymentMethod: null, isSystemEvent: false } }));
+  const openingBalance = month.openingBalance ? decimalToNumber(month.openingBalance) : 0;
+  const openingEntries: Entry[] = openingBalance > 0 ? [{
+    entryKey: `opening:${month.id}`, occurredAt: month.openedAt.toISOString(), eventType: "OPENING_BALANCE", direction: "TRANSFER",
+    source: entity("MONTH", month.openingSourceMonthId ?? null), destination: entity("MONTH", month.id), amount: openingBalance,
+    balanceEffects: effects(openingBalance, 0, 0, 0),
+    metadata: { description: "Saldo inicial del cierre anterior", paymentMethod: null, isSystemEvent: true },
+  }] : [];
   const movementEntries = month.movements.map(mapMovement).filter((entry): entry is Entry => entry !== null);
-  return { monthId: month.id, status: month.status, entries: [...incomeEntries, ...movementEntries].filter((entry) => includeSystemEvents || !entry.metadata.isSystemEvent).sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt) || ranks[left.eventType] - ranks[right.eventType] || left.entryKey.localeCompare(right.entryKey)) };
+  return { monthId: month.id, status: month.status, entries: [...openingEntries, ...incomeEntries, ...movementEntries].filter((entry) => includeSystemEvents || !entry.metadata.isSystemEvent).sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt) || ranks[left.eventType] - ranks[right.eventType] || left.entryKey.localeCompare(right.entryKey)) };
 };

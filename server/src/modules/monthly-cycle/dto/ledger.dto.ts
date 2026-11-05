@@ -6,7 +6,7 @@ export type MonthlyLedgerQueryInput = { monthId: string; includeSystemEvents: bo
 export type MonthlyLedgerEntryView = {
   entryKey: string;
   occurredAt: string;
-  eventType: "MONTHLY_INCOME" | "CASH_EXPENSE" | "NON_CASH_EXPENSE" | "CASH_WITHDRAWAL" | "POCKET_DEPOSIT_FROM_SUBCATEGORY" | "POCKET_DEPOSIT_FROM_AVAILABLE" | "CASH_CARRYOVER" | "CLOSURE_SURPLUS" | "DEFICIT_RESOLUTION";
+  eventType: "OPENING_BALANCE" | "MONTHLY_INCOME" | "CASH_EXPENSE" | "NON_CASH_EXPENSE" | "CASH_WITHDRAWAL" | "POCKET_DEPOSIT_FROM_SUBCATEGORY" | "POCKET_DEPOSIT_FROM_AVAILABLE" | "CASH_CARRYOVER" | "CLOSURE_SURPLUS" | "DEFICIT_RESOLUTION";
   direction: "INFLOW" | "OUTFLOW" | "TRANSFER";
   source: { kind: "MONTH" | "SUBCATEGORY" | "POCKET" | "CASH" | "EXTERNAL"; id: string | null };
   destination: { kind: "MONTH" | "SUBCATEGORY" | "POCKET" | "CASH" | "EXPENSE"; id: string | null };

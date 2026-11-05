@@ -37,6 +37,10 @@ type MonthState = {
   status: MonthStatus;
   openedAt: Date;
   closedAt: Date | null;
+  openingBalance?: Prisma.Decimal;
+  openingSourceMonthId?: string | null;
+  closureCarryAmount?: Prisma.Decimal | null;
+  closureExcludedAmount?: Prisma.Decimal | null;
   incomes: Array<{
     id: string;
     monthId: string;
@@ -251,8 +255,12 @@ const createIntegrationDb = (
       },
     },
     month: {
-      async findFirst(args: { where?: { status?: MonthStatus }; select?: unknown }) {
-        const found = months.find((month) => !args.where?.status || month.status === args.where.status) ?? null;
+      async findFirst(args: { where?: { status?: MonthStatus; OR?: [{ year: { lt: number } }, { year: number; month: { lt: number } }]; openingSourceMonthId?: string }; select?: unknown; orderBy?: unknown }) {
+        const candidates = months.filter((month) => (!args.where?.status || month.status === args.where.status) &&
+          (!args.where?.openingSourceMonthId || month.openingSourceMonthId === args.where.openingSourceMonthId) &&
+          (!args.where?.OR || month.year < args.where.OR[0].year.lt || (month.year === args.where.OR[1].year && month.month < args.where.OR[1].month.lt)));
+        if (args.orderBy) candidates.sort((a, b) => b.year - a.year || b.month - a.month);
+        const found = candidates[0] ?? null;
         if (!found) return null;
 
         if (args.select) {
@@ -278,6 +286,8 @@ const createIntegrationDb = (
           year: number;
           month: number;
           status: MonthStatus;
+          openingBalance?: Prisma.Decimal;
+          openingSourceMonthId?: string | null;
           categories: {
             create: Array<{
               name: string;
@@ -301,6 +311,10 @@ const createIntegrationDb = (
           year: args.data.year,
           month: args.data.month,
           status: args.data.status,
+          openingBalance: args.data.openingBalance ?? money(0),
+          openingSourceMonthId: args.data.openingSourceMonthId ?? null,
+          closureCarryAmount: null,
+          closureExcludedAmount: null,
           openedAt: new Date("2026-05-01T00:00:00.000Z"),
           closedAt: null,
           incomes: [],
@@ -324,12 +338,11 @@ const createIntegrationDb = (
         months.push(month);
         return cloneMonth(month);
       },
-      async update(args: { where: { id: string }; data: { status: MonthStatus; closedAt: Date } }) {
+      async update(args: { where: { id: string }; data: { status: MonthStatus; closedAt: Date; closureCarryAmount?: Prisma.Decimal; closureExcludedAmount?: Prisma.Decimal } }) {
         const found = months.find((month) => month.id === args.where.id);
         if (!found) throw new Error("Month missing in integration stub.");
 
-        found.status = args.data.status;
-        found.closedAt = args.data.closedAt;
+        Object.assign(found, args.data);
         return cloneMonth(found);
       },
     },
@@ -1619,4 +1632,108 @@ test("service integration: opening next month creates no cash carryover when pri
 
   assert.equal(carryovers.length, 0);
   assert.equal(june.cashBalance, 0);
+});
+
+for (const [carryAmount, excludedAmount] of [[100_000, 200_000], [300_000, 0], [0, 300_000], [100_000.01, 199_999.99]]) {
+  test(`guided closure persists ${carryAmount}/${excludedAmount}, reloads and funds the next year once`, async () => {
+    const { db, getCapturedMovements } = createIntegrationDb();
+    let service = createMonthlyCycleTestService(db);
+    const opened = await service.openMonth({ year: 2026, month: 12 });
+    await service.createMonthlyIncome({ monthId: opened.id, sourceName: "Salary", amount: 1_000_000, receivedAt: "2026-12-01T00:00:00.000Z" });
+    const before = await service.recordExpense({ monthId: opened.id, sourceSubcategoryId: null, amount: 700_000, occurredAt: "2026-12-02T00:00:00.000Z", paymentMethod: "NON_CASH" });
+    const ledgerBefore = await service.getMonthlyLedger({ monthId: opened.id, includeSystemEvents: true });
+    const closed = await service.closeMonth(opened.id, { carryAmount, excludedAmount });
+    assert.equal(closed.availableMoney, 300_000);
+    assert.deepEqual(closed.closureAllocation, { availableMoney: 300_000, carryAmount, excludedAmount });
+    assert.deepEqual(closed.incomes, before.incomes);
+    assert.deepEqual(closed.categories, before.categories);
+    assert.equal(closed.cashBalance, before.cashBalance);
+    assert.deepEqual(await service.getMonthlyLedger({ monthId: opened.id, includeSystemEvents: true }), { ...ledgerBefore, status: "CLOSED" });
+    service = createMonthlyCycleTestService(db);
+    assert.deepEqual(await service.getMonth(opened.id), closed);
+    assert.deepEqual(await service.getLatestClosedMonth(), closed);
+    assert.deepEqual(await service.closeMonth(opened.id, { carryAmount, excludedAmount }), closed);
+    await assert.rejects(() => service.closeMonth(opened.id, { carryAmount: 0, excludedAmount: 0 }), { statusCode: 409 });
+    assert.deepEqual(await service.getMonth(opened.id), closed);
+    const january = await service.openMonth({ year: 2027, month: 1 });
+    assert.equal(january.openingBalance, carryAmount);
+    assert.equal(january.openingSourceMonthId, opened.id);
+    assert.equal(january.availableMoney, carryAmount);
+    assert.equal(january.monthlyIncomeTotal, 0);
+    assert.deepEqual(january.incomes, []);
+    assert.equal(january.categories[0]!.subcategories[0]!.plannedAmount, 300);
+    const report = await service.getBasicReport(january.id);
+    assert.equal(report.summary.availableMoney, carryAmount);
+    assert.equal(report.summary.monthlyIncomeTotal, 0);
+    assert.equal(report.summary.totalPlanned, 300);
+    const ledger = await service.getMonthlyLedger({ monthId: january.id, includeSystemEvents: true });
+    assert.equal(ledger.entries.reduce((sum, entry) => sum + entry.balanceEffects.availableMoney, 0), carryAmount);
+    assert.equal(ledger.entries.some((entry) => entry.eventType === "MONTHLY_INCOME"), false);
+    await assert.rejects(() => service.openMonth({ year: 2027, month: 1 }), { statusCode: 409 });
+    assert.deepEqual(await service.getActiveMonth(), january);
+    assert.equal(getCapturedMovements().length, 1);
+  });
+}
+
+test("guided closure rejects partial, imprecise, nonfinite and stale allocations without changing public views", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleTestService(db);
+  const month = await service.openMonth({ year: 2026, month: 5 });
+  const before = await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 0.3, receivedAt: "2026-05-01T00:00:00.000Z" });
+  const ledger = await service.getMonthlyLedger({ monthId: month.id, includeSystemEvents: true });
+  for (const [payload, statusCode] of [
+    [{ carryAmount: 0.1 }, 400], [{ carryAmount: -0.1, excludedAmount: 0.4 }, 400],
+    [{ carryAmount: NaN, excludedAmount: 0.3 }, 400], [{ carryAmount: Infinity, excludedAmount: 0 }, 400],
+    [{ carryAmount: 0.001, excludedAmount: 0.299 }, 400], [{ carryAmount: "0.1", excludedAmount: 0.2 }, 400],
+    [{ carryAmount: 0.1, excludedAmount: 0.19 }, 409], [undefined, 409],
+  ] as const) {
+    await assert.rejects(() => service.closeMonth(month.id, payload as never), { statusCode });
+    assert.deepEqual(await service.getActiveMonth(), before);
+    assert.deepEqual(await service.getMonthlyLedger({ monthId: month.id, includeSystemEvents: true }), ledger);
+  }
+  const closed = await service.closeMonth(month.id, { carryAmount: 0.1, excludedAmount: 0.2 });
+  assert.deepEqual(closed.closureAllocation, { availableMoney: 0.3, carryAmount: 0.1, excludedAmount: 0.2 });
+});
+
+test("guided closure keeps physical cash independent and rejects consumed predecessors", async () => {
+  const { db } = createIntegrationDb();
+  const service = createMonthlyCycleTestService(db);
+  const may = await service.openMonth({ year: 2026, month: 5 });
+  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 100, receivedAt: "2026-05-01T00:00:00.000Z" });
+  await service.withdrawCash({ monthId: may.id, amount: 40, occurredAt: "2026-05-02T00:00:00.000Z" });
+  await service.recordExpense({ monthId: may.id, sourceSubcategoryId: null, amount: 10, occurredAt: "2026-05-03T00:00:00.000Z", paymentMethod: "CASH" });
+  const closed = await service.closeMonth(may.id, { carryAmount: 20, excludedAmount: 40 });
+  assert.equal(closed.cashBalance, 30);
+  assert.equal(closed.availableMoney, 60);
+  const july = await service.openMonth({ year: 2026, month: 7 });
+  assert.equal(july.cashBalance, 30);
+  assert.equal(july.availableMoney, 20);
+  await service.closeMonth(july.id, { carryAmount: 0, excludedAmount: 20 });
+  await assert.rejects(() => service.openMonth({ year: 2026, month: 6 }), { statusCode: 409 });
+  assert.equal(await service.getActiveMonth(), null);
+});
+
+test("guided closure retains zero baseline, rejects negative money and requires deficit coverage", async () => {
+  for (const kind of ["zero", "negative", "deficit"] as const) {
+    const { db } = createIntegrationDb();
+    const service = createMonthlyCycleTestService(db);
+    const month = await service.openMonth({ year: 2026, month: 5 });
+    if (kind === "zero") {
+      const closed = await service.closeMonth(month.id);
+      assert.deepEqual(closed.closureAllocation, { availableMoney: 0, carryAmount: 0, excludedAmount: 0 });
+      assert.deepEqual(await service.closeMonth(month.id), closed);
+      continue;
+    }
+    if (kind === "deficit") await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 1000, receivedAt: "2026-05-01" });
+    const before = await service.recordExpense({ monthId: month.id, sourceSubcategoryId: kind === "deficit" ? month.categories[0]!.subcategories[0]!.id : null, amount: 350, occurredAt: "2026-05-02", paymentMethod: "NON_CASH" });
+    const ledger = await service.getMonthlyLedger({ monthId: month.id, includeSystemEvents: true });
+    await assert.rejects(() => service.closeMonth(month.id, { carryAmount: kind === "deficit" ? 650 : 0, excludedAmount: 0 }), { statusCode: 409 });
+    assert.deepEqual(await service.getActiveMonth(), before);
+    assert.deepEqual(await service.getMonthlyLedger({ monthId: month.id, includeSystemEvents: true }), ledger);
+    if (kind === "deficit") {
+      const review = await service.applyClosureAction({ monthId: month.id, type: "DEFICIT_COVER_FROM_POCKET", sourcePocketId: "pocket-buffer", targetSubcategoryId: month.categories[0]!.subcategories[0]!.id, amount: 50 });
+      assert.deepEqual(review.pendingDeficits, []);
+      assert.equal((await service.closeMonth(month.id, { carryAmount: 650, excludedAmount: 0 })).status, "CLOSED");
+    }
+  }
 });

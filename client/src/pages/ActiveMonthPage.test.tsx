@@ -112,6 +112,7 @@ describe("ActiveMonthPage", () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    vi.unstubAllEnvs();
   });
 
   beforeEach(() => {
@@ -801,6 +802,54 @@ describe("ActiveMonthPage", () => {
     expect(occurredAt.getDate()).toBe(14);
     expect(occurredAt.getHours()).toBe(21);
     expect(occurredAt.getMinutes()).toBe(14);
+  });
+
+  it("submits month-end expenses with a local offset and the exact real instant", async () => {
+    vi.stubEnv("TZ", "America/Bogota");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const instant = new Date("2026-11-01T01:14:15.250Z");
+    vi.setSystemTime(instant);
+    const october = { ...activeMonth, month: 10 };
+    apiMock.getActiveMonth.mockResolvedValue(october);
+    apiMock.recordExpense.mockResolvedValue(october);
+    render(<ActiveMonthPage />);
+
+    const date = await screen.findByLabelText("Fecha del gasto");
+    expect(date).toHaveValue("2026-10-31");
+    fireEvent.change(screen.getByLabelText("Monto", { selector: "input" }), { target: { value: "20" } });
+    fireEvent.submit(date.closest("form")!);
+
+    await waitFor(() => expect(apiMock.recordExpense).toHaveBeenCalledTimes(1));
+    const payload = apiMock.recordExpense.mock.calls[0][0];
+    expect(payload.occurredAt).toBe("2026-10-31T20:14:15.250-05:00");
+    expect(new Date(payload.occurredAt).getTime()).toBe(instant.getTime());
+    expect(apiMock.updateExpense).not.toHaveBeenCalled();
+    expect(await screen.findByText("Gasto registrado y saldos recalculados.")).toBeInTheDocument();
+  });
+
+  it("edits a month-end expense using its linked-month local date without changing its instant", async () => {
+    vi.stubEnv("TZ", "America/Bogota");
+    const october = { ...activeMonth, month: 10 };
+    const occurredAt = "2026-11-01T01:14:15.250Z";
+    apiMock.getActiveMonth.mockResolvedValue(october);
+    apiMock.updateExpense.mockResolvedValue(october);
+    apiMock.getExpenseHistory.mockResolvedValue([{
+      id: "expense-1", occurredAt, paymentMethod: "NON_CASH", amount: 20,
+      description: "Café", creditCardId: null, category: null, subcategory: null,
+    }]);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true, json: async () => ledgerResponse(ledgerEntry("expense-1", "NON_CASH_EXPENSE", "Café", occurredAt)),
+    }));
+    render(<ActiveMonthPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Editar gasto Café" }));
+    const date = screen.getByLabelText("Fecha del gasto");
+    expect(date).toHaveValue("2026-10-31");
+    fireEvent.change(screen.getByLabelText(/Descripción/), { target: { value: "Corregido" } });
+    fireEvent.submit(date.closest("form")!);
+    await waitFor(() => expect(apiMock.updateExpense).toHaveBeenCalledWith(expect.objectContaining({
+      expenseId: "expense-1", occurredAt, description: "Corregido",
+    })));
+    expect(await screen.findByText("Gasto actualizado en el mes activo y saldos recalculados.")).toBeInTheDocument();
   });
 
   it("records an uncategorized expense without a synthetic subcategory", async () => {

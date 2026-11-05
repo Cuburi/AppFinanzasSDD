@@ -8,6 +8,13 @@ const entry = (key: string, eventType = "CASH_EXPENSE", occurredAt = "2026-08-01
 });
 
 describe("monthly ledger validation", () => {
+  it("labels opening carry as a read-only system transfer, never new income", () => {
+    const opening = { ...entry("opening", "OPENING_BALANCE", undefined, true), direction: "TRANSFER", source: { kind: "MONTH", id: "previous" }, destination: { kind: "MONTH", id: "month-1" }, balanceEffects: { availableMoney: 20, cashBalance: 0, subcategoryAvailable: 0, pocketBalance: 0 } };
+    const item = buildMonthlyLedgerViewModel(validateMonthlyLedger({ monthId: "month-1", status: "ACTIVE", entries: [opening] })).days[0].items[0];
+    expect(item.kind).toBe("system-run");
+    if (item.kind !== "system-run") throw new Error("Expected system transfer");
+    expect(item.entries[0]).toMatchObject({ typeLabel: "Saldo inicial del cierre anterior", isReadOnly: true, direction: "TRANSFER", balanceEffects: opening.balanceEffects });
+  });
   it("rejects malformed replacements while accepting unknown taxonomy as read-only data", () => {
     expect(() => validateMonthlyLedger({ monthId: "month-1", status: "ACTIVE", entries: [entry("bad", "ALIEN_EVENT")] })).not.toThrow();
     expect(() => validateMonthlyLedger({ monthId: "month-1", status: "ACTIVE", entries: [{ entryKey: "bad" }] })).toThrow("Invalid monthly ledger response.");

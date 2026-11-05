@@ -45,6 +45,15 @@ export const mapMonth = (month: MonthRecord): MonthView => {
     })),
     monthlyIncomeTotal: balances.monthlyIncomeTotal,
     availableMoney: balances.availableMoney,
+    openingBalance: month.openingBalance ? decimalToNumber(month.openingBalance) : 0,
+    openingSourceMonthId: month.openingSourceMonthId ?? null,
+    closureAllocation: month.closureCarryAmount != null && month.closureExcludedAmount != null
+      ? {
+          availableMoney: Number((decimalToNumber(month.closureCarryAmount) + decimalToNumber(month.closureExcludedAmount)).toFixed(2)),
+          carryAmount: decimalToNumber(month.closureCarryAmount),
+          excludedAmount: decimalToNumber(month.closureExcludedAmount),
+        }
+      : null,
     cashBalance: calculateCashBalance(month.movements),
     categories: month.categories.map((category) => ({
       id: category.id,
