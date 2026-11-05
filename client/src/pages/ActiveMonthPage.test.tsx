@@ -501,6 +501,71 @@ describe("ActiveMonthPage", () => {
     expect(within(depositForm).queryByLabelText("Subcategoría de origen")).not.toBeInTheDocument();
   });
 
+  it("fills the deposit amount with the selected subcategory maximum without saving", async () => {
+    const user = userEvent.setup();
+    apiMock.getActiveMonth.mockResolvedValueOnce({
+      ...activeMonth,
+      categories: [{ ...activeMonth.categories[0], subcategories: [{ ...activeMonth.categories[0].subcategories[0], available: 500.25 }] }],
+    });
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    const depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+    const useMaximum = within(depositForm).getByRole("button", { name: "Usar máximo disponible" });
+
+    expect(useMaximum).toBeDisabled();
+    await user.selectOptions(within(depositForm).getByLabelText("Categoría de origen"), "cat-income");
+    expect(useMaximum).toBeDisabled();
+    await user.selectOptions(within(depositForm).getByLabelText("Subcategoría de origen"), "sub-bonus");
+    expect(useMaximum).toBeEnabled();
+    await user.click(useMaximum);
+
+    expect(within(depositForm).getByLabelText("Monto", { selector: "input" })).toHaveValue(500.25);
+    expect(apiMock.depositToPocket).not.toHaveBeenCalled();
+
+    await user.selectOptions(within(depositForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
+    await user.click(within(depositForm).getByRole("button", { name: "Depositar en bolsillo" }));
+    await waitFor(() => expect(apiMock.depositToPocket).toHaveBeenCalledWith(expect.objectContaining({ sourceKind: "SUBCATEGORY", sourceSubcategoryId: "sub-bonus", amount: 500.25 })));
+  });
+
+  it("fills the deposit amount with the month available money and disables the shortcut when nothing is available", async () => {
+    const user = userEvent.setup();
+    apiMock.getActiveMonth.mockResolvedValueOnce({ ...activeMonth, availableMoney: 375 }).mockResolvedValueOnce({ ...activeMonth, availableMoney: 0 });
+    const { unmount } = render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    let depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+    await user.selectOptions(within(depositForm).getByLabelText("Origen de los fondos"), "MONTH_AVAILABLE");
+    await user.click(within(depositForm).getByRole("button", { name: "Usar máximo disponible" }));
+    expect(within(depositForm).getByLabelText("Monto", { selector: "input" })).toHaveValue(375);
+    expect(apiMock.depositToPocket).not.toHaveBeenCalled();
+    unmount();
+
+    render(<ActiveMonthPage />);
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+    await user.selectOptions(within(depositForm).getByLabelText("Origen de los fondos"), "MONTH_AVAILABLE");
+    expect(within(depositForm).getByRole("button", { name: "Usar máximo disponible" })).toBeDisabled();
+  });
+
+  it("renders the deposit and withdrawal amount fields at full field width", async () => {
+    const user = userEvent.setup();
+    render(<ActiveMonthPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Depositar en bolsillo" }));
+    const depositForm = screen.getByRole("region", { name: "Depositar en bolsillo" }).querySelector("form");
+    if (!depositForm) throw new Error("Missing deposit form.");
+    expect(within(depositForm).getByLabelText("Monto", { selector: "input" }).closest("label")).not.toHaveClass("small-field");
+
+    await user.click(screen.getByRole("button", { name: "Retirar efectivo" }));
+    const withdrawalForm = screen.getByRole("region", { name: "Retirar efectivo" }).querySelector("form");
+    if (!withdrawalForm) throw new Error("Missing withdrawal form.");
+    expect(within(withdrawalForm).getByLabelText("Monto a retirar").closest("label")).not.toHaveClass("small-field");
+  });
+
   it("refreshes the visible destination pocket balance from the server after a successful deposit", async () => {
     const user = userEvent.setup();
     apiMock.getPockets.mockResolvedValueOnce(activePockets).mockResolvedValueOnce([
