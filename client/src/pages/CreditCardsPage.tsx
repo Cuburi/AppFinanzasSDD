@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { Button, Card, KpiCard, SectionHeader, StatusPill } from "../components/ui";
+import { Button, Card, FeedbackBanner, KpiCard, SectionHeader, StatusPill } from "../components/ui";
 import { api } from "../lib/api";
 import type { CreditCardStatementBucketView, CreditCardStatementSummaryListView, CreditCardStatementSummaryView, CreditCardView } from "../types";
 
@@ -226,7 +226,7 @@ export const CreditCardsPage = () => {
           title="Credit card statement periods"
         />
         {statementState.loading ? <p>Loading credit card statement periods...</p> : null}
-        {statementState.error ? <p role="alert" className="error">{statementState.error}</p> : null}
+        {statementState.error ? <FeedbackBanner tone="error">{statementState.error}</FeedbackBanner> : null}
         {!statementState.loading && !statementState.error && statements.length === 0 ? <p>No credit-card statement periods are available yet.</p> : null}
 
         {statements.length > 0 ? (
@@ -279,12 +279,12 @@ export const CreditCardsPage = () => {
           <Button disabled={submitting} type="submit">Create card</Button>
         </form>
 
-        {message ? <p className="success" role="status">{message}</p> : null}
-        {mutationError ? <p className="error" role="alert">{mutationError}</p> : null}
+        {message ? <FeedbackBanner tone="success">{message}</FeedbackBanner> : null}
+        {mutationError ? <FeedbackBanner tone="error">{mutationError}</FeedbackBanner> : null}
         {cardsState.loading ? <p>Loading credit cards...</p> : null}
         {cardsState.error ? (
           <>
-            <p role="alert" className="error">{cardsState.error}</p>
+            <FeedbackBanner tone="error">{cardsState.error}</FeedbackBanner>
             <p>Statement data remains visible while card inventory could not load.</p>
           </>
         ) : null}

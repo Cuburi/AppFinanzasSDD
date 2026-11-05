@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "../lib/api";
-import { Button, Card, StatusPill } from "../components/ui";
+import { Button, Card, FeedbackBanner, StatusPill } from "../components/ui";
 import type { CloseMonthInput, ClosureReview, Month } from "../types";
 import { ClosedMonthDashboard } from "../features/monthly-cycle/closed-month-dashboard/components/ClosedMonthDashboard";
 import { GuidedClosure } from "../features/monthly-cycle/month-closure/GuidedClosure";
@@ -207,8 +207,8 @@ export const CloseMonthPage = () => {
         </Button>
       </header>
       {loading ? <p role="status">Cargando revisión de cierre...</p> : null}
-      {message ? <p role="status" className="success">{message}</p> : null}
-      {error ? <p role="alert" className="error">{error}</p> : null}
+      {message ? <FeedbackBanner tone="success">{message}</FeedbackBanner> : null}
+      {error ? <FeedbackBanner tone="error">{error}</FeedbackBanner> : null}
       {!loading && !activeMonth && !error ? (
         <Card aria-label="Sin mes activo">
           <h2>No hay mes activo</h2>

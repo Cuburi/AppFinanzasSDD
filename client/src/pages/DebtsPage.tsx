@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 
 import { api } from "../lib/api";
 import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
-import { Button, Card, SectionHeader, StatusPill } from "../components/ui";
+import { Button, Card, FeedbackBanner, SectionHeader, StatusPill } from "../components/ui";
 import type { DebtDirection, DebtView } from "../types";
 
 const formatMoney = (amount: number, _currency: string) => formatCop(amount);
@@ -141,8 +141,8 @@ export const DebtsPage = () => {
         </form>
       </Card>
 
-      {message ? <p className="success">{message}</p> : null}
-      {error ? <p className="error">{error}</p> : null}
+      {message ? <FeedbackBanner tone="success">{message}</FeedbackBanner> : null}
+      {error ? <FeedbackBanner tone="error">{error}</FeedbackBanner> : null}
 
       <Card aria-label="Listado de deudas" className="stack-md">
         <h2>Listado</h2>

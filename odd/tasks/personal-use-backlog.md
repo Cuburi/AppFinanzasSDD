@@ -5,7 +5,7 @@ Use this file to capture real-use frictions and follow-up ideas before they beco
 ## Inbox
 
 - [ ] Recurring expenses.
-- [ ] Improve success and error feedback beyond plain colored text.
+- [ ] Translate server error messages shown to the user (some arrive in English, e.g. "Insufficient funds for this pocket deposit.").
 - [ ] Improve the credit-card screen and logic after reviewing its current capabilities and defining the desired changes.
 
 ### User reports — monthly-use review
@@ -18,6 +18,8 @@ Additional report: "Me falto algo, el hacer un deposito a un bolsillo el campo d
 4. "Mejorar pantalla de cierre de mes y lógica porque no se si siempre convenga que el mes quede en 0, me refiero si me sobro plata pero que no ira a ningun bolsillo"
 
 ## Recently resolved / no longer pending
+
+- [x] Success and error feedback: one shared inline `FeedbackBanner` (icon, title, tinted background, close button; success auto-dismisses after 6s, errors persist) across all pages, message texts unchanged. Approved artboard `design/feedback-messages/01-inline-banner.html`. Issue #225. Client 276/276, TypeScript, build and Chromium 1440/320 passed.
 
 - [x] Pocket deposit form: amount field at full field width (withdrawal amount too) and a “Usar máximo disponible” shortcut that fills the selected subcategory or month available amount without saving. Issue #223, PR #224. Client 267/267, TypeScript, build, Playwright 8/8 and Chromium 1440/320 passed; CI green.
 
