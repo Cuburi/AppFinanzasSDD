@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import type { SavingsPocketMovement } from "../../../types";
 
@@ -19,7 +19,9 @@ const movementProvenance = (movement: SavingsPocketMovement) => {
 const previewCount = 3;
 
 export const PocketRecentMovements = ({ movements }: PocketRecentMovementsProps) => {
+  const [expanded, setExpanded] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const listId = useId();
   const visibleMovements = showAll ? movements : movements.slice(0, previewCount);
   const hiddenCount = Math.max(movements.length - previewCount, 0);
 
@@ -30,8 +32,19 @@ export const PocketRecentMovements = ({ movements }: PocketRecentMovementsProps)
         {movements.length > 0 ? <span>{movements.length} recientes</span> : null}
       </div>
       {movements.length > 0 ? (
+        <button
+          aria-controls={listId}
+          aria-expanded={expanded}
+          className="button tertiary pocket-movements-toggle"
+          onClick={() => setExpanded((current) => !current)}
+          type="button"
+        >
+          {expanded ? "Ocultar movimientos" : `Ver movimientos (${movements.length})`}
+        </button>
+      ) : null}
+      {movements.length > 0 && expanded ? (
         <>
-          <ul>
+          <ul id={listId}>
             {visibleMovements.map((movement) => (
               <li className={`pocket-movement pocket-movement-${movement.direction}`} key={movement.id}>
                 <div className="pocket-movement-main">
@@ -52,9 +65,10 @@ export const PocketRecentMovements = ({ movements }: PocketRecentMovementsProps)
             </button>
           ) : null}
         </>
-      ) : (
+      ) : null}
+      {movements.length === 0 ? (
         <p className="pocket-movements-empty">No se recibieron movimientos recientes.</p>
-      )}
+      ) : null}
     </section>
   );
 };

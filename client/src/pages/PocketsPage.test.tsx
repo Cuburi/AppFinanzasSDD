@@ -85,6 +85,8 @@ describe("PocketsPage", () => {
     expect(await screen.findByText("Emergencias")).toBeInTheDocument();
     expect(screen.getByText("Balance: $250 COP")).toBeInTheDocument();
     expect(screen.getByText("Meta: $1.000 COP")).toBeInTheDocument();
+    expect(screen.queryByText(/Ahorro inicial/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Ver movimientos (1)" }));
     expect(screen.getByText(/Ahorro inicial/)).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Success: Activo" })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Success: Balance $250 COP" })).toBeInTheDocument();
@@ -155,7 +157,8 @@ describe("PocketsPage", () => {
 
     render(<PocketsPage />);
 
-    expect(await screen.findByText(/Uso de emergencia/)).toBeInTheDocument();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Ver movimientos (1)" }));
+    expect(screen.getByText(/Uso de emergencia/)).toBeInTheDocument();
   });
 
   it("submits an external deposit only from Pockets and refreshes the displayed pockets", async () => {

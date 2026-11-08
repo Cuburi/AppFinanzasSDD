@@ -1,10 +1,64 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { PocketRecentMovements } from "./PocketRecentMovements";
 
+const expandMovements = async (user = userEvent.setup()) => {
+  await user.click(screen.getByRole("button", { name: /Ver movimientos/ }));
+  return user;
+};
+
 describe("PocketRecentMovements", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("keeps movements collapsed until the pocket is expanded, then collapses them again", async () => {
+    const user = userEvent.setup();
+    render(
+      <PocketRecentMovements
+        movements={[
+          { id: "one", type: "POCKET_DEPOSIT_EXTERNAL", sourceKind: "EXTERNAL", amount: 50, occurredAt: "2026-05-14T12:00:00.000Z", description: "Ahorro", direction: "in" },
+          { id: "two", type: "POCKET_TRANSFER", amount: 20, occurredAt: "2026-05-13T12:00:00.000Z", description: "Transfer", direction: "out" },
+        ]}
+      />,
+    );
+
+    const toggle = screen.getByRole("button", { name: "Ver movimientos (2)" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
+    expect(screen.getByText("2 recientes")).toBeInTheDocument();
+
+    await user.click(toggle);
+
+    const hide = screen.getByRole("button", { name: "Ocultar movimientos" });
+    expect(hide).toHaveAttribute("aria-expanded", "true");
+    expect(hide).toHaveAttribute("aria-controls", screen.getByRole("list").id);
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+
+    await user.click(hide);
+
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ver movimientos (2)" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("expands each pocket's movements independently", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <PocketRecentMovements movements={[{ id: "a", type: "POCKET_TRANSFER", amount: 10, occurredAt: "2026-05-14T12:00:00.000Z", description: "First pocket", direction: "in" }]} />
+        <PocketRecentMovements movements={[{ id: "b", type: "POCKET_TRANSFER", amount: 20, occurredAt: "2026-05-14T12:00:00.000Z", description: "Second pocket", direction: "in" }]} />
+      </>,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "Ver movimientos (1)" })[0]!);
+
+    expect(screen.getByText("First pocket")).toBeInTheDocument();
+    expect(screen.queryByText("Second pocket")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Ver movimientos (1)" })).toHaveLength(1);
+  });
+
   it("previews three movements, then expands the remaining supplied movements in response order", async () => {
     const user = userEvent.setup();
     render(
@@ -19,6 +73,7 @@ describe("PocketRecentMovements", () => {
         ]}
       />,
     );
+    await expandMovements(user);
 
     const movements = screen.getAllByRole("listitem");
     expect(movements).toHaveLength(3);
@@ -39,12 +94,13 @@ describe("PocketRecentMovements", () => {
     expect(screen.queryByRole("link", { name: /view all/i })).not.toBeInTheDocument();
   });
 
-  it("labels a pocket withdrawal as an understandable outgoing spend", () => {
+  it("labels a pocket withdrawal as an understandable outgoing spend", async () => {
     render(
       <PocketRecentMovements
         movements={[{ id: "withdrawal", type: "DEFICIT_COVER_FROM_POCKET", amount: 25, occurredAt: "2026-05-14T12:00:00.000Z", description: "Groceries", direction: "out" }]}
       />,
     );
+    await expandMovements();
 
     const movement = screen.getByText(/Retiro o gasto del bolsillo/).closest("li");
 
@@ -60,9 +116,10 @@ describe("PocketRecentMovements", () => {
     render(<PocketRecentMovements movements={[]} />);
 
     expect(screen.getByText("No se recibieron movimientos recientes.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /movimientos/ })).not.toBeInTheDocument();
   });
 
-  it("preserves the UTC calendar date for a movement recorded at midnight", () => {
+  it("preserves the UTC calendar date for a movement recorded at midnight", async () => {
     const { container } = render(
       <PocketRecentMovements
         movements={[
@@ -70,6 +127,7 @@ describe("PocketRecentMovements", () => {
         ]}
       />,
     );
+    await expandMovements();
 
     expect(within(container).getByRole("time")).toHaveTextContent("14/05/2026");
   });
