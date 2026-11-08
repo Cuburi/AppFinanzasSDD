@@ -81,7 +81,7 @@ describe("DebtsPage", () => {
     const amount = await screen.findByLabelText("Monto total");
     fireEvent.change(amount, { target: { value: "0124" } });
 
-    expect(amount).toHaveValue(124);
+    expect(amount).toHaveValue("$ 124");
   });
 
   it("creates a debt and keeps it visible in the MVP list", async () => {

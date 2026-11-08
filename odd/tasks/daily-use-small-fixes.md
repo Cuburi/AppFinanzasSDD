@@ -12,7 +12,7 @@ Order: pocket collapse, currency money input, server error translation.
 ## Tasks
 
 - [x] T1 — S3 — inline — collapsible movements per pocket (`PocketRecentMovements`), collapsed by default, independent per pocket.
-- [ ] T2 — S2 — inline — shared integer COP money input replacing every money field (18 sites in 7 screens).
+- [x] T2 — S2 — inline — shared `MoneyInput` (integer COP, caret-preserving) replacing all 18 money fields in 7 screens.
 - [ ] T3 — S1 — inline — Spanish server error messages at the source, plus Spanish client transport fallback.
 
 ## Log
@@ -20,3 +20,4 @@ Order: pocket collapse, currency money input, server error translation.
 - L1 — User (original request, after the agreed backlog order): "Si me parece y creeria que los arreglos pequeños los podemos hacer de una, no?"
 - L2 — Exploration: 18 money inputs, no shared input component, 6 page test files type into money fields; server errors are English across all modules with 17 test files asserting exact strings; pockets render movements unconditionally at `PocketsPage.tsx:471`, `TemplatePage.tsx` already uses controlled `<details>` per category.
 - L3 — User decision on money format: "Solo pesos enteros".
+- L4 — T2 consequences of "Solo pesos enteros": "Usar máximo disponible" truncates cents (500.25 -> $ 500); stored amounts with cents load truncated when edited; guided split hint now says whole pesos; native min/max on money inputs removed, server validation applies.

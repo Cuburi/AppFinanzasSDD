@@ -17,13 +17,13 @@ for (const width of [1440, 320]) {
       if (path === "/api/months/active") payload = { month: next ?? (closed ? null : initial) };
       else if (path === "/api/months/latest-closed") payload = { month: closed };
       else if (path === "/api/months/guided-month" && request.method() === "GET") payload = closed;
-      else if (path.endsWith("/closure-review")) payload = { monthId: path.includes("guided-next") ? "guided-next" : initial.id, status: "ACTIVE", canClose: false, requiresDisposition: true, closureAllocation: null, availableMoney: path.includes("guided-next") ? 100000.01 : 300000, availableMoneyBlocker: "SURPLUS", pendingDeficits: [], pendingSurpluses: [], budgetVariances: [] };
+      else if (path.endsWith("/closure-review")) payload = { monthId: path.includes("guided-next") ? "guided-next" : initial.id, status: "ACTIVE", canClose: false, requiresDisposition: true, closureAllocation: null, availableMoney: path.includes("guided-next") ? 100000 : 300000, availableMoneyBlocker: "SURPLUS", pendingDeficits: [], pendingSurpluses: [], budgetVariances: [] };
       else if (path === "/api/months/guided-month/close" && request.method() === "POST") {
         const allocation = request.postDataJSON(); posts.push(allocation);
         closed = { ...initial, status: "CLOSED", closedAt: "2026-10-31", closureAllocation: { availableMoney: 300000, ...allocation } }; payload = closed;
       } else if (path === "/api/months/open" && request.method() === "POST") {
         expect(request.postDataJSON()).toEqual({ year: 2026, month: 11 });
-        next = { ...initial, id: "guided-next", month: 11, openingBalance: 100000.01, openingSourceMonthId: initial.id, monthlyIncomeTotal: 0, availableMoney: 100000.01 }; payload = next;
+        next = { ...initial, id: "guided-next", month: 11, openingBalance: 100000, openingSourceMonthId: initial.id, monthlyIncomeTotal: 0, availableMoney: 100000 }; payload = next;
       } else { await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: `Unexpected intercepted endpoint: ${path}` }) }); return; }
       await route.fulfill({ contentType: "application/json", body: JSON.stringify(payload) });
     });
@@ -45,26 +45,26 @@ for (const width of [1440, 320]) {
     await page.getByLabel("Fuera del seguimiento (COP)").fill("200000");
     await expect(page.getByRole("button", { name: "Revisar cierre →" })).toBeDisabled();
     expect(posts).toEqual([]);
-    await page.getByLabel("Al siguiente mes (COP)").fill("100000.01");
-    await page.getByLabel("Fuera del seguimiento (COP)").fill("199999.99");
+    await page.getByLabel("Al siguiente mes (COP)").fill("100000");
+    await page.getByLabel("Fuera del seguimiento (COP)").fill("200000");
     await page.getByRole("button", { name: "Revisar cierre →" }).click();
     expect(posts).toEqual([]);
     await expect(page.getByRole("button", { name: "Confirmar cierre" })).toBeVisible();
     await page.getByRole("button", { name: "← Cambiar destino" }).click();
-    await expect(page.getByLabel("Al siguiente mes (COP)")).toHaveValue("100000.01");
+    await expect(page.getByLabel("Al siguiente mes (COP)")).toHaveValue("$ 100.000");
     await page.getByRole("button", { name: "Revisar cierre →" }).click();
     await page.getByRole("button", { name: "Confirmar cierre" }).click();
     await expect(page.getByRole("region", { name: "Resumen del mes cerrado" })).toBeVisible();
-    expect(posts).toEqual([{ carryAmount: 100000.01, excludedAmount: 199999.99 }]);
+    expect(posts).toEqual([{ carryAmount: 100000, excludedAmount: 200000 }]);
     await expect(page).toHaveURL(/closedMonthId=guided-month/);
     const beforeReload = apiPaths.length;
     await page.reload();
-    await expect(page.getByRole("region", { name: "Historial de distribución del cierre" })).toContainText("100.000,01");
+    await expect(page.getByRole("region", { name: "Historial de distribución del cierre" })).toContainText("100.000");
     expect(apiPaths[beforeReload]).toBe("/api/months/guided-month");
     await page.getByRole("button", { name: "Abrir noviembre de 2026" }).click();
     await expect(page.getByRole("heading", { name: "Esto es lo que te queda" })).toBeVisible();
     await expect(page).not.toHaveURL(/closedMonthId/);
-    await expect(page.locator(".month-closure-equation")).toContainText("100.000,01");
+    await expect(page.locator(".month-closure-equation")).toContainText("100.000");
     await expect(page.locator(".month-closure-equation")).toContainText("+ Ingresos$0 COP");
     expect(await page.locator("html").evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   });

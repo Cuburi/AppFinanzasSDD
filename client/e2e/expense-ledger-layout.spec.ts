@@ -61,7 +61,7 @@ for (const width of [1280, 320]) {
         expect(box.x + box.width).toBeLessThanOrEqual(width);
         expect(box.height).toBeGreaterThan(0);
       }
-      await expect(capture.getByLabel("Monto", { exact: true })).toHaveValue("34567");
+      await expect(capture.getByLabel("Monto", { exact: true })).toHaveValue("$ 34.567");
       await expect(capture.getByLabel("Descripción (opcional)", { exact: true })).toHaveValue("Borrador conservado");
       await expect(capture.getByLabel("Fecha del gasto")).toHaveValue("2026-08-05");
       await expect(capture.getByLabel("Método de pago")).toHaveValue("CASH");

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "../lib/api";
-import { Button, Card, FeedbackBanner, StatusPill } from "../components/ui";
+import { Button, Card, FeedbackBanner, MoneyInput, StatusPill } from "../components/ui";
 import type { CloseMonthInput, ClosureReview, Month } from "../types";
 import { ClosedMonthDashboard } from "../features/monthly-cycle/closed-month-dashboard/components/ClosedMonthDashboard";
 import { GuidedClosure } from "../features/monthly-cycle/month-closure/GuidedClosure";
-import { formatCop } from "../lib/money";
+import { formatCop, formatMoneyInput, toMoneyInputValue } from "../lib/money";
 
 type TextById = Record<string, string>;
 const errorText = (error: unknown) => error instanceof Error ? error.message : "No se pudo completar la operación.";
@@ -271,16 +271,12 @@ export const CloseMonthPage = () => {
                   </label>
                   <label className="field">
                     Monto
-                    <input
+                    <MoneyInput
                       disabled={submitting}
-                      max={deficit.amount}
-                      min="0.01"
-                      placeholder={deficit.amount.toFixed(2)}
-                      step="0.01"
-                      type="number"
+                      placeholder={formatMoneyInput(toMoneyInputValue(deficit.amount))}
                       value={deficitAmounts[deficit.subcategoryId] ?? ""}
-                      onChange={event => setDeficitAmounts(current => ({
-                        ...current, [deficit.subcategoryId]: event.target.value,
+                      onValueChange={digits => setDeficitAmounts(current => ({
+                        ...current, [deficit.subcategoryId]: digits,
                       }))}
                     />
                   </label>

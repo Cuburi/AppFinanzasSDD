@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { Button, Card, FeedbackBanner, KpiCard, SectionHeader, StatusPill } from "../components/ui";
+import { Button, Card, FeedbackBanner, KpiCard, MoneyInput, SectionHeader, StatusPill } from "../components/ui";
+import { toMoneyInputValue } from "../lib/money";
 import { api } from "../lib/api";
 import type { CreditCardStatementBucketView, CreditCardStatementSummaryListView, CreditCardStatementSummaryView, CreditCardView } from "../types";
 
@@ -49,7 +50,7 @@ const CardStatus = ({ card }: { card: CreditCardView }) => (
 const cardFormFromView = (card: CreditCardView): CardForm => ({
   issuer: card.issuer,
   name: card.name,
-  limit: card.limit?.toString() ?? "",
+  limit: toMoneyInputValue(card.limit),
   closingDay: card.closingDay.toString(),
   dueDay: card.dueDay.toString(),
 });
@@ -89,7 +90,7 @@ const CardFormFields = ({ disabled, form, onChange }: { disabled: boolean; form:
     </label>
     <label className="field small-field">
       <span>Limit (optional)</span>
-      <input disabled={disabled} min="0.01" step="0.01" type="number" value={form.limit} onChange={(event) => onChange("limit", event.target.value)} />
+      <MoneyInput disabled={disabled} value={form.limit} onValueChange={(digits) => onChange("limit", digits)} />
     </label>
     <label className="field small-field">
       <span>Closing day</span>
