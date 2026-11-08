@@ -2,11 +2,25 @@
 
 Use this file to capture real-use frictions and follow-up ideas before they become scoped issues/PRs.
 
+## Agreed order
+
+1. Small daily-use fixes, together: translate server error messages, currency format while typing, collapsible pocket movements.
+2. RM-027 UI diagnosis, before any serious screen redesign.
+3. Credit cards: screen improvements and statement payments as one piece of work.
+4. Recurring expenses and recurring incomes together.
+5. Excel export last, so it includes the data added by the previous items.
+
 ## Inbox
 
 - [ ] Recurring expenses.
 - [ ] Translate server error messages shown to the user (some arrive in English, e.g. "Insufficient funds for this pocket deposit.").
+- [ ] Format money inputs as currency while typing (thousands separators as the user types, keeping the stored value exact). User report: "que lo campos de dinero, me gustaria que tenga formato de moneda a medida que se vaya copiando".
+- [ ] Pockets screen: let each pocket collapse/expand its movements instead of always showing them, so the page stays short as movements accumulate. User report: "que en la pantalla de bolsillos pueda hacer wrap a cada bolsillo y no siempre esten los movimientos porque cuando ya llevo varios empieza a hacer largo esa pantalla".
 - [ ] Improve the credit-card screen and logic after reviewing its current capabilities and defining the desired changes.
+- [ ] Recurring incomes.
+- [ ] Export data to Excel.
+- [ ] Credit-card statement payments: keep the original statement amount and track paid amount, remaining balance, payment status and payment date through non-expense financial movements (deferred decision; pairs with the credit-card improvement above).
+- [ ] RM-027 UI direction audit (issue #195): read-only, screen-by-screen UI diagnosis from a usage perspective (findings per screen plus a prioritized direction for later redesign work), done before any redesign. Checklist and scope live in `odd/tasks/rm027-ui-direction-audit.md`.
 
 ### User reports — monthly-use review
 
