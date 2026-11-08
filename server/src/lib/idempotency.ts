@@ -71,14 +71,14 @@ export const createMemoryIdempotencyStore = (): IdempotencyStore => {
     async complete(requestKey, scope, response) {
       const key = recordKey(requestKey, scope);
       const existing = records.get(key);
-      if (!existing) throw new Error("Idempotency reservation was not found.");
+      if (!existing) throw new Error("No se encontró la reserva de idempotencia.");
       records.set(key, { ...existing, statusCode: response.statusCode, responseBody: response.body });
     },
     async failCompletion(requestKey, scope) {
       const key = recordKey(requestKey, scope);
       const existing = records.get(key);
       if (!existing || existing.statusCode !== null) return;
-      records.set(key, { ...existing, statusCode: 500, responseBody: { message: "Idempotent request completed, but its replay response could not be stored." } });
+      records.set(key, { ...existing, statusCode: 500, responseBody: { message: "La solicitud idempotente se completó, pero no se pudo guardar la respuesta para su repetición." } });
     },
     async abandon(requestKey, scope) {
       const key = recordKey(requestKey, scope);
@@ -114,7 +114,7 @@ export const createPrismaIdempotencyStore = (db: PrismaIdempotencyDb): Idempoten
         return { kind: "reserved" };
       } catch {
         const existing = await readExisting(record.requestKey, record.scope);
-        if (!existing) throw new Error("Idempotency reservation failed without an existing record.");
+        if (!existing) throw new Error("La reserva de idempotencia falló sin un registro existente.");
         return { kind: "existing", record: existing };
       }
     },
@@ -132,7 +132,7 @@ export const createPrismaIdempotencyStore = (db: PrismaIdempotencyDb): Idempoten
         `UPDATE "IdempotencyRecord" SET "statusCode" = 500, "responseBody" = $3::jsonb, "updatedAt" = CURRENT_TIMESTAMP WHERE "requestKey" = $1 AND "scope" = $2 AND "statusCode" IS NULL`,
         requestKey,
         scope,
-        JSON.stringify({ message: "Idempotent request completed, but its replay response could not be stored." }),
+        JSON.stringify({ message: "La solicitud idempotente se completó, pero no se pudo guardar la respuesta para su repetición." }),
       );
     },
     async abandon(requestKey, scope) {
@@ -159,11 +159,11 @@ export const runIdempotentCreate = async (input: {
 
   if (reservation.kind === "existing") {
     if (isIdempotencyConflict(reservation.record, fingerprint)) {
-      return { statusCode: 409, body: { message: "Idempotency-Key was already used for a different request." } };
+      return { statusCode: 409, body: { message: "Idempotency-Key ya se utilizó para una solicitud diferente." } };
     }
 
     if (reservation.record.statusCode === null) {
-      return { statusCode: 409, body: { message: "Idempotency-Key request is already in progress." } };
+      return { statusCode: 409, body: { message: "La solicitud con Idempotency-Key ya está en curso." } };
     }
 
     return { statusCode: reservation.record.statusCode, body: reservation.record.responseBody };

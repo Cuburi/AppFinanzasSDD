@@ -7,6 +7,8 @@ import { PaymentMethod } from "../../lib/prisma-client.js";
 import { createMemoryIdempotencyStore } from "../../lib/idempotency.js";
 import { createMonthlyCycleRouter, monthlyCycleRouter } from "./routes.js";
 import { DomainError, SemanticError } from "./shared/service-errors.js";
+import { createStrictDepositToPocketUseCase } from "./application/use-cases/movement-use-cases.js";
+import type { MonthlyCyclePorts } from "./application/ports/monthly-cycle-ports.js";
 import type { BasicMonthlyReportView, MonthView, MonthlyLedgerView } from "./dto/index.js";
 
 const report: BasicMonthlyReportView = {
@@ -119,7 +121,7 @@ test("monthlyCycleRouter maps blank report month ids to 400 and missing segment 
     const missingSegmentResponse = await request(server, "/api/months//reports/basic");
 
     assert.equal(encodedBlankResponse.status, 400);
-    assert.deepEqual(await encodedBlankResponse.json(), { message: "Month id is required." });
+    assert.deepEqual(await encodedBlankResponse.json(), { message: "Identificador del mes: valor obligatorio." });
     assert.equal(missingSegmentResponse.status, 404);
     assert.equal(calls, 0);
   } finally {
@@ -130,7 +132,7 @@ test("monthlyCycleRouter maps blank report month ids to 400 and missing segment 
 test("monthlyCycleRouter maps missing report months to 404", async () => {
   const server = createTestServer({
     async getBasicReport() {
-      throw new DomainError(404, "Month was not found.");
+      throw new DomainError(404, "No se encontró el mes.");
     },
   });
 
@@ -138,7 +140,7 @@ test("monthlyCycleRouter maps missing report months to 404", async () => {
     const response = await request(server, "/api/months/missing-month/reports/basic");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(await response.json(), { message: "Month was not found." });
+    assert.deepEqual(await response.json(), { message: "No se encontró el mes." });
   } finally {
     server.close();
   }
@@ -159,7 +161,7 @@ test("monthlyCycleRouter exposes the unpaginated ledger and rejects invalid syst
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), ledger);
     assert.equal(invalid.status, 400);
-    assert.deepEqual(await invalid.json(), { code: "INVALID_QUERY", message: "includeSystemEvents must be true or false." });
+    assert.deepEqual(await invalid.json(), { code: "INVALID_QUERY", message: "includeSystemEvents debe ser true o false." });
     assert.deepEqual(calls, [{ monthId: "month-1", includeSystemEvents: false }, { monthId: "month-1", includeSystemEvents: true }]);
   } finally {
     server.close();
@@ -177,7 +179,7 @@ test("monthlyCycleRouter returns a safe 500 response for unexpected ledger failu
     const response = await request(server, "/api/months/month-1/ledger");
 
     assert.equal(response.status, 500);
-    assert.deepEqual(await response.json(), { message: "Internal server error." });
+    assert.deepEqual(await response.json(), { message: "Error interno del servidor." });
   } finally {
     server.close();
   }
@@ -191,7 +193,7 @@ test("monthlyCycleRouter maps blank ledger month ids to semantic 400 before serv
     const response = await request(server, "/api/months/%20%20%20/ledger");
 
     assert.equal(response.status, 400);
-    assert.deepEqual(await response.json(), { code: "INVALID_QUERY", message: "Month id is required." });
+    assert.deepEqual(await response.json(), { code: "INVALID_QUERY", message: "Identificador del mes: valor obligatorio." });
     assert.equal(calls, 0);
   } finally {
     server.close();
@@ -292,13 +294,13 @@ test("monthlyCycleRouter cuts over pocket deposits to strict source contracts be
     });
 
     assert.equal(legacyResponse.status, 400);
-    assert.deepEqual(await legacyResponse.json(), { code: "INVALID_DEPOSIT_SOURCE", message: "Pocket deposit source kind must be SUBCATEGORY, MONTH_AVAILABLE, or EXTERNAL." });
+    assert.deepEqual(await legacyResponse.json(), { code: "INVALID_DEPOSIT_SOURCE", message: "El tipo de origen del depósito al bolsillo debe ser SUBCATEGORY, MONTH_AVAILABLE o EXTERNAL." });
     assert.equal(contradictoryResponse.status, 400);
-    assert.deepEqual(await contradictoryResponse.json(), { code: "INVALID_DEPOSIT_SOURCE", message: "External pocket deposits cannot specify a month or subcategory." });
+    assert.deepEqual(await contradictoryResponse.json(), { code: "INVALID_DEPOSIT_SOURCE", message: "Los depósitos externos al bolsillo no pueden indicar un mes ni una subcategoría." });
     assert.equal(invalidAmountResponse.status, 400);
-    assert.deepEqual(await invalidAmountResponse.json(), { code: "INVALID_AMOUNT", message: "Deposit amount must be greater than zero." });
+    assert.deepEqual(await invalidAmountResponse.json(), { code: "INVALID_AMOUNT", message: "Monto del depósito debe ser mayor que cero." });
     assert.equal(invalidDateResponse.status, 400);
-    assert.deepEqual(await invalidDateResponse.json(), { code: "INVALID_DATE", message: "Pocket deposit date must be a valid date." });
+    assert.deepEqual(await invalidDateResponse.json(), { code: "INVALID_DATE", message: "Fecha del depósito al bolsillo debe ser una fecha válida." });
     assert.equal(calls, 0);
   } finally {
     server.close();
@@ -315,10 +317,10 @@ test("monthlyCycleRouter rejects missing and explicitly-null invalid deposit sou
     const postDeposit = (body: object) => fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const base = { targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z" };
     for (const [body, message] of [
-      [{ ...base, sourceKind: "SUBCATEGORY", monthId: "month-1" }, "Source subcategory is required."],
-      [{ ...base, sourceKind: "MONTH_AVAILABLE" }, "Month id is required."],
-      [{ ...base, sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: null }, "Available-funds pocket deposits cannot specify a subcategory or external source label."],
-      [{ ...base, sourceKind: "EXTERNAL", monthId: null }, "External pocket deposits cannot specify a month or subcategory."],
+      [{ ...base, sourceKind: "SUBCATEGORY", monthId: "month-1" }, "Subcategoría de origen: valor obligatorio."],
+      [{ ...base, sourceKind: "MONTH_AVAILABLE" }, "Identificador del mes: valor obligatorio."],
+      [{ ...base, sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: null }, "Los depósitos al bolsillo desde el dinero disponible no pueden indicar una subcategoría ni una etiqueta de origen externo."],
+      [{ ...base, sourceKind: "EXTERNAL", monthId: null }, "Los depósitos externos al bolsillo no pueden indicar un mes ni una subcategoría."],
     ] as const) {
       const response = await postDeposit(body);
       assert.equal(response.status, 400);
@@ -330,10 +332,43 @@ test("monthlyCycleRouter rejects missing and explicitly-null invalid deposit sou
   }
 });
 
+test("Spanish pocket deposit conflict preserves status and code without writing movements", async () => {
+  const created: unknown[] = [];
+  const storedMonth = {
+    ...month, status: "ACTIVE", incomes: [], movements: [], categories: [],
+    openedAt: new Date(month.openedAt),
+  };
+  const before = structuredClone(storedMonth);
+  const txPorts = {
+    depositWriterGate: { async isEnabled() { return true; } },
+    pockets: { async ensurePocketIsActive() {} },
+    months: { async lockForMutation() { return storedMonth; } },
+    movements: { async create(input: unknown) { created.push(input); } },
+  };
+  const ports = {
+    transactionRunner: { async runSerializable(work: (tx: typeof txPorts) => Promise<unknown>) { return work(txPorts); } },
+  } as unknown as MonthlyCyclePorts;
+  const server = createTestServer({ depositToPocket: createStrictDepositToPocketUseCase(ports) });
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10" }),
+    });
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { code: "INSUFFICIENT_FUNDS", message: "Fondos insuficientes para este depósito al bolsillo." });
+    assert.deepEqual(created, []);
+    assert.deepEqual(storedMonth, before);
+  } finally {
+    server.close();
+  }
+});
+
 test("monthlyCycleRouter preserves strict pocket-deposit error codes", async () => {
   const server = createTestServer({
     async depositToPocket() {
-      throw new SemanticError("INSUFFICIENT_FUNDS", 409, "Insufficient funds for this pocket deposit.");
+      throw new SemanticError("INSUFFICIENT_FUNDS", 409, "Fondos insuficientes para este depósito al bolsillo.");
     },
   });
 
@@ -347,7 +382,7 @@ test("monthlyCycleRouter preserves strict pocket-deposit error codes", async () 
     });
 
     assert.equal(response.status, 409);
-    assert.deepEqual(await response.json(), { code: "INSUFFICIENT_FUNDS", message: "Insufficient funds for this pocket deposit." });
+    assert.deepEqual(await response.json(), { code: "INSUFFICIENT_FUNDS", message: "Fondos insuficientes para este depósito al bolsillo." });
   } finally {
     server.close();
   }
@@ -356,7 +391,7 @@ test("monthlyCycleRouter preserves strict pocket-deposit error codes", async () 
 test("monthlyCycleRouter returns the service quiescence conflict for pocket deposits", async () => {
   const server = createTestServer({
     async depositToPocket() {
-      throw new DomainError(409, "Pocket deposits are temporarily disabled.");
+      throw new DomainError(409, "Los depósitos a bolsillos están deshabilitados temporalmente.");
     },
   });
 
@@ -370,7 +405,7 @@ test("monthlyCycleRouter returns the service quiescence conflict for pocket depo
     });
 
     assert.equal(response.status, 409);
-    assert.deepEqual(await response.json(), { message: "Pocket deposits are temporarily disabled." });
+    assert.deepEqual(await response.json(), { message: "Los depósitos a bolsillos están deshabilitados temporalmente." });
   } finally {
     server.close();
   }
@@ -402,7 +437,7 @@ test("monthlyCycleRouter validates and delegates pocket withdrawals with semanti
     assert.equal(valid.status, 201);
     assert.deepEqual(await valid.json(), { month: null });
     assert.equal(invalid.status, 400);
-    assert.deepEqual(await invalid.json(), { code: "INVALID_AMOUNT", message: "Deposit amount must be greater than zero." });
+    assert.deepEqual(await invalid.json(), { code: "INVALID_AMOUNT", message: "Monto del depósito debe ser mayor que cero." });
     assert.deepEqual(calls, [{ sourcePocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10", description: "Groceries" }]);
   } finally {
     server.close();
@@ -530,7 +565,7 @@ test("monthlyCycleRouter exposes DELETE /api/months/:id/expenses/:expenseId and 
     },
     async deleteExpense(monthId: string, expenseId: string) {
       calls.push({ monthId, expenseId });
-      throw new DomainError(404, "Expense was not found in this month.");
+      throw new DomainError(404, "No se encontró el gasto en este mes.");
     },
   });
 
@@ -543,7 +578,7 @@ test("monthlyCycleRouter exposes DELETE /api/months/:id/expenses/:expenseId and 
     });
 
     assert.equal(response.status, 404);
-    assert.deepEqual(await response.json(), { message: "Expense was not found in this month." });
+    assert.deepEqual(await response.json(), { message: "No se encontró el gasto en este mes." });
     assert.deepEqual(calls, [{ monthId: "month-1", expenseId: "expense-foreign" }]);
   } finally {
     server.close();
@@ -603,11 +638,11 @@ test("monthlyCycleRouter rejects malformed PATCH expense payloads before service
     });
 
     assert.equal(invalidPaymentResponse.status, 400);
-    assert.deepEqual(await invalidPaymentResponse.json(), { message: "Payment method must be CASH or NON_CASH." });
+    assert.deepEqual(await invalidPaymentResponse.json(), { message: "El medio de pago debe ser CASH o NON_CASH." });
     assert.equal(invalidDateResponse.status, 400);
-    assert.deepEqual(await invalidDateResponse.json(), { message: "Expense date must be a valid date." });
+    assert.deepEqual(await invalidDateResponse.json(), { message: "Fecha del gasto debe ser una fecha válida." });
     assert.equal(blankMonthResponse.status, 400);
-    assert.deepEqual(await blankMonthResponse.json(), { message: "Month id is required." });
+    assert.deepEqual(await blankMonthResponse.json(), { message: "Identificador del mes: valor obligatorio." });
     assert.equal(malformedJsonResponse.status, 400);
     assert.equal(calls, 0);
   } finally {
@@ -639,9 +674,9 @@ test("monthlyCycleRouter rejects blank DELETE expense route ids before service e
     });
 
     assert.equal(blankExpenseResponse.status, 400);
-    assert.deepEqual(await blankExpenseResponse.json(), { message: "Expense id is required." });
+    assert.deepEqual(await blankExpenseResponse.json(), { message: "Identificador del gasto: valor obligatorio." });
     assert.equal(blankMonthResponse.status, 400);
-    assert.deepEqual(await blankMonthResponse.json(), { message: "Month id is required." });
+    assert.deepEqual(await blankMonthResponse.json(), { message: "Identificador del mes: valor obligatorio." });
     assert.equal(calls, 0);
   } finally {
     server.close();
@@ -878,13 +913,13 @@ test("monthlyCycleRouter rejects malformed POST month structure payloads before 
     });
 
     assert.equal(missingFlag.status, 400);
-    assert.deepEqual(await missingFlag.json(), { message: "addToTemplate is required." });
+    assert.deepEqual(await missingFlag.json(), { message: "addToTemplate: valor obligatorio." });
     assert.equal(badFlag.status, 400);
-    assert.deepEqual(await badFlag.json(), { message: "addToTemplate must be true or false." });
+    assert.deepEqual(await badFlag.json(), { message: "addToTemplate debe ser true o false." });
     assert.equal(negativeAmount.status, 400);
-    assert.deepEqual(await negativeAmount.json(), { message: "Planned amount must be zero or greater." });
+    assert.deepEqual(await negativeAmount.json(), { message: "El monto planeado debe ser mayor o igual a cero." });
     assert.equal(blankParent.status, 400);
-    assert.deepEqual(await blankParent.json(), { message: "Category id is required." });
+    assert.deepEqual(await blankParent.json(), { message: "Identificador de la categoría: valor obligatorio." });
     assert.equal(calls, 0);
   } finally {
     server.close();
@@ -899,11 +934,11 @@ test("monthlyCycleRouter maps POST month structure domain errors", async () => {
     },
     async createMonthCategory(input: unknown) {
       calls.push({ type: "category", input });
-      throw new DomainError(409, "Closed months are immutable.");
+      throw new DomainError(409, "Los meses cerrados no se pueden modificar.");
     },
     async createMonthSubcategory(input: unknown) {
       calls.push({ type: "subcategory", input });
-      throw new DomainError(404, "Category was not found in this month.");
+      throw new DomainError(404, "No se encontró la categoría en este mes.");
     },
   });
 
@@ -923,9 +958,9 @@ test("monthlyCycleRouter maps POST month structure domain errors", async () => {
     });
 
     assert.equal(categoryResponse.status, 409);
-    assert.deepEqual(await categoryResponse.json(), { message: "Closed months are immutable." });
+    assert.deepEqual(await categoryResponse.json(), { message: "Los meses cerrados no se pueden modificar." });
     assert.equal(subcategoryResponse.status, 404);
-    assert.deepEqual(await subcategoryResponse.json(), { message: "Category was not found in this month." });
+    assert.deepEqual(await subcategoryResponse.json(), { message: "No se encontró la categoría en este mes." });
     assert.deepEqual(calls, [
       { type: "category", input: { monthId: "month-1", name: "Variables", addToTemplate: false } },
       { type: "subcategory", input: { monthId: "month-1", categoryId: "missing-category", name: "Taxi", plannedAmount: 0, addToTemplate: false } },
@@ -943,11 +978,11 @@ test("monthlyCycleRouter maps month structure PATCH domain errors", async () => 
     },
     async updateMonthCategory(input: unknown) {
       calls.push({ type: "category", input });
-      throw new DomainError(404, "Category was not found in this month.");
+      throw new DomainError(404, "No se encontró la categoría en este mes.");
     },
     async updateMonthSubcategory(input: unknown) {
       calls.push({ type: "subcategory", input });
-      throw new DomainError(409, "Closed months are immutable.");
+      throw new DomainError(409, "Los meses cerrados no se pueden modificar.");
     },
   });
 
@@ -967,9 +1002,9 @@ test("monthlyCycleRouter maps month structure PATCH domain errors", async () => 
     });
 
     assert.equal(categoryResponse.status, 404);
-    assert.deepEqual(await categoryResponse.json(), { message: "Category was not found in this month." });
+    assert.deepEqual(await categoryResponse.json(), { message: "No se encontró la categoría en este mes." });
     assert.equal(subcategoryResponse.status, 409);
-    assert.deepEqual(await subcategoryResponse.json(), { message: "Closed months are immutable." });
+    assert.deepEqual(await subcategoryResponse.json(), { message: "Los meses cerrados no se pueden modificar." });
     assert.deepEqual(calls, [
       { type: "category", input: { monthId: "month-1", categoryId: "missing-category", name: "Variables", updateTemplate: false } },
       { type: "subcategory", input: { monthId: "month-1", subcategoryId: "sub-market", name: "Supermercado", plannedAmount: 300, updateTemplate: false } },
@@ -987,11 +1022,11 @@ test("monthlyCycleRouter exposes DELETE month structure routes and maps delete g
     },
     async deleteMonthSubcategory(monthId: string, subcategoryId: string) {
       calls.push({ type: "subcategory", monthId, subcategoryId });
-      throw new DomainError(409, "Cannot delete subcategory with associated movements.");
+      throw new DomainError(409, "No se puede eliminar una subcategoría con movimientos asociados.");
     },
     async deleteMonthCategory(monthId: string, categoryId: string) {
       calls.push({ type: "category", monthId, categoryId });
-      throw new DomainError(409, "Delete subcategories first before deleting this category.");
+      throw new DomainError(409, "Elimine primero las subcategorías antes de eliminar esta categoría.");
     },
   });
 
@@ -1007,9 +1042,9 @@ test("monthlyCycleRouter exposes DELETE month structure routes and maps delete g
     });
 
     assert.equal(subcategoryResponse.status, 409);
-    assert.deepEqual(await subcategoryResponse.json(), { message: "Cannot delete subcategory with associated movements." });
+    assert.deepEqual(await subcategoryResponse.json(), { message: "No se puede eliminar una subcategoría con movimientos asociados." });
     assert.equal(categoryResponse.status, 409);
-    assert.deepEqual(await categoryResponse.json(), { message: "Delete subcategories first before deleting this category." });
+    assert.deepEqual(await categoryResponse.json(), { message: "Elimine primero las subcategorías antes de eliminar esta categoría." });
     assert.deepEqual(calls, [
       { type: "subcategory", monthId: "month-1", subcategoryId: "sub-market" },
       { type: "category", monthId: "month-1", categoryId: "cat-food" },
@@ -1027,11 +1062,11 @@ test("monthlyCycleRouter maps missing month structure DELETE domain errors", asy
     },
     async deleteMonthSubcategory(monthId: string, subcategoryId: string) {
       calls.push({ type: "subcategory", monthId, subcategoryId });
-      throw new DomainError(404, "Subcategory was not found in this month.");
+      throw new DomainError(404, "No se encontró la subcategoría en este mes.");
     },
     async deleteMonthCategory(monthId: string, categoryId: string) {
       calls.push({ type: "category", monthId, categoryId });
-      throw new DomainError(404, "Category was not found in this month.");
+      throw new DomainError(404, "No se encontró la categoría en este mes.");
     },
   });
 
@@ -1047,9 +1082,9 @@ test("monthlyCycleRouter maps missing month structure DELETE domain errors", asy
     });
 
     assert.equal(subcategoryResponse.status, 404);
-    assert.deepEqual(await subcategoryResponse.json(), { message: "Subcategory was not found in this month." });
+    assert.deepEqual(await subcategoryResponse.json(), { message: "No se encontró la subcategoría en este mes." });
     assert.equal(categoryResponse.status, 404);
-    assert.deepEqual(await categoryResponse.json(), { message: "Category was not found in this month." });
+    assert.deepEqual(await categoryResponse.json(), { message: "No se encontró la categoría en este mes." });
     assert.deepEqual(calls, [
       { type: "subcategory", monthId: "month-1", subcategoryId: "missing-subcategory" },
       { type: "category", monthId: "month-1", categoryId: "missing-category" },
@@ -1107,13 +1142,13 @@ test("monthlyCycleRouter rejects malformed month structure payloads and blank id
     });
 
     assert.equal(blankCategoryPatch.status, 400);
-    assert.deepEqual(await blankCategoryPatch.json(), { message: "Category id is required." });
+    assert.deepEqual(await blankCategoryPatch.json(), { message: "Identificador de la categoría: valor obligatorio." });
     assert.equal(blankNamePatch.status, 400);
-    assert.deepEqual(await blankNamePatch.json(), { message: "Category name is required." });
+    assert.deepEqual(await blankNamePatch.json(), { message: "Nombre de la categoría: valor obligatorio." });
     assert.equal(negativeAmountPatch.status, 400);
-    assert.deepEqual(await negativeAmountPatch.json(), { message: "Planned amount must be zero or greater." });
+    assert.deepEqual(await negativeAmountPatch.json(), { message: "El monto planeado debe ser mayor o igual a cero." });
     assert.equal(blankDelete.status, 400);
-    assert.deepEqual(await blankDelete.json(), { message: "Month id is required." });
+    assert.deepEqual(await blankDelete.json(), { message: "Identificador del mes: valor obligatorio." });
     assert.equal(calls, 0);
   } finally {
     server.close();
@@ -1179,7 +1214,7 @@ test("monthlyCycleRouter rejects same-key financial creates with a different fin
 
     assert.equal(first.status, 201);
     assert.equal(conflict.status, 409);
-    assert.deepEqual(await conflict.json(), { message: "Idempotency-Key was already used for a different request." });
+    assert.deepEqual(await conflict.json(), { message: "Idempotency-Key ya se utilizó para una solicitud diferente." });
     assert.equal(calls, 1);
   } finally {
     server.close();

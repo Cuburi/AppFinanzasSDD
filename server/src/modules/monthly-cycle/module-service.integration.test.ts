@@ -729,7 +729,7 @@ test("service integration: opening a second active month is rejected", async () 
   await assert.rejects(() => service.openMonth({ year: 2026, month: 6 }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /already an active month/i);
+    assert.match(error.message, /Ya existe un mes activo/i);
     return true;
   });
 });
@@ -762,7 +762,7 @@ test("service integration: closed months are immutable", async () => {
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -788,7 +788,7 @@ test("service integration: rejects cash withdrawal for closed months", async () 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -812,7 +812,7 @@ test("service integration: rejects reopening a previously closed month", async (
   await assert.rejects(() => service.openMonth({ year: 2026, month: 5 }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /already exists/i);
+    assert.match(error.message, /ya existe/i);
     return true;
   });
 });
@@ -827,7 +827,7 @@ test("service integration: rejects unknown month and subcategory references for 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /month was not found/i);
+      assert.match(error.message, /No se encontró el mes/i);
       return true;
     },
   );
@@ -837,7 +837,7 @@ test("service integration: rejects unknown month and subcategory references for 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /subcategory was not found/i);
+      assert.match(error.message, /No se encontró la subcategoría/i);
       return true;
     },
   );
@@ -854,7 +854,7 @@ test("service integration: rejects unknown month and subcategory references for 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /subcategory was not found/i);
+      assert.match(error.message, /No se encontró la subcategoría/i);
       return true;
     },
   );
@@ -876,7 +876,7 @@ test("service integration: closing is rejected while closure review has pending 
   await assert.rejects(() => service.closeMonth(month.id), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /pending subcategory balances or available money/i);
+    assert.match(error.message, /saldos pendientes de subcategorías o dinero disponible/i);
     return true;
   });
 });
@@ -972,7 +972,7 @@ test("service integration: income CRUD rejects closed month mutations", async ()
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -982,7 +982,7 @@ test("service integration: income CRUD rejects closed month mutations", async ()
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -992,7 +992,7 @@ test("service integration: income CRUD rejects closed month mutations", async ()
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -1181,7 +1181,7 @@ test("service integration: rejects inactive missing or unowned card expense link
       (error: unknown) => {
         assert.ok(error instanceof DomainError);
         assert.equal(error.statusCode, 400);
-        assert.match(error.message, /credit card must exist/i);
+        assert.match(error.message, /La tarjeta de crédito debe existir/i);
         return true;
       },
     );
@@ -1204,7 +1204,7 @@ test("service integration: rejects expense dates outside the linked month", asyn
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 400);
-      assert.match(error.message, /inside the linked month/i);
+      assert.match(error.message, /dentro del mes vinculado/i);
       return true;
     },
   );
@@ -1220,7 +1220,7 @@ test("service integration: withdraws cash only when available money is sufficien
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /insufficient available money/i);
+      assert.match(error.message, /Dinero disponible insuficiente/i);
       return true;
     },
   );
@@ -1246,7 +1246,7 @@ test("service integration: cash expense is rejected when physical cash is insuff
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /insufficient cash/i);
+      assert.match(error.message, /Efectivo insuficiente/i);
       return true;
     },
   );
@@ -1342,7 +1342,7 @@ test("service integration: rejects expense corrections for expenses that belong 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -1350,7 +1350,7 @@ test("service integration: rejects expense corrections for expenses that belong 
   await assert.rejects(() => service.deleteExpense(may.id, expenseId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /closed months are immutable/i);
+    assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
     return true;
   });
 });
@@ -1387,7 +1387,7 @@ test("service integration: rejects foreign expense ids from another month", asyn
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /expense was not found in this month/i);
+      assert.match(error.message, /No se encontró el gasto en este mes/i);
       return true;
     },
   );
@@ -1395,7 +1395,7 @@ test("service integration: rejects foreign expense ids from another month", asyn
   await assert.rejects(() => service.deleteExpense(june.id, expenseId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 404);
-    assert.match(error.message, /expense was not found in this month/i);
+    assert.match(error.message, /No se encontró el gasto en este mes/i);
     return true;
   });
 });
@@ -1503,7 +1503,7 @@ test("service integration: deletes empty subcategories before deleting their cat
   await assert.rejects(() => service.deleteMonthCategory(month.id, categoryId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /delete subcategories first/i);
+    assert.match(error.message, /Elimine primero las subcategorías/i);
     return true;
   });
 
@@ -1531,14 +1531,14 @@ test("service integration: rejects deleting movement-linked month structure node
   await assert.rejects(() => service.deleteMonthSubcategory(month.id, subcategoryId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /associated movements/i);
+    assert.match(error.message, /movimientos asociados/i);
     return true;
   });
 
   await assert.rejects(() => service.deleteMonthCategory(month.id, categoryId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /delete subcategories first/i);
+    assert.match(error.message, /Elimine primero las subcategorías/i);
     return true;
   });
 });
@@ -1557,7 +1557,7 @@ test("service integration: month structure corrections reject closed months and 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -1566,14 +1566,14 @@ test("service integration: month structure corrections reject closed months and 
   await assert.rejects(() => service.updateMonthCategory({ monthId: nextMonth.id, categoryId: "missing-category", name: "Missing" }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 404);
-    assert.match(error.message, /category was not found/i);
+    assert.match(error.message, /No se encontró la categoría/i);
     return true;
   });
 
   await assert.rejects(() => service.deleteMonthSubcategory(nextMonth.id, "missing-subcategory"), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 404);
-    assert.match(error.message, /subcategory was not found/i);
+    assert.match(error.message, /No se encontró la subcategoría/i);
     return true;
   });
 });

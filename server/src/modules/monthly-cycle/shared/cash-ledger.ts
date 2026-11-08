@@ -44,6 +44,6 @@ export const assertOccurredAtWithinMonth = (occurredAt: Date, month: MonthPeriod
   const occurredMonth = occurredAt.getUTCMonth() + 1;
 
   if (occurredYear !== month.year || occurredMonth !== month.month) {
-    throw new RangeError("Movement occurredAt must be within the target month");
+    throw new RangeError("La fecha occurredAt del movimiento debe estar dentro del mes de destino.");
   }
 };

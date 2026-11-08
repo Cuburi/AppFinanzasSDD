@@ -477,7 +477,7 @@ test("updateTemplate rejects inactive or nonexistent default pockets", async () 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
         assert.equal(error.statusCode, 400);
-      assert.match(error.message, /default pocket must exist and be active/i);
+      assert.match(error.message, /Bolsillo predeterminado: debe existir y tener estado activo/i);
       return true;
     },
   );
@@ -495,7 +495,7 @@ test("updateTemplate rejects inactive or nonexistent default pockets", async () 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
         assert.equal(error.statusCode, 400);
-      assert.match(error.message, /default pocket must exist and be active/i);
+      assert.match(error.message, /Bolsillo predeterminado: debe existir y tener estado activo/i);
       return true;
     },
   );
@@ -521,14 +521,14 @@ test("openMonth rejects template snapshots with inactive or nonexistent default 
   await assert.rejects(() => serviceWithInactivePocket.openMonth({ year: 2026, month: 6 }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 400);
-    assert.match(error.message, /default pocket must exist and be active/i);
+    assert.match(error.message, /Bolsillo predeterminado: debe existir y tener estado activo/i);
     return true;
   });
 
   await assert.rejects(() => serviceWithMissingPocket.openMonth({ year: 2026, month: 6 }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 400);
-    assert.match(error.message, /default pocket must exist and be active/i);
+    assert.match(error.message, /Bolsillo predeterminado: debe existir y tener estado activo/i);
     return true;
   });
 });
@@ -554,7 +554,7 @@ test("depositToPocket rejects inactive or nonexistent target pockets", async () 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /target pocket was not found/i);
+      assert.match(error.message, /No se encontró Bolsillo de destino/i);
       return true;
     },
   );
@@ -572,7 +572,7 @@ test("depositToPocket rejects inactive or nonexistent target pockets", async () 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /target pocket was not found/i);
+      assert.match(error.message, /No se encontró Bolsillo de destino/i);
       return true;
     },
   );
@@ -598,7 +598,7 @@ test("applyClosureAction rejects surplus transfers before checking default pocke
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /budget variance is informational and cannot be transferred/i);
+      assert.match(error.message, /La variación del presupuesto es informativa y no se puede transferir/i);
       return true;
     },
   );
@@ -643,7 +643,7 @@ test("openMonth rejects creating a second active month", async () => {
   await assert.rejects(() => service.openMonth({ year: 2026, month: 6 }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /already an active month/i);
+    assert.match(error.message, /Ya existe un mes activo/i);
     return true;
   });
 });
@@ -664,7 +664,7 @@ test("openMonth rejects opening a month without template subcategories", async (
   await assert.rejects(() => service.openMonth({ year: 2026, month: 6 }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 400);
-    assert.match(error.message, /at least one subcategory/i);
+    assert.match(error.message, /al menos una subcategoría/i);
     return true;
   });
 });
@@ -800,7 +800,7 @@ test("updateExpense rejects cash changes that would exceed physical cash", async
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /insufficient cash/i);
+      assert.match(error.message, /Efectivo insuficiente/i);
       return true;
     },
   );
@@ -877,7 +877,7 @@ test("updateExpense and deleteExpense reject expenses that belong to closed mont
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -885,7 +885,7 @@ test("updateExpense and deleteExpense reject expenses that belong to closed mont
   await assert.rejects(() => service.deleteExpense(month.id, "expense-1"), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /closed months are immutable/i);
+    assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
     return true;
   });
 });
@@ -920,7 +920,7 @@ test("updateExpense and deleteExpense reject movements outside the active month 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /expense was not found in this month/i);
+      assert.match(error.message, /No se encontró el gasto en este mes/i);
       return true;
     },
   );
@@ -928,7 +928,7 @@ test("updateExpense and deleteExpense reject movements outside the active month 
   await assert.rejects(() => service.deleteExpense(month.id, "foreign-expense"), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 404);
-    assert.match(error.message, /expense was not found in this month/i);
+    assert.match(error.message, /No se encontró el gasto en este mes/i);
     return true;
   });
 });
@@ -1010,7 +1010,7 @@ test("updateMonthSubcategory rejects inactive default pocket strings", async () 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 400);
-      assert.match(error.message, /default pocket must exist and be active/i);
+      assert.match(error.message, /Bolsillo predeterminado: debe existir y tener estado activo/i);
       return true;
     },
   );
@@ -1065,7 +1065,7 @@ test("createMonthCategory rejects duplicate names in snapshot and template scope
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /category already exists in this month/i);
+      assert.match(error.message, /La categoría ya existe en este mes/i);
       return true;
     },
   );
@@ -1075,7 +1075,7 @@ test("createMonthCategory rejects duplicate names in snapshot and template scope
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /category already exists in the template/i);
+      assert.match(error.message, /La categoría ya existe en la plantilla/i);
       return true;
     },
   );
@@ -1153,7 +1153,7 @@ test("createMonthSubcategory rejects duplicates, closed months, missing parents,
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /subcategory already exists in this month category/i);
+      assert.match(error.message, /La subcategoría ya existe en esta categoría del mes/i);
       return true;
     },
   );
@@ -1166,7 +1166,7 @@ test("createMonthSubcategory rejects duplicates, closed months, missing parents,
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -1178,7 +1178,7 @@ test("createMonthSubcategory rejects duplicates, closed months, missing parents,
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /category was not found in this month/i);
+      assert.match(error.message, /No se encontró la categoría en este mes/i);
       return true;
     },
   );
@@ -1191,7 +1191,7 @@ test("createMonthSubcategory rejects duplicates, closed months, missing parents,
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 400);
-      assert.match(error.message, /default pocket must exist and be active/i);
+      assert.match(error.message, /Bolsillo predeterminado: debe existir y tener estado activo/i);
       return true;
     },
   );
@@ -1219,14 +1219,14 @@ test("month structure deletes reject movement-linked subcategories and non-empty
   await assert.rejects(() => service.deleteMonthSubcategory(month.id, subcategoryId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /associated movements/i);
+    assert.match(error.message, /movimientos asociados/i);
     return true;
   });
 
   await assert.rejects(() => service.deleteMonthCategory(month.id, categoryId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /delete subcategories first/i);
+    assert.match(error.message, /Elimine primero las subcategorías/i);
     return true;
   });
 });
@@ -1240,7 +1240,7 @@ test("month structure mutations reject closed months and missing snapshot nodes"
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -1251,14 +1251,14 @@ test("month structure mutations reject closed months and missing snapshot nodes"
   await assert.rejects(() => serviceForActiveMonth.deleteMonthCategory(activeMonth.id, "missing-category"), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 404);
-    assert.match(error.message, /category was not found/i);
+    assert.match(error.message, /No se encontró la categoría/i);
     return true;
   });
 
   await assert.rejects(() => serviceForActiveMonth.deleteMonthSubcategory(activeMonth.id, "missing-subcategory"), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 404);
-    assert.match(error.message, /subcategory was not found/i);
+    assert.match(error.message, /No se encontró la subcategoría/i);
     return true;
   });
 });
@@ -1299,7 +1299,7 @@ test("createMonthlyIncome rejects income dates outside the linked month", async 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 400);
-      assert.match(error.message, /inside the linked month/i);
+      assert.match(error.message, /dentro del período del mes vinculado/i);
       return true;
     },
   );
@@ -1315,7 +1315,7 @@ test("createMonthlyIncome rejects income dates outside the linked month", async 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 400);
-      assert.match(error.message, /inside the linked month/i);
+      assert.match(error.message, /dentro del período del mes vinculado/i);
       return true;
     },
   );
@@ -1345,7 +1345,7 @@ test("updateMonthlyIncome rejects received dates outside the linked month", asyn
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 400);
-      assert.match(error.message, /inside the linked month/i);
+      assert.match(error.message, /dentro del período del mes vinculado/i);
       return true;
     },
   );
@@ -1396,7 +1396,7 @@ test("createMonthlyIncome rejects closed months", async () => {
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months/i);
+      assert.match(error.message, /meses cerrados/i);
       return true;
     },
   );
@@ -1421,7 +1421,7 @@ test("depositToPocket rejects source subcategory deposits in closed months", asy
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /month is not active/i);
+      assert.match(error.message, /El mes no está activo/i);
       return true;
     },
   );
@@ -1520,7 +1520,7 @@ test("applyClosureAction rejects surplus transfer as non-transferable budget var
 
   await assert.rejects(
     () => service.applyClosureAction({ monthId: month.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategory.id }),
-    { message: "Budget variance is informational and cannot be transferred." },
+    { message: "La variación del presupuesto es informativa y no se puede transferir." },
   );
 
   assert.equal(dbStub.getCapturedMovements().length, 0);
@@ -1548,7 +1548,7 @@ test("applyClosureAction keeps surplus transfers non-transferable without a defa
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /budget variance is informational and cannot be transferred/i);
+      assert.match(error.message, /La variación del presupuesto es informativa y no se puede transferir/i);
       return true;
     },
   );

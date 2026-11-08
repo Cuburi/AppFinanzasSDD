@@ -18,7 +18,7 @@ const parseReceivedAt = (receivedAt: string) => {
   const date = new Date(receivedAt);
 
   if (Number.isNaN(date.getTime())) {
-    throw new DomainError(400, "Income received date must be a valid ISO date.");
+    throw new DomainError(400, "La fecha de recepción del ingreso debe ser una fecha ISO válida.");
   }
 
   return date;
@@ -29,13 +29,13 @@ const assertReceivedAtBelongsToMonth = (month: MonthRecord, receivedAt: Date) =>
   const nextMonthStart = new Date(Date.UTC(month.year, month.month, 1));
 
   if (receivedAt < monthStart || receivedAt >= nextMonthStart) {
-    throw new DomainError(400, "Income received date must be inside the linked month period.");
+    throw new DomainError(400, "La fecha de recepción del ingreso debe estar dentro del período del mes vinculado.");
   }
 };
 
 const assertIncomeBelongsToMonth = (income: MonthlyIncomeRecord | null, monthId: string): MonthlyIncomeRecord => {
   if (!income || income.monthId !== monthId) {
-    throw new DomainError(404, "Monthly income was not found for this month.");
+    throw new DomainError(404, "No se encontró el ingreso mensual en este mes.");
   }
 
   return income;

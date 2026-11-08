@@ -82,7 +82,7 @@ test("listExpenseHistory rejects unknown subcategories before movement history r
   await assert.rejects(() => useCases.listExpenseHistory({ monthId: "month-1", subcategoryId: "missing-sub" }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 404);
-    assert.equal(error.message, "Subcategory was not found in this month.");
+    assert.equal(error.message, "No se encontró la subcategoría en este mes.");
     return true;
   });
   assert.deepEqual(calls, [["months.findById", "month-1"]]);

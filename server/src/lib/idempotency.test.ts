@@ -40,7 +40,7 @@ test("runIdempotentCreate rejects same-key requests with a different fingerprint
   await runIdempotentCreate({ request: request({ amount: 10 }), scope: "expenses", store, execute });
   const conflict = await runIdempotentCreate({ request: request({ amount: 20 }), scope: "expenses", store, execute });
 
-  assert.deepEqual(conflict, { statusCode: 409, body: { message: "Idempotency-Key was already used for a different request." } });
+  assert.deepEqual(conflict, { statusCode: 409, body: { message: "Idempotency-Key ya se utilizó para una solicitud diferente." } });
   assert.equal(calls, 1);
 });
 
@@ -131,7 +131,7 @@ test("runIdempotentCreate stores a replayable failure when response persistence 
 
   assert.deepEqual(retry, {
     statusCode: 500,
-    body: { message: "Idempotent request completed, but its replay response could not be stored." },
+    body: { message: "La solicitud idempotente se completó, pero no se pudo guardar la respuesta para su repetición." },
   });
   assert.equal(calls, 1);
 });

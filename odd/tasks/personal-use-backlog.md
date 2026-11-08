@@ -13,9 +13,9 @@ Use this file to capture real-use frictions and follow-up ideas before they beco
 ## Inbox
 
 - [ ] Recurring expenses.
-- [ ] Translate server error messages shown to the user (some arrive in English, e.g. "Insufficient funds for this pocket deposit.").
-- [ ] Format money inputs as currency while typing (thousands separators as the user types, keeping the stored value exact). User report: "que lo campos de dinero, me gustaria que tenga formato de moneda a medida que se vaya copiando".
-- [ ] Pockets screen: let each pocket collapse/expand its movements instead of always showing them, so the page stays short as movements accumulate. User report: "que en la pantalla de bolsillos pueda hacer wrap a cada bolsillo y no siempre esten los movimientos porque cuando ya llevo varios empieza a hacer largo esa pantalla".
+- [x] Translate server error messages shown to the user (some arrive in English, e.g. "Insufficient funds for this pocket deposit.").
+- [x] Format money inputs as currency while typing (thousands separators as the user types, keeping the stored value exact). User report: "que lo campos de dinero, me gustaria que tenga formato de moneda a medida que se vaya copiando".
+- [x] Pockets screen: let each pocket collapse/expand its movements instead of always showing them, so the page stays short as movements accumulate. User report: "que en la pantalla de bolsillos pueda hacer wrap a cada bolsillo y no siempre esten los movimientos porque cuando ya llevo varios empieza a hacer largo esa pantalla".
 - [ ] Improve the credit-card screen and logic after reviewing its current capabilities and defining the desired changes.
 - [ ] Recurring incomes.
 - [ ] Export data to Excel.

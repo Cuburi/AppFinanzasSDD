@@ -13,12 +13,12 @@ test("expense DTO parsing rejects malformed record and history dates", () => {
         occurredAt: "not-a-date",
         paymentMethod: PaymentMethod.NON_CASH,
       }),
-    /expense date must be a valid date/i,
+    /Fecha del gasto debe ser una fecha válida/i,
   );
 
   assert.throws(
     () => parseExpenseHistoryQueryInput("month-1", { from: "2026-05-01T00:00:00.000Z", to: "definitely-not-a-date" }),
-    /to date must be a valid date/i,
+    /Fecha final debe ser una fecha válida/i,
   );
 });
 
@@ -30,8 +30,8 @@ test("expense DTO parsing preserves explicit offsets and rejects impossible cale
   }
   for (const occurredAt of ["2026-02-29T20:00:00.000-05:00", "2026-04-31T20:00:00.000-05:00", "2026-10-31T20:00:00.000-25:00"]) {
     const payload = { amount: 20, occurredAt, paymentMethod: PaymentMethod.NON_CASH };
-    assert.throws(() => parseRecordExpenseInput("month-1", payload), { message: "Expense date must be a valid date." });
-    assert.throws(() => parseUpdateExpenseInput("month-1", "expense-1", payload), { message: "Expense date must be a valid date." });
+    assert.throws(() => parseRecordExpenseInput("month-1", payload), { message: "Fecha del gasto debe ser una fecha válida." });
+    assert.throws(() => parseUpdateExpenseInput("month-1", "expense-1", payload), { message: "Fecha del gasto debe ser una fecha válida." });
   }
 });
 
@@ -83,5 +83,5 @@ test("expense DTO parsing accepts only the explicit uncategorized history filter
     subcategoryId: undefined,
     classification: "UNCATEGORIZED",
   });
-  assert.throws(() => parseExpenseHistoryQueryInput("month-1", { classification: "uncategorized" }), /classification must be uncategorized/i);
+  assert.throws(() => parseExpenseHistoryQueryInput("month-1", { classification: "uncategorized" }), /La clasificación debe ser UNCATEGORIZED/i);
 });

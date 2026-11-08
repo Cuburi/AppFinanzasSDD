@@ -137,7 +137,7 @@ test("registerPayment use case rejects missing debts inside the transaction", as
 
   await assert.rejects(registerPayment("missing-debt", { amount: 20, paidAt: fixedDate }), (error) => {
     assert.ok(error instanceof DebtNotFoundError);
-    assert.equal(error.message, "Debt not found.");
+    assert.equal(error.message, "No se encontró la deuda.");
     assert.equal("statusCode" in error, false);
     return true;
   });
@@ -178,12 +178,12 @@ test("registerPayment use case rejects already-paid and overpayment attempts", a
 
   await assert.rejects(
     registerPayment("debt-paid", { amount: 1, paidAt: fixedDate }),
-    (error) => error instanceof DomainError && error.statusCode === 409 && error.message === "Debt is already paid.",
+    (error) => error instanceof DomainError && error.statusCode === 409 && error.message === "La deuda ya está pagada.",
   );
 
   await assert.rejects(
     registerPayment("debt-open", { amount: 21, paidAt: fixedDate }),
-    (error) => error instanceof DomainError && error.statusCode === 409 && error.message === "Payment exceeds remaining debt balance.",
+    (error) => error instanceof DomainError && error.statusCode === 409 && error.message === "El pago supera el saldo pendiente de la deuda.",
   );
 });
 
@@ -269,7 +269,7 @@ test("registerPayment use case preserves debt balance when conflicting payments 
   assert.equal(succeeded.length, 1);
   assert.equal(rejected.length, 1);
   assert.ok(rejected[0]?.reason instanceof DomainError);
-  assert.equal(rejected[0]?.reason.message, "Debt is already paid.");
+  assert.equal(rejected[0]?.reason.message, "La deuda ya está pagada.");
   assert.equal(collected, 100);
   assert.equal(buildDebt({ payments: storedPayments }).payments.length, 1);
   assert.equal(toDebtView(buildDebt({ payments: storedPayments })).remainingBalance, 0);

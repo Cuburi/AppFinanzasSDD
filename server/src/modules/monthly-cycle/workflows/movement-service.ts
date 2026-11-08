@@ -13,21 +13,21 @@ import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from 
 const SINGLE_USER_OWNER_ID = "single-user";
 
 const assertExpenseDateWithinMonth = (value: string, month: Parameters<typeof assertOccurredAtWithinMonth>[1], unchangedInstant?: Date) => {
-  const validated = readIsoDateString(value, "Expense date");
+  const validated = readIsoDateString(value, "Fecha del gasto");
   const occurredAt = new Date(validated);
   // History returns UTC instants, so an owned expense may retain its original instant on edit.
   if (unchangedInstant?.getTime() === occurredAt.getTime()) return;
   try {
     if (/^\d{4}-\d{2}-\d{2}T.*[+-]\d{2}:\d{2}$/.test(validated)) {
       if (Number(validated.slice(0, 4)) !== month.year || Number(validated.slice(5, 7)) !== month.month) {
-        throw new RangeError("Expense calendar month does not match.");
+        throw new RangeError("El mes calendario del gasto no coincide.");
       }
     } else {
       assertOccurredAtWithinMonth(occurredAt, month);
     }
   } catch (error) {
     if (error instanceof RangeError) {
-      throw new DomainError(400, "Expense date must be inside the linked month.");
+      throw new DomainError(400, "La fecha del gasto debe estar dentro del mes vinculado.");
     }
 
     throw error;
@@ -39,7 +39,7 @@ const assertExpenseBelongsToMonth = (
   monthId: string,
 ) => {
   if (!movement || movement.type !== MovementType.EXPENSE || movement.monthId !== monthId) {
-    throw new DomainError(404, "Expense was not found in this month.");
+    throw new DomainError(404, "No se encontró el gasto en este mes.");
   }
 
   return movement;
@@ -54,14 +54,14 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
         const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
 
         if (input.sourceSubcategoryId && !findMonthSubcategory(existingMonth, input.sourceSubcategoryId)) {
-          throw new DomainError(404, "Subcategory was not found in this month.");
+          throw new DomainError(404, "No se encontró la subcategoría en este mes.");
         }
 
         const occurredAt = new Date(input.occurredAt);
         assertExpenseDateWithinMonth(input.occurredAt, existingMonth);
 
         if (input.paymentMethod === PaymentMethod.CASH && calculateCashBalance(existingMonth.movements) < input.amount) {
-          throw new DomainError(409, "Insufficient cash for this expense.");
+          throw new DomainError(409, "Efectivo insuficiente para este gasto.");
         }
 
         if (input.creditCardId) {
@@ -92,7 +92,7 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
         const existingExpense = assertExpenseBelongsToMonth(await txPorts.movements.findById(input.expenseId), input.monthId);
 
         if (input.sourceSubcategoryId && !findMonthSubcategory(existingMonth, input.sourceSubcategoryId)) {
-          throw new DomainError(404, "Subcategory was not found in this month.");
+          throw new DomainError(404, "No se encontró la subcategoría en este mes.");
         }
 
         const occurredAt = new Date(input.occurredAt);
@@ -100,7 +100,7 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
 
         const movementsWithoutCurrentExpense = existingMonth.movements.filter((movement) => movement.id !== existingExpense.id);
         if (input.paymentMethod === PaymentMethod.CASH && calculateCashBalance(movementsWithoutCurrentExpense) < input.amount) {
-          throw new DomainError(409, "Insufficient cash for this expense.");
+          throw new DomainError(409, "Efectivo insuficiente para este gasto.");
         }
 
         if (input.creditCardId) {
@@ -140,19 +140,19 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
     async depositToPocket(input: DepositToPocketInput): Promise<MonthView | null> {
       const month = await ports.transactionRunner.run(async (txPorts) => {
         if (!await txPorts.depositWriterGate.isEnabled()) {
-          throw new DomainError(409, "Pocket deposits are temporarily disabled.");
+          throw new DomainError(409, "Los depósitos a bolsillos están deshabilitados temporalmente.");
         }
-        await txPorts.pockets.ensurePocketIsActive(input.targetPocketId, "Target pocket");
+        await txPorts.pockets.ensurePocketIsActive(input.targetPocketId, "Bolsillo de destino");
 
         const existingMonth = input.monthId ? await lockMutableMonthForMutation(txPorts.months, input.monthId) : null;
 
         if (input.sourceSubcategoryId) {
           if (!existingMonth) {
-            throw new DomainError(400, "Month id is required when depositing from a subcategory.");
+            throw new DomainError(400, "Se requiere el identificador del mes al depositar desde una subcategoría.");
           }
 
           if (!findMonthSubcategory(existingMonth, input.sourceSubcategoryId)) {
-            throw new DomainError(400, "Source subcategory does not belong to this month.");
+            throw new DomainError(400, "La subcategoría de origen no pertenece a este mes.");
           }
         }
 

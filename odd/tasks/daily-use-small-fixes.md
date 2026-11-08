@@ -13,7 +13,7 @@ Order: pocket collapse, currency money input, server error translation.
 
 - [x] T1 — S3 — inline — collapsible movements per pocket (`PocketRecentMovements`), collapsed by default, independent per pocket.
 - [x] T2 — S2 — inline — shared `MoneyInput` (integer COP, caret-preserving) replacing all 18 money fields in 7 screens.
-- [ ] T3 — S1 — inline — Spanish server error messages at the source, plus Spanish client transport fallback.
+- [x] T3 — S1 — worker — Spanish server error messages at the source (codes and statuses unchanged), plus Spanish client transport fallback.
 
 ## Log
 
@@ -21,3 +21,5 @@ Order: pocket collapse, currency money input, server error translation.
 - L2 — Exploration: 18 money inputs, no shared input component, 6 page test files type into money fields; server errors are English across all modules with 17 test files asserting exact strings; pockets render movements unconditionally at `PocketsPage.tsx:471`, `TemplatePage.tsx` already uses controlled `<details>` per category.
 - L3 — User decision on money format: "Solo pesos enteros".
 - L4 — T2 consequences of "Solo pesos enteros": "Usar máximo disponible" truncates cents (500.25 -> $ 500); stored amounts with cents load truncated when edited; guided split hint now says whole pesos; native min/max on money inputs removed, server validation applies.
+- L5 — Slice boundary: T1+T2 (commits e9b05ec, 9fb4630) reached ~470 authored lines; T3 starts a second reviewable slice on the same branch.
+- L6 — T3 verified: server 354/354 against dev (DATABASE_URL override; guided-closure PostgreSQL tests in disposable schema guided_closure_t1_check, dropped after), client 287/287, client and server tsc clean. Persisted strings, health contract and log-only/invariant strings intentionally left in English. Found active .env on personal profile: guarded tests refused, migration tests used random schemas and left none behind.

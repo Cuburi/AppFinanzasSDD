@@ -25,9 +25,9 @@ test("pocket deposit DTO parses every strict source shape", () => {
 test("pocket deposit DTO rejects compatibility and contradictory source shapes", () => {
   const base = { targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" };
 
-  assert.throws(() => parseDepositToPocketInput({ ...base, monthId: "month-1", sourceSubcategoryId: "subcategory-food" }), /source kind must/i);
-  assert.throws(() => parseDepositToPocketInput({ ...base, sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: "subcategory-food" }), /cannot specify/i);
-  assert.throws(() => parseDepositToPocketInput({ ...base, sourceKind: "EXTERNAL", monthId: "month-1", externalSourceLabel: "Bonus" }), /cannot specify/i);
+  assert.throws(() => parseDepositToPocketInput({ ...base, monthId: "month-1", sourceSubcategoryId: "subcategory-food" }), /tipo de origen del depósito al bolsillo debe/i);
+  assert.throws(() => parseDepositToPocketInput({ ...base, sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: "subcategory-food" }), /no pueden indicar/i);
+  assert.throws(() => parseDepositToPocketInput({ ...base, sourceKind: "EXTERNAL", monthId: "month-1", externalSourceLabel: "Bonus" }), /no pueden indicar/i);
   for (const payload of [{ ...base, sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: null }, { ...base, sourceKind: "EXTERNAL", monthId: null }]) assertInvalidDepositSource(payload);
 });
 

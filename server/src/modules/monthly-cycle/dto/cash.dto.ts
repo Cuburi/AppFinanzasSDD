@@ -13,19 +13,19 @@ export type CashSummaryInput = {
 
 export const parseWithdrawCashInput = (monthId: string, payload: unknown): WithdrawCashInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Cash withdrawal payload is required.");
+    throw new Error("Se requieren los datos del retiro de efectivo.");
   }
 
   const rawPayload = payload as { amount?: unknown; occurredAt?: unknown; description?: unknown };
 
   return {
-    monthId: readNonEmptyString(monthId, "Month id"),
-    amount: readPositiveAmount(rawPayload.amount, "Cash withdrawal amount"),
-    occurredAt: readIsoDateString(rawPayload.occurredAt, "Cash withdrawal date"),
+    monthId: readNonEmptyString(monthId, "Identificador del mes"),
+    amount: readPositiveAmount(rawPayload.amount, "Monto del retiro de efectivo"),
+    occurredAt: readIsoDateString(rawPayload.occurredAt, "Fecha del retiro de efectivo"),
     description: readOptionalString(rawPayload.description),
   };
 };
 
 export const parseCashSummaryInput = (monthId: string): CashSummaryInput => ({
-  monthId: readNonEmptyString(monthId, "Month id"),
+  monthId: readNonEmptyString(monthId, "Identificador del mes"),
 });

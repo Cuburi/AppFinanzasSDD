@@ -186,7 +186,7 @@ test("applyClosureAction rejects surplus transfer and persists deficit closure m
 
   await assert.rejects(
     () => useCases.applyClosureAction({ monthId: "month-1", type: MovementType.SURPLUS_TO_POCKET_ON_CLOSE, sourceSubcategoryId: "sub-market" }),
-    { message: "Budget variance is informational and cannot be transferred." },
+    { message: "La variación del presupuesto es informativa y no se puede transferir." },
   );
   const deficitReview = await createClosureUseCases(deficitPorts.ports).applyClosureAction({
     monthId: "month-1",
@@ -204,7 +204,7 @@ test("applyClosureAction rejects surplus transfer and persists deficit closure m
   assert.deepEqual(deficitPorts.calls, [
     ["transactionRunner.run"],
     ["tx.months.findById", "month-1"],
-    ["tx.pockets.ensurePocketIsActive", "pocket-safe", "Source pocket"],
+    ["tx.pockets.ensurePocketIsActive", "pocket-safe", "Bolsillo de origen"],
     ["tx.movements.create", "DEFICIT_COVER_FROM_POCKET", "25", null, "sub-market", "pocket-safe", null],
     ["tx.months.findById", "month-1"],
   ]);

@@ -7,12 +7,12 @@ const toNumber = (value: unknown): number => {
     if (!Number.isNaN(parsed)) return parsed;
   }
 
-  throw new Error("Expected a valid number.");
+  throw new Error("Se esperaba un número válido.");
 };
 
 const readName = (value: unknown): string => {
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error("Pocket name is required.");
+    throw new Error("Nombre del bolsillo: valor obligatorio.");
   }
 
   return value.trim();
@@ -23,7 +23,7 @@ const readOptionalGoalAmount = (value: unknown): number | null => {
 
   const amount = toNumber(value);
   if (!Number.isFinite(amount) || amount < 0) {
-    throw new Error("Pocket goal amount must be zero or greater.");
+    throw new Error("El monto de la meta del bolsillo debe ser mayor o igual a cero.");
   }
 
   return amount;
@@ -35,7 +35,7 @@ const readOptionalBoolean = (value: unknown): boolean | undefined => {
   if (value === "true") return true;
   if (value === "false") return false;
 
-  throw new Error("Pocket active flag must be a boolean.");
+  throw new Error("El indicador de bolsillo activo debe ser un booleano.");
 };
 
 export const parsePocketListFilter = (value: unknown): PocketListFilter => {
@@ -47,7 +47,7 @@ export const parsePocketListFilter = (value: unknown): PocketListFilter => {
 
 export const parseCreatePocketInput = (payload: unknown): CreatePocketInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Pocket payload is required.");
+    throw new Error("Se requieren los datos del bolsillo.");
   }
 
   const rawPayload = payload as { name?: unknown; goalAmount?: unknown };
@@ -60,7 +60,7 @@ export const parseCreatePocketInput = (payload: unknown): CreatePocketInput => {
 
 export const parseUpdatePocketInput = (payload: unknown): UpdatePocketInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Pocket update payload is required.");
+    throw new Error("Se requieren los datos para actualizar el bolsillo.");
   }
 
   const rawPayload = payload as { name?: unknown; goalAmount?: unknown; active?: unknown };

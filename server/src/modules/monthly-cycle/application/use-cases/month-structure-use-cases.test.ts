@@ -235,7 +235,7 @@ test("createMonthSubcategory validates pockets and links promoted template subca
   assert.deepEqual(calls, [
     ["transactionRunner.run"],
     ["tx.months.findById", "month-1"],
-    ["tx.pockets.ensurePocketIsActive", "pocket-food", "Default pocket"],
+    ["tx.pockets.ensurePocketIsActive", "pocket-food", "Bolsillo predeterminado"],
     ["tx.templates.readCategories"],
     ["tx.structure.createMonthSubcategory", "cat-food", "Restaurants", "80", "pocket-food", 1, null],
     ["tx.structure.createTemplateSubcategory", "template-food", "Restaurants", "80", "pocket-food", 1],
@@ -249,7 +249,7 @@ test("update and delete month structure methods preserve validation and transact
   const useCases = createMonthStructureUseCases(ports);
 
   await useCases.updateMonthSubcategory({ monthId: "month-1", subcategoryId: "sub-market", name: "Groceries", plannedAmount: 125, defaultPocketId: null });
-  await useCases.deleteMonthCategory("month-1", "cat-food").catch((error: Error) => assert.equal(error.message, "Delete subcategories first before deleting this category."));
+  await useCases.deleteMonthCategory("month-1", "cat-food").catch((error: Error) => assert.equal(error.message, "Elimine primero las subcategorías antes de eliminar esta categoría."));
   await useCases.deleteMonthSubcategory("month-1", "sub-market");
 
   assert.deepEqual(calls, [

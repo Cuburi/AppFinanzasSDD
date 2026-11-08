@@ -134,9 +134,9 @@ test("createDebtsRouter rejects invalid create shapes before application executi
     });
 
     assert.equal(amountResponse.status, 400);
-    assert.deepEqual(await amountResponse.json(), { message: "Debt amount must be positive." });
+    assert.deepEqual(await amountResponse.json(), { message: "Monto de la deuda debe ser mayor que cero." });
     assert.equal(currencyResponse.status, 400);
-    assert.deepEqual(await currencyResponse.json(), { message: "Debt currency must be COP." });
+    assert.deepEqual(await currencyResponse.json(), { message: "La moneda de la deuda debe ser COP." });
     assert.equal(createCalls, 0);
   } finally {
     server.close();
@@ -155,7 +155,7 @@ test("createDebtsRouter parses payment payloads and maps overpayment domain erro
     async registerPayment(debtId: string, input: unknown) {
       calls.push({ debtId, input });
       if (calls.length === 2) {
-        throw new DomainError(409, "Payment exceeds remaining debt balance.");
+        throw new DomainError(409, "El pago supera el saldo pendiente de la deuda.");
       }
       return { ...openDebt, remainingBalance: 50, payments: [...openDebt.payments, { id: "payment-2", amount: 20, paidAt: "2026-05-04T00:00:00.000Z", notes: null }] };
     },
@@ -175,7 +175,7 @@ test("createDebtsRouter parses payment payloads and maps overpayment domain erro
     assert.equal(validResponse.status, 201);
     assert.equal((await validResponse.json()).remainingBalance, 50);
     assert.equal(overpaymentResponse.status, 409);
-    assert.deepEqual(await overpaymentResponse.json(), { message: "Payment exceeds remaining debt balance." });
+    assert.deepEqual(await overpaymentResponse.json(), { message: "El pago supera el saldo pendiente de la deuda." });
     assert.deepEqual(calls, [
       { debtId: "debt-1", input: { amount: 20, paidAt: new Date("2026-05-04T00:00:00.000Z"), notes: null } },
       { debtId: "debt-1", input: { amount: 80, paidAt: new Date("2026-05-05T00:00:00.000Z"), notes: null } },
@@ -206,7 +206,7 @@ test("createDebtsRouter maps missing-debt payment errors to HTTP 404", async () 
     });
 
     assert.equal(response.status, 404);
-    assert.deepEqual(await response.json(), { message: "Debt not found." });
+    assert.deepEqual(await response.json(), { message: "No se encontró la deuda." });
   } finally {
     server.close();
   }
@@ -239,9 +239,9 @@ test("createDebtsRouter rejects invalid payment shapes before application execut
     });
 
     assert.equal(amountResponse.status, 400);
-    assert.deepEqual(await amountResponse.json(), { message: "Payment amount must be positive." });
+    assert.deepEqual(await amountResponse.json(), { message: "Monto del pago debe ser mayor que cero." });
     assert.equal(dateResponse.status, 400);
-    assert.deepEqual(await dateResponse.json(), { message: "Payment date must be a valid date." });
+    assert.deepEqual(await dateResponse.json(), { message: "Fecha del pago debe ser una fecha válida." });
     assert.equal(paymentCalls, 0);
   } finally {
     server.close();
@@ -316,7 +316,7 @@ test("createDebtsRouter rejects reused payment keys with a different body before
 
     assert.equal(first.status, 201);
     assert.equal(conflict.status, 409);
-    assert.deepEqual(await conflict.json(), { message: "Idempotency-Key was already used for a different request." });
+    assert.deepEqual(await conflict.json(), { message: "Idempotency-Key ya se utilizó para una solicitud diferente." });
     assert.equal(calls, 1);
   } finally {
     server.close();
