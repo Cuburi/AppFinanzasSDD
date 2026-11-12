@@ -1,4 +1,5 @@
 import type {
+  BusinessDate,
   ClosureActionInput,
   CloseMonthInput,
   ClosureReview,
@@ -71,7 +72,7 @@ type ActiveMonthPocketDepositInput = {
   monthId: string;
   targetPocketId: string;
   amount: number;
-  occurredAt: string;
+  occurredAt: BusinessDate;
 } & (
   | { sourceKind: "SUBCATEGORY"; sourceSubcategoryId: string }
   | { sourceKind: "MONTH_AVAILABLE" }
@@ -81,7 +82,7 @@ type ExternalPocketDepositInput = {
   sourceKind: "EXTERNAL";
   targetPocketId: string;
   amount: number;
-  occurredAt: string;
+  occurredAt: BusinessDate;
   externalSourceLabel?: string;
 };
 

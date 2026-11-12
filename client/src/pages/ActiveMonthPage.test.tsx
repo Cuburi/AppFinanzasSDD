@@ -29,7 +29,7 @@ const apiMock = vi.hoisted(() => ({
   getExpenseHistory: vi.fn(),
 }));
 
-const ledgerEntry = (entryKey: string, eventType: string, description: string | null, occurredAt = "2026-05-12T12:00:00.000Z") => ({
+const ledgerEntry = (entryKey: string, eventType: string, description: string | null, occurredAt = "2026-05-12") => ({
   entryKey,
   occurredAt,
   eventType,
@@ -60,7 +60,7 @@ const activeMonth: Month = {
       monthId: "month-1",
       sourceName: "Sueldo",
       amount: 1000,
-      receivedAt: "2026-05-05T00:00:00.000Z",
+      receivedAt: "2026-05-05",
       notes: "neto",
       createdAt: "2026-05-05T00:00:00.000Z",
       updatedAt: "2026-05-05T00:00:00.000Z",
@@ -139,7 +139,7 @@ describe("ActiveMonthPage", () => {
     apiMock.getExpenseHistory.mockResolvedValue([
       {
         id: "expense-1",
-        occurredAt: "2026-05-12T00:00:00.000Z",
+        occurredAt: "2026-05-12",
         paymentMethod: "CASH",
         amount: 20,
         description: "Café",
@@ -149,7 +149,7 @@ describe("ActiveMonthPage", () => {
       },
       {
         id: "expense-2",
-        occurredAt: "2026-05-15T00:00:00.000Z",
+        occurredAt: "2026-05-15",
         paymentMethod: "NON_CASH",
         amount: 35,
         description: null,
@@ -471,7 +471,7 @@ describe("ActiveMonthPage", () => {
         sourceSubcategoryId: "sub-bonus",
         targetPocketId: "pocket-emergency",
         amount: 125,
-        occurredAt: expect.stringMatching(/^2026-05-\d{2}T/),
+        occurredAt: "2026-05-12",
       }),
     );
   });
@@ -495,7 +495,7 @@ describe("ActiveMonthPage", () => {
       monthId: "month-1",
       targetPocketId: "pocket-emergency",
       amount: 75,
-      occurredAt: expect.stringMatching(/^2026-05-\d{2}T/),
+      occurredAt: "2026-05-13",
     }));
     expect(within(depositForm).queryByLabelText(/externo/i)).not.toBeInTheDocument();
     expect(within(depositForm).queryByLabelText("Subcategoría de origen")).not.toBeInTheDocument();
@@ -747,7 +747,7 @@ describe("ActiveMonthPage", () => {
         sourceSubcategoryId: "sub-bonus",
         amount: 35,
         description: "Groceries",
-        occurredAt: expect.stringMatching(/^2026-05-\d{2}T/),
+        occurredAt: "2026-05-15",
         paymentMethod: "NON_CASH",
         creditCardId: "card-1",
       }),
@@ -834,14 +834,14 @@ describe("ActiveMonthPage", () => {
         sourceSubcategoryId: "sub-bonus",
         amount: 20,
         description: "Café",
-        occurredAt: expect.stringMatching(/^2026-05-\d{2}T/),
+        occurredAt: "2026-05-12",
         paymentMethod: "CASH",
         creditCardId: null,
       }),
     );
   });
 
-  it("defaults new expense registration to today with the current clock time when the active month is current", async () => {
+  it("defaults new expense registration to today's local calendar day when the active month is current", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const currentTime = new Date(2026, 4, 14, 21, 14, 15, 250);
     vi.setSystemTime(currentTime);
@@ -861,15 +861,10 @@ describe("ActiveMonthPage", () => {
     await waitFor(() => expect(apiMock.recordExpense).toHaveBeenCalled());
     const payload = apiMock.recordExpense.mock.calls.at(-1)?.[0];
     if (!payload) throw new Error("Missing expense payload.");
-    const occurredAt = new Date(payload.occurredAt);
-    expect(occurredAt.getFullYear()).toBe(2026);
-    expect(occurredAt.getMonth()).toBe(4);
-    expect(occurredAt.getDate()).toBe(14);
-    expect(occurredAt.getHours()).toBe(21);
-    expect(occurredAt.getMinutes()).toBe(14);
+    expect(payload.occurredAt).toBe("2026-05-14");
   });
 
-  it("submits month-end expenses with a local offset and the exact real instant", async () => {
+  it("submits month-end expenses as bare days late in the Colombian evening", async () => {
     vi.stubEnv("TZ", "America/Bogota");
     vi.useFakeTimers({ toFake: ["Date"] });
     const instant = new Date("2026-11-01T01:14:15.250Z");
@@ -886,16 +881,15 @@ describe("ActiveMonthPage", () => {
 
     await waitFor(() => expect(apiMock.recordExpense).toHaveBeenCalledTimes(1));
     const payload = apiMock.recordExpense.mock.calls[0][0];
-    expect(payload.occurredAt).toBe("2026-10-31T20:14:15.250-05:00");
-    expect(new Date(payload.occurredAt).getTime()).toBe(instant.getTime());
+    expect(payload.occurredAt).toBe("2026-10-31");
     expect(apiMock.updateExpense).not.toHaveBeenCalled();
     expect(await screen.findByText("Gasto registrado y saldos recalculados.")).toBeInTheDocument();
   });
 
-  it("edits a month-end expense using its linked-month local date without changing its instant", async () => {
+  it("pre-fills and edits a month-end expense with its stored calendar day unchanged", async () => {
     vi.stubEnv("TZ", "America/Bogota");
     const october = { ...activeMonth, month: 10 };
-    const occurredAt = "2026-11-01T01:14:15.250Z";
+    const occurredAt = "2026-10-31";
     apiMock.getActiveMonth.mockResolvedValue(october);
     apiMock.updateExpense.mockResolvedValue(october);
     apiMock.getExpenseHistory.mockResolvedValue([{
@@ -915,6 +909,50 @@ describe("ActiveMonthPage", () => {
       expenseId: "expense-1", occurredAt, description: "Corregido",
     })));
     expect(await screen.findByText("Gasto actualizado en el mes activo y saldos recalculados.")).toBeInTheDocument();
+  });
+
+  it.each(["income", "withdrawal", "deposit"] as const)("sends a bare month-end day for %s late in Colombia", async (kind) => {
+    vi.stubEnv("TZ", "America/Bogota");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-01T01:14:15.250Z"));
+    const october = { ...activeMonth, month: 10 };
+    apiMock.getActiveMonth.mockResolvedValue(october);
+    apiMock.createMonthlyIncome.mockResolvedValue(october);
+    apiMock.withdrawCash.mockResolvedValue(october);
+    apiMock.depositToPocket.mockResolvedValue(october);
+    render(<ActiveMonthPage />);
+    const label = kind === "income" ? "Registrar ingreso" : kind === "withdrawal" ? "Retirar efectivo" : "Depositar en bolsillo";
+    fireEvent.click(await screen.findByRole("button", { name: label }));
+    const form = screen.getByRole("region", { name: label }).querySelector("form")!;
+    const fields = within(form);
+    if (kind === "income") fireEvent.change(fields.getByLabelText("Fuente del ingreso"), { target: { value: "Extra" } });
+    if (kind === "deposit") {
+      fireEvent.change(fields.getByLabelText("Origen de los fondos"), { target: { value: "MONTH_AVAILABLE" } });
+      fireEvent.change(fields.getByLabelText("Bolsillo destino"), { target: { value: "pocket-emergency" } });
+    }
+    fireEvent.change(fields.getByLabelText(kind === "withdrawal" ? "Monto a retirar" : "Monto", { selector: "input" }), { target: { value: "20" } });
+    const date = fields.getByLabelText(kind === "income" ? "Fecha" : kind === "withdrawal" ? "Fecha del retiro" : "Fecha del depósito");
+    fireEvent.change(date, { target: { value: "2026-10-31" } });
+    fireEvent.submit(form);
+    const mutation = kind === "income" ? apiMock.createMonthlyIncome : kind === "withdrawal" ? apiMock.withdrawCash : apiMock.depositToPocket;
+    await waitFor(() => expect(mutation).toHaveBeenCalledTimes(1));
+    expect(mutation.mock.calls[0][0]).toEqual(kind === "income"
+      ? { monthId: "month-1", sourceName: "Extra", amount: 20, receivedAt: "2026-10-31", notes: null }
+      : kind === "withdrawal"
+        ? { monthId: "month-1", amount: 20, occurredAt: "2026-10-31", description: undefined }
+        : { monthId: "month-1", targetPocketId: "pocket-emergency", amount: 20, occurredAt: "2026-10-31", sourceKind: "MONTH_AVAILABLE" });
+  });
+
+  it("pre-fills and updates an income with its stored month-end day", async () => {
+    const october = { ...activeMonth, month: 10, incomes: [{ ...activeMonth.incomes[0], receivedAt: "2026-10-31" }] };
+    apiMock.getActiveMonth.mockResolvedValue(october);
+    apiMock.updateMonthlyIncome.mockResolvedValue(october);
+    render(<ActiveMonthPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Editar ingreso Sueldo" }));
+    const date = screen.getByLabelText("Fecha");
+    expect(date).toHaveValue("2026-10-31");
+    fireEvent.submit(date.closest("form")!);
+    await waitFor(() => expect(apiMock.updateMonthlyIncome).toHaveBeenCalledWith({ monthId: "month-1", incomeId: "income-1", sourceName: "Sueldo", amount: 1000, receivedAt: "2026-10-31", notes: "neto" }));
   });
 
   it("records an uncategorized expense without a synthetic subcategory", async () => {
@@ -1049,7 +1087,7 @@ describe("ActiveMonthPage", () => {
   it("keeps a refreshed canonical expense visible but read-only after its expense-history refresh fails", async () => {
     const user = userEvent.setup();
     apiMock.updateExpense.mockResolvedValueOnce({ ...activeMonth, availableMoney: 390 });
-    apiMock.getExpenseHistory.mockResolvedValueOnce([{ id: "expense-1", occurredAt: "2026-05-12T00:00:00.000Z", paymentMethod: "CASH", amount: 20, description: "Café", creditCardId: null, category: { id: "cat-income", name: "Ingresos" }, subcategory: { id: "sub-bonus", name: "Bonus" } }]).mockRejectedValueOnce(new Error("History unavailable."));
+    apiMock.getExpenseHistory.mockResolvedValueOnce([{ id: "expense-1", occurredAt: "2026-05-12", paymentMethod: "CASH", amount: 20, description: "Café", creditCardId: null, category: { id: "cat-income", name: "Ingresos" }, subcategory: { id: "sub-bonus", name: "Bonus" } }]).mockRejectedValueOnce(new Error("History unavailable."));
     vi.stubGlobal("fetch", vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ledgerResponse(ledgerEntry("expense-1", "CASH_EXPENSE", "Café")) })
       .mockResolvedValueOnce({ ok: true, json: async () => ledgerResponse(ledgerEntry("expense-1", "CASH_EXPENSE", "Café corregido")) }));
@@ -1451,7 +1489,7 @@ describe("ActiveMonthPage", () => {
       expect(apiMock.withdrawCash).toHaveBeenCalledWith({
         monthId: "month-1",
         amount: 50,
-        occurredAt: expect.stringMatching(/^2026-05-\d{2}T/),
+        occurredAt: "2026-05-10",
         description: "ATM",
       }),
     );
@@ -1468,7 +1506,7 @@ describe("ActiveMonthPage", () => {
           monthId: "month-1",
           sourceName: "Freelance",
           amount: 250,
-          receivedAt: "2026-05-08T00:00:00.000Z",
+          receivedAt: "2026-05-08",
           notes: null,
           createdAt: "2026-05-08T00:00:00.000Z",
           updatedAt: "2026-05-08T00:00:00.000Z",
@@ -1509,7 +1547,7 @@ describe("ActiveMonthPage", () => {
         monthId: "month-1",
         sourceName: "Freelance",
         amount: 250,
-        receivedAt: expect.stringMatching(/^2026-05-\d{2}T/),
+        receivedAt: "2026-05-08",
         notes: null,
       }),
     );

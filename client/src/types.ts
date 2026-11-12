@@ -1,3 +1,6 @@
+/** Business calendar day in YYYY-MM-DD format; never an ISO timestamp. */
+export type BusinessDate = string;
+
 export type TemplateSubcategory = {
   id: string;
   name: string;
@@ -35,7 +38,7 @@ export type SavingsPocketMovement = {
   type: string;
   amount: number;
   description: string | null;
-  occurredAt: string;
+  occurredAt: BusinessDate;
   direction: "in" | "out";
   sourceKind?: "EXTERNAL";
   sourceLabel?: string | null;
@@ -57,7 +60,7 @@ export type DebtStatus = "OPEN" | "PAID";
 export type DebtPaymentView = {
   id: string;
   amount: number;
-  paidAt: string;
+  paidAt: BusinessDate;
   notes: string | null;
 };
 
@@ -68,7 +71,7 @@ export type DebtView = {
   description: string | null;
   totalAmount: number;
   currency: string;
-  originDate: string;
+  originDate: BusinessDate;
   remainingBalance: number;
   status: DebtStatus;
   payments: DebtPaymentView[];
@@ -78,14 +81,14 @@ export type CreateDebtInput = {
   direction: DebtDirection;
   counterpartyName: string;
   totalAmount: number;
-  originDate: string;
+  originDate: BusinessDate;
   description?: string | null;
   currency?: string;
 };
 
 export type RegisterDebtPaymentInput = {
   amount: number;
-  paidAt: string;
+  paidAt: BusinessDate;
   notes?: string | null;
 };
 
@@ -151,7 +154,7 @@ export type UpdatePocketInput = {
 export type WithdrawFromPocketInput = {
   sourcePocketId: string;
   amount: number;
-  occurredAt: string;
+  occurredAt: BusinessDate;
   description?: string;
 };
 
@@ -178,7 +181,7 @@ export type MonthlyIncome = {
   monthId: string;
   sourceName: string;
   amount: number;
-  receivedAt: string;
+  receivedAt: BusinessDate;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -190,7 +193,7 @@ export type RecordExpenseInput = {
   monthId: string;
   sourceSubcategoryId: string | null;
   amount: number;
-  occurredAt: string;
+  occurredAt: BusinessDate;
   paymentMethod: PaymentMethod;
   creditCardId?: string | null;
   description?: string;
@@ -232,8 +235,8 @@ export type UpdateMonthSubcategoryInput = {
 };
 
 export type ExpenseHistoryFilters = {
-  from?: string;
-  to?: string;
+  from?: BusinessDate;
+  to?: BusinessDate;
   paymentMethod?: PaymentMethod;
   subcategoryId?: string;
   creditCardId?: string;
@@ -242,7 +245,7 @@ export type ExpenseHistoryFilters = {
 
 export type ExpenseHistoryItem = {
   id: string;
-  occurredAt: string;
+  occurredAt: BusinessDate;
   paymentMethod: PaymentMethod;
   amount: number;
   description: string | null;
@@ -260,7 +263,7 @@ export type ExpenseHistoryItem = {
 export type WithdrawCashInput = {
   monthId: string;
   amount: number;
-  occurredAt: string;
+  occurredAt: BusinessDate;
   description?: string;
 };
 
@@ -268,7 +271,7 @@ export type CashSummaryEvent = {
   id: string;
   type: "CASH_WITHDRAWAL" | "CASH_CARRYOVER_IN" | "EXPENSE";
   amount: number;
-  occurredAt: string;
+  occurredAt: BusinessDate;
   description: string | null;
 };
 
@@ -318,7 +321,7 @@ export type CreateMonthlyIncomeInput = {
   monthId: string;
   sourceName: string;
   amount: number;
-  receivedAt: string;
+  receivedAt: BusinessDate;
   notes?: string | null;
 };
 
@@ -327,7 +330,7 @@ export type UpdateMonthlyIncomeInput = {
   incomeId: string;
   sourceName?: string;
   amount?: number;
-  receivedAt?: string;
+  receivedAt?: BusinessDate;
   notes?: string | null;
 };
 
