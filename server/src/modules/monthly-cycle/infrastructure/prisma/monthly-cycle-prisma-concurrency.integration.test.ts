@@ -59,7 +59,7 @@ test("qualifying P2010 recovery rolls back the first real PostgreSQL write and c
   const deposit = createStrictDepositToPocketUseCase({ ...createMonthlyCyclePrismaAdapters(prisma as never), transactionRunner });
 
   try {
-    await deposit({ sourceKind: "MONTH_AVAILABLE", monthId: month.id, targetPocketId: pocket.id, amount: 0.2, occurredAt: occurredAt.toISOString() });
+    await deposit({ sourceKind: "MONTH_AVAILABLE", monthId: month.id, targetPocketId: pocket.id, amount: 0.2, occurredAt: occurredAt.toISOString().slice(0, 10) });
     assert.equal(attempts(), 2);
     assert.equal(await prisma.movement.count({ where: { monthId: month.id, targetPocketId: pocket.id } }), 1);
     const balances = calculateMonthBalances(await createMonthlyCyclePrismaAdapters(prisma as never).months.findById(month.id));
@@ -234,15 +234,15 @@ const waitForBlockedMonthMutation = async (writer: WriterDefinition, writerPid: 
 };
 
 const closeFirstWriterFactories: WriterDefinition[] = [
-  { name: "recordExpense", write: (fixture, ports) => createMovementUseCases(ports).recordExpense({ monthId: fixture.month.id, sourceSubcategoryId: fixture.subcategoryId, amount: 1, occurredAt: fixture.occurredAt.toISOString(), paymentMethod: "NON_CASH" }) },
-  { name: "updateExpense", write: (fixture, ports) => createMovementUseCases(ports).updateExpense({ monthId: fixture.month.id, expenseId: fixture.expense.id, sourceSubcategoryId: fixture.subcategoryId, amount: 1, occurredAt: fixture.occurredAt.toISOString(), paymentMethod: "NON_CASH" }) },
+  { name: "recordExpense", write: (fixture, ports) => createMovementUseCases(ports).recordExpense({ monthId: fixture.month.id, sourceSubcategoryId: fixture.subcategoryId, amount: 1, occurredAt: fixture.occurredAt.toISOString().slice(0, 10), paymentMethod: "NON_CASH" }) },
+  { name: "updateExpense", write: (fixture, ports) => createMovementUseCases(ports).updateExpense({ monthId: fixture.month.id, expenseId: fixture.expense.id, sourceSubcategoryId: fixture.subcategoryId, amount: 1, occurredAt: fixture.occurredAt.toISOString().slice(0, 10), paymentMethod: "NON_CASH" }) },
   { name: "deleteExpense", write: (fixture, ports) => createMovementUseCases(ports).deleteExpense(fixture.month.id, fixture.expense.id) },
-  { name: "compatibilityDepositToPocket", write: (fixture, ports) => createMovementService(ports).depositToPocket({ sourceKind: "SUBCATEGORY", monthId: fixture.month.id, sourceSubcategoryId: fixture.subcategoryId, targetPocketId: fixture.pocket.id, amount: 1, occurredAt: fixture.occurredAt.toISOString() }) },
-  { name: "strictDepositToPocket", write: (fixture, ports) => createStrictDepositToPocketUseCase(ports)({ sourceKind: "SUBCATEGORY", monthId: fixture.month.id, sourceSubcategoryId: fixture.subcategoryId, targetPocketId: fixture.pocket.id, amount: 1, occurredAt: "2026-01-10T00:00:00.000Z" }) },
-  { name: "createMonthlyIncome", write: (fixture, ports) => createIncomeUseCases(ports).createMonthlyIncome({ monthId: fixture.month.id, sourceName: "late", amount: 1, receivedAt: fixture.occurredAt.toISOString() }) },
+  { name: "compatibilityDepositToPocket", write: (fixture, ports) => createMovementService(ports).depositToPocket({ sourceKind: "SUBCATEGORY", monthId: fixture.month.id, sourceSubcategoryId: fixture.subcategoryId, targetPocketId: fixture.pocket.id, amount: 1, occurredAt: fixture.occurredAt.toISOString().slice(0, 10) }) },
+  { name: "strictDepositToPocket", write: (fixture, ports) => createStrictDepositToPocketUseCase(ports)({ sourceKind: "SUBCATEGORY", monthId: fixture.month.id, sourceSubcategoryId: fixture.subcategoryId, targetPocketId: fixture.pocket.id, amount: 1, occurredAt: fixture.occurredAt.toISOString().slice(0, 10) }) },
+  { name: "createMonthlyIncome", write: (fixture, ports) => createIncomeUseCases(ports).createMonthlyIncome({ monthId: fixture.month.id, sourceName: "late", amount: 1, receivedAt: fixture.occurredAt.toISOString().slice(0, 10) }) },
   { name: "updateMonthlyIncome", write: (fixture, ports) => createIncomeUseCases(ports).updateMonthlyIncome({ monthId: fixture.month.id, incomeId: fixture.income.id, sourceName: "late" }) },
   { name: "deleteMonthlyIncome", write: (fixture, ports) => createIncomeUseCases(ports).deleteMonthlyIncome(fixture.month.id, fixture.income.id) },
-  { name: "withdrawCash", write: (fixture, ports) => createCashUseCases(ports).withdrawCash({ monthId: fixture.month.id, amount: 1, occurredAt: fixture.occurredAt.toISOString() }) },
+  { name: "withdrawCash", write: (fixture, ports) => createCashUseCases(ports).withdrawCash({ monthId: fixture.month.id, amount: 1, occurredAt: fixture.occurredAt.toISOString().slice(0, 10) }) },
   { name: "createMonthCategory", write: (fixture, ports) => createMonthStructureUseCases(ports).createMonthCategory({ monthId: fixture.month.id, name: "late", addToTemplate: false }) },
   { name: "updateMonthCategory", write: (fixture, ports) => createMonthStructureUseCases(ports).updateMonthCategory({ monthId: fixture.month.id, categoryId: fixture.emptyCategoryId, name: "late" }) },
   { name: "deleteMonthCategory", write: (fixture, ports) => createMonthStructureUseCases(ports).deleteMonthCategory(fixture.month.id, fixture.emptyCategoryId) },
@@ -392,7 +392,7 @@ test("expense-first makes close reread the committed expense before rejecting an
   });
 
   try {
-    const updatingExpense = writer.updateExpense({ monthId: fixture.month.id, expenseId: fixture.expense.id, sourceSubcategoryId: fixture.subcategoryId, amount: 101, occurredAt: fixture.occurredAt.toISOString(), paymentMethod: "NON_CASH" });
+    const updatingExpense = writer.updateExpense({ monthId: fixture.month.id, expenseId: fixture.expense.id, sourceSubcategoryId: fixture.subcategoryId, amount: 101, occurredAt: fixture.occurredAt.toISOString().slice(0, 10), paymentMethod: "NON_CASH" });
     await writerLocked.promise;
     const closing = close.closeMonth(fixture.month.id);
     await closeAttempted.promise;
@@ -435,7 +435,7 @@ test("strict deposit rolls back all effects when persistence fails after its mov
   const deposit = createStrictDepositToPocketUseCase({ ...createMonthlyCyclePrismaAdapters(prisma as never), transactionRunner });
 
   try {
-    await assert.rejects(() => deposit({ sourceKind: "MONTH_AVAILABLE", monthId: month.id, targetPocketId: pocket.id, amount: 0.2, occurredAt: occurredAt.toISOString() }), /force rollback/);
+    await assert.rejects(() => deposit({ sourceKind: "MONTH_AVAILABLE", monthId: month.id, targetPocketId: pocket.id, amount: 0.2, occurredAt: occurredAt.toISOString().slice(0, 10) }), /force rollback/);
     assert.equal(await prisma.movement.count({ where: { monthId: month.id, targetPocketId: pocket.id } }), 0);
     const balances = calculateMonthBalances(await createMonthlyCyclePrismaAdapters(prisma as never).months.findById(month.id));
     assert.equal(balances.availableMoney, 0.3);

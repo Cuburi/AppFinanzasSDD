@@ -8,6 +8,8 @@ import { calculateMonthBalances } from "../../balance-calculator.js";
 import type { MonthRecord } from "../../shared/service-types.js";
 import { MovementType, type MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 
+import { businessDateToPrisma } from "../../../../shared/business-date.js";
+
 export const CASH_USE_CASE_NAMES = ["withdrawCash", "getCashSummary"] as const;
 
 export type CashUseCases = {
@@ -31,7 +33,7 @@ export const createCashUseCases = (ports: MonthlyCyclePorts): CashUseCases => ({
   async withdrawCash(input) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
       const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
-      const occurredAt = new Date(input.occurredAt);
+      const occurredAt = businessDateToPrisma(input.occurredAt);
       assertDateInsideMonth(occurredAt, existingMonth);
 
       const balances = calculateMonthBalances(existingMonth);

@@ -32,7 +32,6 @@ const clampDay = (year: number, monthIndex: number, day: number) => Math.min(day
 const clampedUtcDate = (year: number, monthIndex: number, day: number) => dateOnlyUtc(year, monthIndex, clampDay(year, monthIndex, day));
 const addUtcDays = (date: Date, days: number) => dateOnlyUtc(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days);
 const dateKey = (date: Date) => date.toISOString().slice(0, 10);
-const endOfUtcDate = (date: Date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
 
 export const calculateStatementCycle = ({ closingDay, dueDay, today }: StatementCycleInput): StatementCycle => {
   const todayDate = dateOnlyUtc(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
@@ -48,7 +47,7 @@ export const calculateStatementCycle = ({ closingDay, dueDay, today }: Statement
     cutoffDate: dateKey(cycleEnd),
     dueDate: dateKey(dueDate),
     from: cycleStart,
-    to: endOfUtcDate(cycleEnd),
+    to: cycleEnd,
   };
 };
 
@@ -57,7 +56,7 @@ const toStatementPeriod = (periodStart: Date, cutoff: Date): StatementPeriod => 
   periodEnd: dateKey(cutoff),
   cutoffDate: dateKey(cutoff),
   from: periodStart,
-  to: endOfUtcDate(cutoff),
+  to: cutoff,
 });
 
 export const calculateStatementPeriodSplit = ({ closingDay, dueDay, today }: StatementCycleInput): StatementPeriodSplit => {

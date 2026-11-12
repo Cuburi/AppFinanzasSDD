@@ -1,5 +1,7 @@
 import type { CreatePocketInput, PocketMovement, SavingsPocketView } from "../shared/types.js";
 
+import { businessDateFromPrisma } from "../../../shared/business-date.js";
+
 export type Pocket = {
   id: string;
   name: string;
@@ -20,7 +22,7 @@ const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100)
 export const normalizePocketName = (name: string) => name.trim();
 
 const sortRecentMovements = (movements: Array<PocketMovement & { direction: "in" | "out" }>) =>
-  [...movements].sort((left, right) => right.occurredAt.getTime() - left.occurredAt.getTime());
+  [...movements].sort((left, right) => right.occurredAt.getTime() - left.occurredAt.getTime() || (right.createdAt?.getTime() ?? 0) - (left.createdAt?.getTime() ?? 0));
 
 export const createPocket = (input: CreatePocketInput): NewPocket => ({
   name: normalizePocketName(input.name),
@@ -54,7 +56,7 @@ export const projectRecentMovements = (pocket: Pocket) => {
       type: movement.type,
       ...(movement.type === "POCKET_DEPOSIT_EXTERNAL" ? { sourceKind: "EXTERNAL" as const, sourceLabel: movement.externalSourceLabel ?? null } : {}),
       amount: movement.amount,
-      occurredAt: movement.occurredAt.toISOString(),
+      occurredAt: businessDateFromPrisma(movement.occurredAt),
       description: movement.description,
       direction: movement.direction,
     }));

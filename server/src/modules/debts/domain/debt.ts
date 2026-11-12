@@ -3,6 +3,8 @@ import type { CreateDebtInput, DebtDirection, DebtStatus, DebtView } from "../sh
 import { DomainError } from "./debt-errors.js";
 import type { DebtPayment, NewDebtPayment } from "./debt-payment.js";
 
+import { businessDateFromPrisma } from "../../../shared/business-date.js";
+
 const COP_CURRENCY = "COP";
 
 export type Debt = {
@@ -43,7 +45,7 @@ const normalizeCurrency = (currency?: string) => {
 };
 
 const sortPayments = (payments: DebtPayment[]) =>
-  [...payments].sort((left, right) => left.paidAt.getTime() - right.paidAt.getTime());
+  [...payments].sort((left, right) => left.paidAt.getTime() - right.paidAt.getTime() || (left.createdAt?.getTime() ?? 0) - (right.createdAt?.getTime() ?? 0));
 
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
@@ -114,13 +116,13 @@ export const toDebtView = (debt: Debt, options?: { clampOverpayment?: boolean })
   description: debt.description,
   totalAmount: debt.totalAmount,
   currency: debt.currency,
-  originDate: debt.originDate.toISOString(),
+  originDate: businessDateFromPrisma(debt.originDate),
   remainingBalance: calculateRemainingBalance(debt, options),
   status: getDebtStatus(debt, options),
   payments: sortPayments(debt.payments).map((payment) => ({
     id: payment.id,
     amount: payment.amount,
-    paidAt: payment.paidAt.toISOString(),
+    paidAt: businessDateFromPrisma(payment.paidAt),
     notes: payment.notes,
   })),
 });
