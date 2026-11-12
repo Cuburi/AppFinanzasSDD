@@ -16,7 +16,7 @@ Branch: `feat/date-only-business-dates` (from `dev`). Timezone of the app: Colom
 
 - [x] T1 — S1, S5 — worker — Prisma schema to `@db.Date` (no business-date defaults) plus migration converting existing rows per S5, with an isolated-schema migration test. High risk (stored data): own commit. Commit: a7c3bdd.
 - [x] T2 — S2, S3, S4, S6 — worker — Server contracts: `YYYY-MM-DD` parsing and serialization, string-based month validation, ordering by date then `createdAt`, generated movement dates, credit-card statement windows, pockets and debts; update tests. Commit: 3eda689.
-- [x] T3 — S2, S3, S4 — worker — Client: send and edit bare dates, remove timestamp synthesis, display days without timezone conversion and without time, ledger grouping by date string, pockets and debts; update tests and E2E.
+- [x] T3 — S2, S3, S4 — worker — Client: send and edit bare dates, remove timestamp synthesis, display days without timezone conversion and without time, ledger grouping by date string, pockets and debts; update tests and E2E. Commit: de5c832.
 - [ ] T4 — S1-S6 — inline — Docs, backlog closure, full verification (server, client, build, E2E) and personal-database migration notes.
 
 ## Log
