@@ -28,6 +28,7 @@ Additional report: "Me falto algo, el hacer un deposito a un bolsillo el campo d
 
 1. "Mejorar las alertas de exito y error, solo son un texto verde"
 2. "Intente guardar gastos el 31 de Oct y me decia que deberia de estar linkeado al mes activo que wefectivamente era octubre pero el 30 si me dejo, sospecho que son los meses que tienen 31 dias"
+   - Resolved by storing business dates as calendar days (`odd/tasks/date-only-business-dates.md`, branch `feat/date-only-business-dates`). Root cause: month validation used the UTC instant, so any month's last day from 19:00 in Colombia (UTC-5) fell into the next month.
 3. "Mejorar ui y logica del apartado del credit card (recurdame que permite hacer ahora mismo en este aspecto)"
 4. "Mejorar pantalla de cierre de mes y lógica porque no se si siempre convenga que el mes quede en 0, me refiero si me sobro plata pero que no ira a ningun bolsillo"
 
