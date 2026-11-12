@@ -1,0 +1,27 @@
+# Date-only business dates
+
+Store and exchange user-chosen business dates as calendar days (`YYYY-MM-DD`, PostgreSQL `date`) instead of instants, removing the month-end timezone bug class at its root.
+Branch: `feat/date-only-business-dates` (from `dev`). Timezone of the app: Colombia, `America/Bogota` (UTC-5).
+
+## Specs
+
+- S1 — Business dates are calendar days. User: "Ahm y no seria mas facil no mandar hora?" and "No yo haria la 2 de una vez". The four business-date fields become date-only (`@db.Date`): `Movement.occurredAt`, `MonthlyIncome.receivedAt`, `Debt.originDate`, `DebtPayment.paidAt`. System timestamps (`createdAt`, `updatedAt`, `Month.openedAt`, `Month.closedAt`) stay instants. No database default for a business date: the server always provides it.
+- S2 — API contract: business dates are sent and returned as `YYYY-MM-DD`. Month membership is decided by the date's year and month, with no timezone arithmetic. Original bug (user): "Intente guardar gastos el 31 de Oct y me decia que deberia de estar linkeado al mes activo que wefectivamente era octubre pero el 30 si me dejo, sospecho que son los meses que tienen 31 dias". A movement or income dated the last day of the active month is accepted at any hour; a date outside the active month is rejected without writing.
+- S3 — History shows no time. User decision for the ledger time display: "Sin hora". Movements show only their day; movements of the same day are ordered by registration order (`createdAt`), without showing it.
+- S4 — Debts included. User decision: "Sí, todo junto". Debt origin dates and debt payment dates follow S1-S2.
+- S5 — Existing data conversion. User decision: "Todo a hora Colombia". Every stored value converts to its calendar day in `America/Bogota`: `((value AT TIME ZONE 'UTC') AT TIME ZONE 'America/Bogota')::date`. Accepted consequence: values stored as date-only (UTC midnight, e.g. `2026-05-10T00:00:00.000Z`) move one day earlier (`2026-05-09`).
+- S6 — Generated movements. User decision: "Día 1 / hoy". Cash carryover when opening a month is dated the 1st of the new month; guided-closure movements are dated with today's local date in `America/Bogota`.
+
+## Tasks
+
+- [x] T1 — S1, S5 — worker — Prisma schema to `@db.Date` (no business-date defaults) plus migration converting existing rows per S5, with an isolated-schema migration test. High risk (stored data): own commit.
+- [ ] T2 — S2, S3, S4, S6 — worker — Server contracts: `YYYY-MM-DD` parsing and serialization, string-based month validation, ordering by date then `createdAt`, generated movement dates, credit-card statement windows, pockets and debts; update tests.
+- [ ] T3 — S2, S3, S4 — worker — Client: send and edit bare dates, remove timestamp synthesis, display days without timezone conversion and without time, ledger grouping by date string, pockets and debts; update tests and E2E.
+- [ ] T4 — S1-S6 — inline — Docs, backlog closure, full verification (server, client, build, E2E) and personal-database migration notes.
+
+## Log
+
+- L1 — User (original request, in response to the proposal of storing calendar days): "Ahm y no seria mas facil no mandar hora?" then "No yo haria la 2 de una vez, pero entonces descarta y lo proximo sera implementar eso". The interim fix branch `fix/month-end-local-dates` (commit 43aa2dc) was discarded at the user's request.
+- L2 — Exploration: four business-date fields (`schema.prisma:126,173,208,222`), all `TIMESTAMP(3)` without timezone, none `@db.Date`; `Movement.occurredAt` defaults to `now()`. Stored data mixes real instants (local clock since f22391a, 2026-10-09) and UTC-midnight date-only values (PocketsPage, DebtsPage, edits). Time part was added for ledger time display (issue #213, `odd/tasks/active-month-daily-use-polish.md:13,51`). Ledger sorts by `occurredAt` desc, then event rank, then key (`ledger-mappers.ts:50`); credit-card statement windows use UTC bounds (`statement-cycle.ts:29-35,63-76`); closure deficit movements omit dates (`closure-use-cases.ts:153,184`); cash carryover uses UTC midnight day 1 (`month-lifecycle-service.ts:75-81`). The `20260729190000_backfill_pocket_deposit_from_available` migration installs an INSERT/UPDATE trigger on Movement. Estimated 35-50 files, 800-1,400 lines.
+- L3 — User decisions: ledger time "Sin hora"; debts "Sí, todo junto (Recommended)"; existing data "Todo a hora Colombia"; generated movements "Día 1 / hoy (Recommended)".
+- L4 — T1 verified on the dev profile (user: "Ya esta en dev"): Prisma client regenerated; RED with an empty migration (date assertions failed), GREEN with the real SQL; migration tests 16/16 in a disposable schema; server suite 353/355, the two failures being the guided-closure PostgreSQL tests that refuse to run outside a `guided_closure_t1_*` schema (same failures on `dev` without this change); server `tsc` clean. The existing Movement trigger does not reference `occurredAt`. The migration was not applied to the dev or personal database.
