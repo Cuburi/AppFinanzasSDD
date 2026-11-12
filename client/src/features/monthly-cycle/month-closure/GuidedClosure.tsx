@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 
-import { Button, Card, StatusPill } from "../../../components/ui";
+import { Button, Card, MoneyInput, StatusPill } from "../../../components/ui";
 import { formatCop } from "../../../lib/money";
 import type { CloseMonthInput, ClosureReview, Month } from "../../../types";
 
@@ -155,28 +155,24 @@ export function GuidedClosure({ month, review, pending, onClose, children }: Pro
         {total === 0 ? <p>No hay sobrante para distribuir. Podés cerrar con ambos destinos en cero.</p> : null}
         {mode === "split" && total !== 0 ? (
           <div>
-            <p>Montos COP no negativos, hasta dos decimales con punto y sin separadores de miles.</p>
+            <p>Montos COP no negativos, en pesos enteros.</p>
             <div className="month-closure-fields">
               <label className="field">
                 Al siguiente mes (COP)
-                <input
-                  type="text"
-                  inputMode="decimal"
+                <MoneyInput
                   disabled={pending}
                   value={carry}
-                  onChange={event => setCarry(event.target.value)}
+                  onValueChange={setCarry}
                   aria-invalid={!valid}
                   aria-describedby="month-closure-feedback"
                 />
               </label>
               <label className="field">
                 Fuera del seguimiento (COP)
-                <input
-                  type="text"
-                  inputMode="decimal"
+                <MoneyInput
                   disabled={pending}
                   value={excluded}
-                  onChange={event => setExcluded(event.target.value)}
+                  onValueChange={setExcluded}
                   aria-invalid={!valid}
                   aria-describedby="month-closure-feedback"
                 />

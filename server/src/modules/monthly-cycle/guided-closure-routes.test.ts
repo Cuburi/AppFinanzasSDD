@@ -24,7 +24,7 @@ test("closure HTTP validates before delegation, supports bodyless baseline, and 
   app.use("/api", createMonthlyCycleRouter({
     async closeMonth(...args) { calls.push(args); return closed as never; },
     async getMonth(id) {
-      if (id === "missing") throw new DomainError(404, "Month was not found.");
+      if (id === "missing") throw new DomainError(404, "No se encontró el mes.");
       calls.push(["read", id]); return closed as never;
     },
     async getLatestClosedMonth() { calls.push(["latest"]); return closed as never; },
@@ -38,7 +38,7 @@ test("closure HTTP validates before delegation, supports bodyless baseline, and 
     for (const payload of [{}, { carryAmount: 0.1 }, { carryAmount: 0.001, excludedAmount: 0.299 }, { carryAmount: "0.1", excludedAmount: 0.2 }]) {
       const response = await fetch(`${url}/months/month-1/close`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       assert.equal(response.status, 400);
-      assert.deepEqual(await response.json(), { message: "Closure amounts must be finite nonnegative numbers with at most two decimals." });
+      assert.deepEqual(await response.json(), { message: "Los montos del cierre deben ser números finitos no negativos con máximo dos decimales." });
       assert.deepEqual(calls, []);
     }
     const response = await fetch(`${url}/months/month-1/close`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ carryAmount: 0.1, excludedAmount: 0.2 }) });
@@ -54,7 +54,7 @@ test("closure HTTP validates before delegation, supports bodyless baseline, and 
     }
     const missing = await fetch(`${url}/months/missing`);
     assert.equal(missing.status, 404);
-    assert.deepEqual(await missing.json(), { message: "Month was not found." });
+    assert.deepEqual(await missing.json(), { message: "No se encontró el mes." });
     assert.deepEqual(calls, [["month-1", { carryAmount: 0.1, excludedAmount: 0.2 }], ["month-1"], ["read", "month-1"], ["latest"], ["active"]]);
   } finally {
     server.closeAllConnections();

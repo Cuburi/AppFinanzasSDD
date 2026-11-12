@@ -108,7 +108,7 @@ export const mapExpenseHistory = (month: MonthRecord, movements: MovementHistory
     const context = findSubcategoryContext(month, sourceSubcategoryId);
 
     if (!context) {
-      throw new Error("Expense source subcategory was not found in the month snapshot.");
+      throw new Error("No se encontró la subcategoría de origen del gasto en la copia del mes.");
     }
 
     return {

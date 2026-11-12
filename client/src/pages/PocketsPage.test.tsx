@@ -85,6 +85,8 @@ describe("PocketsPage", () => {
     expect(await screen.findByText("Emergencias")).toBeInTheDocument();
     expect(screen.getByText("Balance: $250 COP")).toBeInTheDocument();
     expect(screen.getByText("Meta: $1.000 COP")).toBeInTheDocument();
+    expect(screen.queryByText(/Ahorro inicial/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Ver movimientos (1)" }));
     expect(screen.getByText(/Ahorro inicial/)).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Success: Activo" })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Success: Balance $250 COP" })).toBeInTheDocument();
@@ -133,7 +135,7 @@ describe("PocketsPage", () => {
     const amount = await screen.findByLabelText("Meta opcional");
     fireEvent.change(amount, { target: { value: "0124" } });
 
-    expect(amount).toHaveValue(124);
+    expect(amount).toHaveValue("$ 124");
   });
 
   it("renders backend outgoing pocket movements as Salida", async () => {
@@ -155,7 +157,8 @@ describe("PocketsPage", () => {
 
     render(<PocketsPage />);
 
-    expect(await screen.findByText(/Uso de emergencia/)).toBeInTheDocument();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Ver movimientos (1)" }));
+    expect(screen.getByText(/Uso de emergencia/)).toBeInTheDocument();
   });
 
   it("submits an external deposit only from Pockets and refreshes the displayed pockets", async () => {
@@ -232,7 +235,7 @@ describe("PocketsPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("El ingreso externo se registró, pero no se pudieron actualizar los bolsillos.");
     expect(screen.getByRole("alert")).toHaveTextContent("Refresh unavailable.");
     expect(screen.getByLabelText("Bolsillo destino")).toHaveValue("");
-    expect(screen.getByLabelText("Monto del ingreso externo")).toHaveValue(null);
+    expect(screen.getByLabelText("Monto del ingreso externo")).toHaveValue("");
     expect(screen.getByLabelText("Origen externo (opcional)")).toHaveValue("");
     await user.click(screen.getByRole("button", { name: "Registrar ingreso externo" }));
     expect(apiMock.depositExternalToPocket).toHaveBeenCalledTimes(1);
@@ -372,7 +375,7 @@ describe("PocketsPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Deposit unavailable.");
     expect(apiMock.getPockets).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText("Nombre del bolsillo")).toHaveValue("");
-    expect(screen.getByLabelText("Saldo inicial")).toHaveValue(null);
+    expect(screen.getByLabelText("Saldo inicial")).toHaveValue("");
   });
 
   it("removes a deactivated pocket from the active-only list immediately", async () => {

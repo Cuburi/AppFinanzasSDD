@@ -10,7 +10,7 @@ test("ledger query DTO maps blank month ids to semantic client errors", () => {
     (error: unknown) => error instanceof SemanticError
       && error.code === "INVALID_QUERY"
       && error.statusCode === 400
-      && error.message === "Month id is required.",
+      && error.message === "Identificador del mes: valor obligatorio.",
   );
 });
 

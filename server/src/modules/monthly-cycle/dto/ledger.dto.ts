@@ -20,12 +20,12 @@ export type MonthlyLedgerView = { monthId: string; status: MonthView["status"]; 
 export const parseMonthlyLedgerQueryInput = (monthId: unknown, query: unknown): MonthlyLedgerQueryInput => {
   const normalizedMonthId = typeof monthId === "string" ? monthId.trim() : "";
   if (!normalizedMonthId) {
-    throw new SemanticError("INVALID_QUERY", 400, "Month id is required.");
+    throw new SemanticError("INVALID_QUERY", 400, "Identificador del mes: valor obligatorio.");
   }
 
   const includeSystemEvents = (query as { includeSystemEvents?: unknown } | undefined)?.includeSystemEvents;
   if (includeSystemEvents !== undefined && includeSystemEvents !== "true" && includeSystemEvents !== "false") {
-    throw new SemanticError("INVALID_QUERY", 400, "includeSystemEvents must be true or false.");
+    throw new SemanticError("INVALID_QUERY", 400, "includeSystemEvents debe ser true o false.");
   }
 
   return { monthId: normalizedMonthId, includeSystemEvents: includeSystemEvents === "true" };

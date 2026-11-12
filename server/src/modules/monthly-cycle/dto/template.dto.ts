@@ -41,22 +41,22 @@ const readOptionalDefaultPocketId = (value: unknown): string | null => readOptio
 
 export const parseTemplateInput = (payload: unknown): TemplateInput => {
   if (!payload || typeof payload !== "object" || !Array.isArray((payload as { categories?: unknown }).categories)) {
-    throw new Error("Template payload must include categories.");
+    throw new Error("Los datos de la plantilla deben incluir categorías.");
   }
 
   const categories = (payload as { categories: unknown[] }).categories.map((category, categoryIndex) => {
     if (!category || typeof category !== "object" || !Array.isArray((category as { subcategories?: unknown }).subcategories)) {
-      throw new Error(`Category ${categoryIndex + 1} must include subcategories.`);
+      throw new Error(`La categoría ${categoryIndex + 1} debe incluir subcategorías.`);
     }
 
     const rawCategory = category as { id?: unknown; name?: unknown; subcategories: unknown[] };
 
     return {
-      ...(rawCategory.id !== undefined ? { id: readNonEmptyString(rawCategory.id, `Category ${categoryIndex + 1} id`) } : {}),
-      name: readNonEmptyString(rawCategory.name, `Category ${categoryIndex + 1} name`),
+      ...(rawCategory.id !== undefined ? { id: readNonEmptyString(rawCategory.id, `Identificador de la categoría ${categoryIndex + 1}`) } : {}),
+      name: readNonEmptyString(rawCategory.name, `Nombre de la categoría ${categoryIndex + 1}`),
       subcategories: rawCategory.subcategories.map((subcategory, subcategoryIndex) => {
         if (!subcategory || typeof subcategory !== "object") {
-          throw new Error(`Subcategory ${categoryIndex + 1}.${subcategoryIndex + 1} is invalid.`);
+          throw new Error(`La subcategoría ${categoryIndex + 1}.${subcategoryIndex + 1} no es válida.`);
         }
 
         const rawSubcategory = subcategory as {
@@ -69,12 +69,12 @@ export const parseTemplateInput = (payload: unknown): TemplateInput => {
         const plannedAmount = toNumber(rawSubcategory.plannedAmount);
 
         if (plannedAmount < 0) {
-          throw new Error(`Subcategory ${categoryIndex + 1}.${subcategoryIndex + 1} plannedAmount must be zero or greater.`);
+          throw new Error(`El campo plannedAmount de la subcategoría ${categoryIndex + 1}.${subcategoryIndex + 1} debe ser mayor o igual a cero.`);
         }
 
         return {
-          ...(rawSubcategory.id !== undefined ? { id: readNonEmptyString(rawSubcategory.id, `Subcategory ${categoryIndex + 1}.${subcategoryIndex + 1} id`) } : {}),
-          name: readNonEmptyString(rawSubcategory.name, `Subcategory ${categoryIndex + 1}.${subcategoryIndex + 1} name`),
+          ...(rawSubcategory.id !== undefined ? { id: readNonEmptyString(rawSubcategory.id, `Identificador de la subcategoría ${categoryIndex + 1}.${subcategoryIndex + 1}`) } : {}),
+          name: readNonEmptyString(rawSubcategory.name, `Nombre de la subcategoría ${categoryIndex + 1}.${subcategoryIndex + 1}`),
           plannedAmount,
           defaultPocketId: readOptionalDefaultPocketId(rawSubcategory.defaultPocketId),
         };

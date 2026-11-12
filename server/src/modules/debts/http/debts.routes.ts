@@ -16,7 +16,7 @@ export type DebtsHttpService = {
 
 const isDomainError = (error: unknown): error is DomainError => error instanceof DomainError;
 
-const readMessage = (error: unknown) => (error instanceof Error ? error.message : "Unexpected error.");
+const readMessage = (error: unknown) => (error instanceof Error ? error.message : "Error inesperado.");
 
 const handleError = (response: Response, error: unknown) => {
   if (error instanceof DebtNotFoundError) {

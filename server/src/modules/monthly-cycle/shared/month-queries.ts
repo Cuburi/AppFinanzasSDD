@@ -12,7 +12,7 @@ export const readMonthById = async (db: MonthlyCycleDb, monthId: string): Promis
   });
 
   if (!month) {
-    throw new DomainError(404, "Month was not found.");
+    throw new DomainError(404, "No se encontró el mes.");
   }
 
   return month as MonthRecord;
@@ -26,7 +26,7 @@ export const readTemplateCategories = async (db: MonthlyCycleDb) =>
 
 export const assertMonthIsMutable = (month: MonthRecord) => {
   if (month.status === MonthStatus.CLOSED) {
-    throw new SemanticError("MONTH_NOT_ACTIVE", 409, "Closed months are immutable.");
+    throw new SemanticError("MONTH_NOT_ACTIVE", 409, "Los meses cerrados no se pueden modificar.");
   }
 };
 
@@ -48,7 +48,7 @@ export const assertMonthCategory = (month: MonthRecord, categoryId: string) => {
   const category = findMonthCategory(month, categoryId);
 
   if (!category) {
-    throw new DomainError(404, "Category was not found in this month.");
+    throw new DomainError(404, "No se encontró la categoría en este mes.");
   }
 
   return category;
@@ -58,7 +58,7 @@ export const assertMonthSubcategory = (month: MonthRecord, subcategoryId: string
   const subcategory = findMonthSubcategory(month, subcategoryId);
 
   if (!subcategory) {
-    throw new DomainError(404, "Subcategory was not found in this month.");
+    throw new DomainError(404, "No se encontró la subcategoría en este mes.");
   }
 
   return subcategory;
@@ -74,7 +74,7 @@ export const assertPocketIsActive = async (db: MonthlyCycleDb, pocketId: string,
   });
 
   if (!pocket || !pocket.active) {
-    throw new DomainError(400, `${label} must exist and be active.`);
+    throw new DomainError(400, `${label}: debe existir y tener estado activo.`);
   }
 };
 
@@ -87,6 +87,6 @@ export const assertTemplateDefaultPocketsAreActive = async (db: MonthlyCycleDb, 
   );
 
   for (const defaultPocketId of defaultPocketIds) {
-    await assertPocketIsActive(db, defaultPocketId, "Default pocket");
+    await assertPocketIsActive(db, defaultPocketId, "Bolsillo predeterminado");
   }
 };

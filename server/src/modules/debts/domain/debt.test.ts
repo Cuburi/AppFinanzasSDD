@@ -33,7 +33,7 @@ test("createDebt enforces positive COP debts and defaults omitted currency to CO
         totalAmount: 0,
         originDate: fixedDate,
       }),
-    (error) => error instanceof DomainError && error.statusCode === 400 && error.message === "Debt amount must be positive.",
+    (error) => error instanceof DomainError && error.statusCode === 400 && error.message === "Monto de la deuda debe ser mayor que cero.",
   );
 
   assert.throws(
@@ -45,7 +45,7 @@ test("createDebt enforces positive COP debts and defaults omitted currency to CO
         currency: "USD",
         originDate: fixedDate,
       }),
-    (error) => error instanceof DomainError && error.statusCode === 400 && error.message === "Debt currency must be COP.",
+    (error) => error instanceof DomainError && error.statusCode === 400 && error.message === "La moneda de la deuda debe ser COP.",
   );
 });
 
@@ -95,7 +95,7 @@ test("toDebtView clamps historic overpayment in list mode and rejects it otherwi
 
   assert.throws(
     () => toDebtView(overpaidDebt),
-    (error) => error instanceof DomainError && error.statusCode === 409 && error.message === "Debt payments exceed total debt amount.",
+    (error) => error instanceof DomainError && error.statusCode === 409 && error.message === "Los pagos de la deuda superan su monto total.",
   );
 });
 
@@ -117,12 +117,12 @@ test("assertPaymentCanBeRegistered accepts valid payments and rejects invalid on
 
   assert.throws(
     () => assertPaymentCanBeRegistered(openDebt, 0),
-    (error) => error instanceof DomainError && error.statusCode === 400 && error.message === "Payment amount must be positive.",
+    (error) => error instanceof DomainError && error.statusCode === 400 && error.message === "Monto del pago debe ser mayor que cero.",
   );
 
   assert.throws(
     () => assertPaymentCanBeRegistered(openDebt, 61),
-    (error) => error instanceof DomainError && error.statusCode === 409 && error.message === "Payment exceeds remaining debt balance.",
+    (error) => error instanceof DomainError && error.statusCode === 409 && error.message === "El pago supera el saldo pendiente de la deuda.",
   );
 
   const paidDebt = rehydrateDebt({
@@ -133,7 +133,7 @@ test("assertPaymentCanBeRegistered accepts valid payments and rejects invalid on
 
   assert.throws(
     () => assertPaymentCanBeRegistered(paidDebt, 1),
-    (error) => error instanceof DomainError && error.statusCode === 409 && error.message === "Debt is already paid.",
+    (error) => error instanceof DomainError && error.statusCode === 409 && error.message === "La deuda ya está pagada.",
   );
 });
 

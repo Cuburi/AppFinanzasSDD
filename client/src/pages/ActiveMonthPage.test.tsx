@@ -179,7 +179,7 @@ describe("ActiveMonthPage", () => {
     const amount = await screen.findByLabelText("Monto", { selector: "input" });
     fireEvent.change(amount, { target: { value: "0124" } });
 
-    expect(amount).toHaveValue(124);
+    expect(amount).toHaveValue("$ 124");
   });
 
   it("keeps financial truth and expense capture before warnings and maintenance", async () => {
@@ -501,7 +501,7 @@ describe("ActiveMonthPage", () => {
     expect(within(depositForm).queryByLabelText("Subcategoría de origen")).not.toBeInTheDocument();
   });
 
-  it("fills the deposit amount with the selected subcategory maximum without saving", async () => {
+  it("fills the deposit amount with the selected subcategory maximum in whole pesos without saving", async () => {
     const user = userEvent.setup();
     apiMock.getActiveMonth.mockResolvedValueOnce({
       ...activeMonth,
@@ -521,12 +521,12 @@ describe("ActiveMonthPage", () => {
     expect(useMaximum).toBeEnabled();
     await user.click(useMaximum);
 
-    expect(within(depositForm).getByLabelText("Monto", { selector: "input" })).toHaveValue(500.25);
+    expect(within(depositForm).getByLabelText("Monto", { selector: "input" })).toHaveValue("$ 500");
     expect(apiMock.depositToPocket).not.toHaveBeenCalled();
 
     await user.selectOptions(within(depositForm).getByLabelText("Bolsillo destino"), "pocket-emergency");
     await user.click(within(depositForm).getByRole("button", { name: "Depositar en bolsillo" }));
-    await waitFor(() => expect(apiMock.depositToPocket).toHaveBeenCalledWith(expect.objectContaining({ sourceKind: "SUBCATEGORY", sourceSubcategoryId: "sub-bonus", amount: 500.25 })));
+    await waitFor(() => expect(apiMock.depositToPocket).toHaveBeenCalledWith(expect.objectContaining({ sourceKind: "SUBCATEGORY", sourceSubcategoryId: "sub-bonus", amount: 500 })));
   });
 
   it("fills the deposit amount with the month available money and disables the shortcut when nothing is available", async () => {
@@ -539,7 +539,7 @@ describe("ActiveMonthPage", () => {
     if (!depositForm) throw new Error("Missing deposit form.");
     await user.selectOptions(within(depositForm).getByLabelText("Origen de los fondos"), "MONTH_AVAILABLE");
     await user.click(within(depositForm).getByRole("button", { name: "Usar máximo disponible" }));
-    expect(within(depositForm).getByLabelText("Monto", { selector: "input" })).toHaveValue(375);
+    expect(within(depositForm).getByLabelText("Monto", { selector: "input" })).toHaveValue("$ 375");
     expect(apiMock.depositToPocket).not.toHaveBeenCalled();
     unmount();
 
@@ -1038,7 +1038,7 @@ describe("ActiveMonthPage", () => {
     expect(await screen.findByText("Gasto actualizado en el mes activo y saldos recalculados.")).toBeInTheDocument();
     expect(apiMock.getExpenseHistory).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("button", { name: "Registrar gasto" })).toBeInTheDocument();
-    expect(within(expenseForm).getByLabelText("Monto", { selector: "input" })).toHaveValue(null);
+    expect(within(expenseForm).getByLabelText("Monto", { selector: "input" })).toHaveValue("");
 
     await user.click(screen.getByRole("button", { name: "Eliminar gasto Café" }));
     await waitFor(() => expect(apiMock.deleteExpense).toHaveBeenCalledWith("month-1", "expense-1"));

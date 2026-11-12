@@ -119,10 +119,7 @@ describe("TemplatePage", () => {
     const amount = await screen.findByLabelText("Monto planificado de Supermercado");
     fireEvent.change(amount, { target: { value: "0124" } });
 
-    expect(amount).toHaveValue(124);
-
-    fireEvent.change(amount, { target: { value: "000.50" } });
-    expect(amount).toHaveValue(0.5);
+    expect(amount).toHaveValue("$ 124");
   });
 
   it("confirms saved template changes affect future months while the active month keeps its snapshot", async () => {

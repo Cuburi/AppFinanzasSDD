@@ -115,7 +115,7 @@ test("credit card router rejects invalid create payload before persistence", asy
     const response = await request(server, "/api/credit-cards", { method: "POST", body: JSON.stringify({ issuer: "", name: "Main", closingDay: 0, dueDay: 28 }) });
 
     assert.equal(response.status, 400);
-    assert.match((await response.json()).message, /issuer/i);
+    assert.match((await response.json()).message, /emisor/i);
   } finally {
     server.close();
   }

@@ -88,7 +88,7 @@ test("pocketsRouter maps domain errors and supports soft deactivation", async ()
       throw new Error("Not used in this test.");
     },
     async createPocket() {
-      throw new DomainError(409, "A pocket with that name already exists.");
+      throw new DomainError(409, "Ya existe un bolsillo con ese nombre.");
     },
     async updatePocket() {
       throw new Error("Not used in this test.");
@@ -107,7 +107,7 @@ test("pocketsRouter maps domain errors and supports soft deactivation", async ()
     const deactivateResponse = await request(server, "/api/pockets/pocket-1", { method: "DELETE" });
 
     assert.equal(duplicateResponse.status, 409);
-    assert.deepEqual(await duplicateResponse.json(), { message: "A pocket with that name already exists." });
+    assert.deepEqual(await duplicateResponse.json(), { message: "Ya existe un bolsillo con ese nombre." });
     assert.equal(deactivateResponse.status, 200);
     assert.equal((await deactivateResponse.json()).active, false);
   } finally {
@@ -140,9 +140,9 @@ test("pocketsRouter rejects invalid create and update payloads with existing mes
     const updateResponse = await request(server, "/api/pockets/pocket-1", { method: "PATCH", body: JSON.stringify({ active: "maybe" }) });
 
     assert.equal(createResponse.status, 400);
-    assert.deepEqual(await createResponse.json(), { message: "Pocket name is required." });
+    assert.deepEqual(await createResponse.json(), { message: "Nombre del bolsillo: valor obligatorio." });
     assert.equal(updateResponse.status, 400);
-    assert.deepEqual(await updateResponse.json(), { message: "Pocket active flag must be a boolean." });
+    assert.deepEqual(await updateResponse.json(), { message: "El indicador de bolsillo activo debe ser un booleano." });
   } finally {
     server.close();
   }

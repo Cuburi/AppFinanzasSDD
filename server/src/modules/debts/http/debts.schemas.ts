@@ -9,12 +9,12 @@ const toNumber = (value: unknown): number => {
     if (!Number.isNaN(parsed)) return parsed;
   }
 
-  throw new Error("Expected a valid number.");
+  throw new Error("Se esperaba un número válido.");
 };
 
 const readNonEmptyString = (value: unknown, label: string): string => {
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${label} is required.`);
+    throw new Error(`${label}: valor obligatorio.`);
   }
 
   return value.trim();
@@ -23,7 +23,7 @@ const readNonEmptyString = (value: unknown, label: string): string => {
 const readOptionalString = (value: unknown): string | null => {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value !== "string") {
-    throw new Error("Optional text fields must be strings.");
+    throw new Error("Los campos de texto opcionales deben ser cadenas de texto.");
   }
 
   return value.trim() === "" ? null : value.trim();
@@ -32,7 +32,7 @@ const readOptionalString = (value: unknown): string | null => {
 const readPositiveAmount = (value: unknown, label: string): number => {
   const amount = toNumber(value);
   if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error(`${label} must be positive.`);
+    throw new Error(`${label} debe ser mayor que cero.`);
   }
 
   return amount;
@@ -40,12 +40,12 @@ const readPositiveAmount = (value: unknown, label: string): number => {
 
 const readDate = (value: unknown, label: string): Date => {
   if (typeof value !== "string" && !(value instanceof Date)) {
-    throw new Error(`${label} must be a valid date.`);
+    throw new Error(`${label} debe ser una fecha válida.`);
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    throw new Error(`${label} must be a valid date.`);
+    throw new Error(`${label} debe ser una fecha válida.`);
   }
 
   return date;
@@ -56,19 +56,19 @@ const readDirection = (value: unknown): DebtDirection => {
     return value;
   }
 
-  throw new Error("Debt direction must be I_OWE or OWED_TO_ME.");
+  throw new Error("La dirección de la deuda debe ser I_OWE u OWED_TO_ME.");
 };
 
 const readCopCurrency = (value: unknown): string => {
   if (value === undefined || value === null || value === "") return COP_CURRENCY;
   if (value === COP_CURRENCY) return COP_CURRENCY;
 
-  throw new Error("Debt currency must be COP.");
+  throw new Error("La moneda de la deuda debe ser COP.");
 };
 
 export const parseCreateDebtInput = (payload: unknown): CreateDebtInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Debt payload is required.");
+    throw new Error("Se requieren los datos de la deuda.");
   }
 
   const rawPayload = payload as {
@@ -82,24 +82,24 @@ export const parseCreateDebtInput = (payload: unknown): CreateDebtInput => {
 
   return {
     direction: readDirection(rawPayload.direction),
-    counterpartyName: readNonEmptyString(rawPayload.counterpartyName, "Counterparty name"),
+    counterpartyName: readNonEmptyString(rawPayload.counterpartyName, "Nombre de la contraparte"),
     description: readOptionalString(rawPayload.description),
-    totalAmount: readPositiveAmount(rawPayload.totalAmount, "Debt amount"),
+    totalAmount: readPositiveAmount(rawPayload.totalAmount, "Monto de la deuda"),
     currency: readCopCurrency(rawPayload.currency),
-    originDate: readDate(rawPayload.originDate, "Origin date"),
+    originDate: readDate(rawPayload.originDate, "Fecha de origen"),
   };
 };
 
 export const parseRegisterDebtPaymentInput = (payload: unknown): RegisterDebtPaymentInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Payment payload is required.");
+    throw new Error("Se requieren los datos del pago.");
   }
 
   const rawPayload = payload as { amount?: unknown; paidAt?: unknown; notes?: unknown };
 
   return {
-    amount: readPositiveAmount(rawPayload.amount, "Payment amount"),
-    paidAt: readDate(rawPayload.paidAt, "Payment date"),
+    amount: readPositiveAmount(rawPayload.amount, "Monto del pago"),
+    paidAt: readDate(rawPayload.paidAt, "Fecha del pago"),
     notes: readOptionalString(rawPayload.notes),
   };
 };

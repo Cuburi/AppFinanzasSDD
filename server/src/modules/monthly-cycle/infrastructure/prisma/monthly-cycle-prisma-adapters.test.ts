@@ -119,7 +119,7 @@ test("monthly-cycle Prisma adapters expose template reads and pocket validation 
   const ports = createMonthlyCyclePrismaAdapters(db);
 
   assert.deepEqual(await ports.templates.readCategories(), templateCategories);
-  await ports.pockets.ensurePocketIsActive("pocket-home", "Default pocket");
+  await ports.pockets.ensurePocketIsActive("pocket-home", "Bolsillo predeterminado");
   assert.deepEqual(calls, [
     { orderBy: { sortOrder: "asc" }, include: { subcategories: { orderBy: { sortOrder: "asc" } } } },
     { where: { id: "pocket-home" }, select: { id: true, active: true } },
@@ -202,7 +202,7 @@ test("monthly-cycle Prisma credit-card validation rejects missing inactive or un
   await assert.rejects(() => ports.creditCards.ensureCreditCardIsActive("single-user", "missing-card"), {
     name: "DomainError",
     statusCode: 400,
-    message: "Credit card must exist, be owned by the current user, and be active.",
+    message: "La tarjeta de crédito debe existir, pertenecer al usuario actual y estar activa.",
   } as DomainError);
 });
 
@@ -245,10 +245,10 @@ test("monthly-cycle Prisma pocket validation preserves existing domain error sem
   };
   const ports = createMonthlyCyclePrismaAdapters(db);
 
-  await assert.rejects(() => ports.pockets.ensurePocketIsActive("pocket-home", "Target pocket"), {
+  await assert.rejects(() => ports.pockets.ensurePocketIsActive("pocket-home", "Bolsillo de destino"), {
     name: "DomainError",
     statusCode: 400,
-    message: "Target pocket must exist and be active.",
+    message: "Bolsillo de destino: debe existir y tener estado activo.",
   } as DomainError);
 });
 
@@ -275,7 +275,7 @@ test("monthly-cycle transaction runner preserves default Prisma transaction opti
 
   const runner = createMonthlyCyclePrismaTransactionRunner(db);
   const result = await runner.run(async (ports) => {
-    await ports.pockets.ensurePocketIsActive("pocket-home", "Target pocket");
+    await ports.pockets.ensurePocketIsActive("pocket-home", "Bolsillo de destino");
     return ports.months.findActiveSummary(MonthStatus.ACTIVE);
   });
 

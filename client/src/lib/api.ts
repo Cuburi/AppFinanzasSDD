@@ -50,13 +50,13 @@ const jsonHeaders = (idempotency?: boolean | IdempotencyOptions) => ({
 
 const readJson = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
-    const fallback = `Request failed with status ${response.status}.`;
+    const fallback = `La solicitud falló con el estado ${response.status}.`;
 
     try {
-      const errorBody = (await response.json()) as { message?: string };
-      throw new Error(errorBody.message ?? fallback);
+      const errorBody = (await response.json()) as { message?: unknown } | null;
+      throw new Error(typeof errorBody?.message === "string" ? errorBody.message : fallback);
     } catch (error) {
-      if (error instanceof Error && error.message !== "Unexpected end of JSON input") {
+      if (error instanceof Error && !(error instanceof SyntaxError) && error.message !== "Unexpected end of JSON input") {
         throw error;
       }
 

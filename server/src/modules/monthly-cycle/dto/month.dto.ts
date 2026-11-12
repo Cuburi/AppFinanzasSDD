@@ -44,7 +44,7 @@ export type OpenMonthInput = {
 
 export const parseOpenMonthInput = (payload: unknown): OpenMonthInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Open month payload is required.");
+    throw new Error("Se requieren los datos para abrir el mes.");
   }
 
   const rawPayload = payload as { year?: unknown; month?: unknown };
@@ -52,11 +52,11 @@ export const parseOpenMonthInput = (payload: unknown): OpenMonthInput => {
   const month = toNumber(rawPayload.month);
 
   if (!Number.isInteger(year) || year < 2000 || year > 9999) {
-    throw new Error("Year must be a valid 4-digit integer.");
+    throw new Error("El año debe ser un número entero válido de 4 dígitos.");
   }
 
   if (!Number.isInteger(month) || month < 1 || month > 12) {
-    throw new Error("Month must be an integer between 1 and 12.");
+    throw new Error("El mes debe ser un número entero entre 1 y 12.");
   }
 
   return { year, month };

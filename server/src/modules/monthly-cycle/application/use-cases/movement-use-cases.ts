@@ -21,12 +21,12 @@ export type MovementUseCases = {
 
 export type StrictDepositToPocketInput = DepositToPocketInput;
 
-const invalidDepositSource = () => new SemanticError("INVALID_DEPOSIT_SOURCE", 400, "Pocket deposit source is invalid.");
+const invalidDepositSource = () => new SemanticError("INVALID_DEPOSIT_SOURCE", 400, "El origen del depósito al bolsillo no es válido.");
 
 const assertStrictDepositShape = (input: StrictDepositToPocketInput) => {
   const amount = roundMoney(input.amount);
-  if (!Number.isFinite(amount) || amount <= 0) throw new SemanticError("INVALID_AMOUNT", 400, "Pocket deposit amount must be positive.");
-  if (Number.isNaN(new Date(input.occurredAt).getTime())) throw new SemanticError("INVALID_DATE", 400, "Pocket deposit date is invalid.");
+  if (!Number.isFinite(amount) || amount <= 0) throw new SemanticError("INVALID_AMOUNT", 400, "El monto del depósito al bolsillo debe ser mayor que cero.");
+  if (Number.isNaN(new Date(input.occurredAt).getTime())) throw new SemanticError("INVALID_DATE", 400, "La fecha del depósito al bolsillo no es válida.");
   if (input.sourceKind === "SUBCATEGORY") {
     if (!input.monthId || !input.sourceSubcategoryId || input.externalSourceLabel != null) throw invalidDepositSource();
   } else if (input.sourceKind === "MONTH_AVAILABLE") {
@@ -41,24 +41,24 @@ export const createStrictDepositToPocketUseCase = (ports: MonthlyCyclePorts) => 
   const amount = assertStrictDepositShape(input);
   const occurredAt = new Date(input.occurredAt);
   const month = await ports.transactionRunner.runSerializable(async (txPorts) => {
-    if (!await txPorts.depositWriterGate.isEnabled()) throw new SemanticError("DEPOSIT_WRITES_DISABLED", 409, "Pocket deposits are temporarily disabled.");
+    if (!await txPorts.depositWriterGate.isEnabled()) throw new SemanticError("DEPOSIT_WRITES_DISABLED", 409, "Los depósitos a bolsillos están deshabilitados temporalmente.");
     if (txPorts.pockets.ensureStrictDepositTargetPocketIsActive) {
       await txPorts.pockets.ensureStrictDepositTargetPocketIsActive(input.targetPocketId);
     } else {
-      await txPorts.pockets.ensurePocketIsActive(input.targetPocketId, "Target pocket");
+      await txPorts.pockets.ensurePocketIsActive(input.targetPocketId, "Bolsillo de destino");
     }
     const existingMonth = input.monthId ? await txPorts.months.lockForMutation(input.monthId) : null;
     if (existingMonth) {
-      if (existingMonth.status !== MonthStatus.ACTIVE) throw new SemanticError("MONTH_NOT_ACTIVE", 409, "Month is not active.");
+      if (existingMonth.status !== MonthStatus.ACTIVE) throw new SemanticError("MONTH_NOT_ACTIVE", 409, "El mes no está activo.");
       try {
         assertOccurredAtWithinMonth(occurredAt, existingMonth);
       } catch {
-        throw new SemanticError("INVALID_DATE", 400, "Pocket deposit date must be inside the active month.");
+        throw new SemanticError("INVALID_DATE", 400, "La fecha del depósito al bolsillo debe estar dentro del mes activo.");
       }
       const balances = calculateMonthBalances(existingMonth);
       const sourceBalance = input.sourceKind === "SUBCATEGORY" ? balances.subcategoryBalances.get(input.sourceSubcategoryId ?? "") : balances.availableMoney;
-      if (input.sourceKind === "SUBCATEGORY" && !findMonthSubcategory(existingMonth, input.sourceSubcategoryId ?? "")) throw new SemanticError("NOT_FOUND", 404, "Source subcategory was not found in this month.");
-      if (input.sourceKind !== "EXTERNAL" && roundMoney(sourceBalance ?? 0) < amount) throw new SemanticError("INSUFFICIENT_FUNDS", 409, "Insufficient funds for this pocket deposit.");
+      if (input.sourceKind === "SUBCATEGORY" && !findMonthSubcategory(existingMonth, input.sourceSubcategoryId ?? "")) throw new SemanticError("NOT_FOUND", 404, "No se encontró la subcategoría de origen en este mes.");
+      if (input.sourceKind !== "EXTERNAL" && roundMoney(sourceBalance ?? 0) < amount) throw new SemanticError("INSUFFICIENT_FUNDS", 409, "Fondos insuficientes para este depósito al bolsillo.");
     }
     await txPorts.movements.create({
       type: input.sourceKind === "SUBCATEGORY" ? MovementType.POCKET_DEPOSIT_FROM_SUBCATEGORY : input.sourceKind === "MONTH_AVAILABLE" ? MovementType.POCKET_DEPOSIT_FROM_AVAILABLE : MovementType.POCKET_DEPOSIT_EXTERNAL,
@@ -73,17 +73,17 @@ export const createStrictDepositToPocketUseCase = (ports: MonthlyCyclePorts) => 
 
 export const createWithdrawFromPocketUseCase = (ports: MonthlyCyclePorts) => async (input: WithdrawFromPocketInput): Promise<null> => {
   const amount = roundMoney(input.amount);
-  if (!Number.isFinite(amount) || amount <= 0) throw new SemanticError("INVALID_AMOUNT", 400, "Pocket withdrawal amount must be positive.");
-  if (Number.isNaN(new Date(input.occurredAt).getTime())) throw new SemanticError("INVALID_DATE", 400, "Pocket withdrawal date is invalid.");
+  if (!Number.isFinite(amount) || amount <= 0) throw new SemanticError("INVALID_AMOUNT", 400, "El monto del retiro del bolsillo debe ser mayor que cero.");
+  if (Number.isNaN(new Date(input.occurredAt).getTime())) throw new SemanticError("INVALID_DATE", 400, "La fecha del retiro del bolsillo no es válida.");
 
   await ports.transactionRunner.runSerializable(async (txPorts) => {
     if (txPorts.pockets.ensureStrictPocketIsActive) {
-      await txPorts.pockets.ensureStrictPocketIsActive(input.sourcePocketId, "Source pocket");
+      await txPorts.pockets.ensureStrictPocketIsActive(input.sourcePocketId, "Bolsillo de origen");
     } else {
-      await txPorts.pockets.ensurePocketIsActive(input.sourcePocketId, "Source pocket");
+      await txPorts.pockets.ensurePocketIsActive(input.sourcePocketId, "Bolsillo de origen");
     }
     const balance = txPorts.pockets.getBalance ? await txPorts.pockets.getBalance(input.sourcePocketId) : 0;
-    if (roundMoney(balance) < amount) throw new SemanticError("INSUFFICIENT_FUNDS", 409, "Insufficient funds for this pocket withdrawal.");
+    if (roundMoney(balance) < amount) throw new SemanticError("INSUFFICIENT_FUNDS", 409, "Fondos insuficientes para este retiro del bolsillo.");
 
     await txPorts.movements.create({
       type: MovementType.DEFICIT_COVER_FROM_POCKET,
