@@ -9,6 +9,8 @@ import { MonthStatus, MovementType } from "../monthly-cycle-types.js";
 import { createMovementService } from "../../workflows/movement-service.js";
 import type { MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 
+import { businessDateToPrisma, parseBusinessDate } from "../../../../shared/business-date.js";
+
 export const MOVEMENT_USE_CASE_NAMES = ["recordExpense", "updateExpense", "deleteExpense", "depositToPocket", "withdrawFromPocket"] as const;
 
 export type MovementUseCases = {
@@ -21,12 +23,20 @@ export type MovementUseCases = {
 
 export type StrictDepositToPocketInput = DepositToPocketInput;
 
+const parsePocketDate = (value: string): Date => {
+  try {
+    return businessDateToPrisma(parseBusinessDate(value, "La fecha del movimiento del bolsillo"));
+  } catch (error) {
+    throw new SemanticError("INVALID_DATE", 400, (error as Error).message);
+  }
+};
+
 const invalidDepositSource = () => new SemanticError("INVALID_DEPOSIT_SOURCE", 400, "El origen del depósito al bolsillo no es válido.");
 
 const assertStrictDepositShape = (input: StrictDepositToPocketInput) => {
   const amount = roundMoney(input.amount);
   if (!Number.isFinite(amount) || amount <= 0) throw new SemanticError("INVALID_AMOUNT", 400, "El monto del depósito al bolsillo debe ser mayor que cero.");
-  if (Number.isNaN(new Date(input.occurredAt).getTime())) throw new SemanticError("INVALID_DATE", 400, "La fecha del depósito al bolsillo no es válida.");
+  parsePocketDate(input.occurredAt);
   if (input.sourceKind === "SUBCATEGORY") {
     if (!input.monthId || !input.sourceSubcategoryId || input.externalSourceLabel != null) throw invalidDepositSource();
   } else if (input.sourceKind === "MONTH_AVAILABLE") {
@@ -39,7 +49,7 @@ const assertStrictDepositShape = (input: StrictDepositToPocketInput) => {
 
 export const createStrictDepositToPocketUseCase = (ports: MonthlyCyclePorts) => async (input: StrictDepositToPocketInput): Promise<MonthView | null> => {
   const amount = assertStrictDepositShape(input);
-  const occurredAt = new Date(input.occurredAt);
+  const occurredAt = parsePocketDate(input.occurredAt);
   const month = await ports.transactionRunner.runSerializable(async (txPorts) => {
     if (!await txPorts.depositWriterGate.isEnabled()) throw new SemanticError("DEPOSIT_WRITES_DISABLED", 409, "Los depósitos a bolsillos están deshabilitados temporalmente.");
     if (txPorts.pockets.ensureStrictDepositTargetPocketIsActive) {
@@ -74,7 +84,7 @@ export const createStrictDepositToPocketUseCase = (ports: MonthlyCyclePorts) => 
 export const createWithdrawFromPocketUseCase = (ports: MonthlyCyclePorts) => async (input: WithdrawFromPocketInput): Promise<null> => {
   const amount = roundMoney(input.amount);
   if (!Number.isFinite(amount) || amount <= 0) throw new SemanticError("INVALID_AMOUNT", 400, "El monto del retiro del bolsillo debe ser mayor que cero.");
-  if (Number.isNaN(new Date(input.occurredAt).getTime())) throw new SemanticError("INVALID_DATE", 400, "La fecha del retiro del bolsillo no es válida.");
+  const occurredAt = parsePocketDate(input.occurredAt);
 
   await ports.transactionRunner.runSerializable(async (txPorts) => {
     if (txPorts.pockets.ensureStrictPocketIsActive) {
@@ -89,7 +99,7 @@ export const createWithdrawFromPocketUseCase = (ports: MonthlyCyclePorts) => asy
       type: MovementType.DEFICIT_COVER_FROM_POCKET,
       amount: decimal(amount),
       description: input.description,
-      occurredAt: new Date(input.occurredAt),
+      occurredAt,
       sourcePocketId: input.sourcePocketId,
     });
   });

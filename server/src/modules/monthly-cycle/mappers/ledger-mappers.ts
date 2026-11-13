@@ -3,6 +3,8 @@ import type { MonthlyLedgerEntryView, MonthlyLedgerView } from "../dto/index.js"
 import { decimalToNumber } from "../shared/money.js";
 import type { MonthRecord } from "../shared/service-types.js";
 
+import { businessDateFromPrisma, todayInBogota } from "../../../shared/business-date.js";
+
 type Entry = MonthlyLedgerEntryView;
 type Movement = MonthRecord["movements"][number];
 const entity = <T extends Entry["source"]["kind"] | Entry["destination"]["kind"]>(kind: T, id: string | null) => ({ kind, id });
@@ -12,7 +14,7 @@ const ranks: Record<Entry["eventType"], number> = { OPENING_BALANCE: -1, MONTHLY
 
 const mapMovement = (movement: Movement): Entry | null => {
   const amount = decimalToNumber(movement.amount);
-  const base = { entryKey: movement.id ?? "", occurredAt: (movement.occurredAt ?? new Date(0)).toISOString(), amount, metadata: { description: movement.description ?? null, paymentMethod: movement.paymentMethod ?? null, isSystemEvent: systemTypes.has(movement.type) } };
+  const base = { entryKey: movement.id ?? "", occurredAt: businessDateFromPrisma(movement.occurredAt ?? new Date(0)), amount, metadata: { description: movement.description ?? null, paymentMethod: movement.paymentMethod ?? null, isSystemEvent: systemTypes.has(movement.type) } };
   switch (movement.type) {
     case MovementType.EXPENSE:
       return movement.paymentMethod === PaymentMethod.CASH
@@ -38,14 +40,19 @@ const mapMovement = (movement: Movement): Entry | null => {
 };
 
 export const mapMonthlyLedger = (month: MonthRecord, includeSystemEvents: boolean): MonthlyLedgerView => {
-  const incomeEntries: Entry[] = (month.incomes ?? []).map((income) => ({ entryKey: income.id, occurredAt: income.receivedAt.toISOString(), eventType: "MONTHLY_INCOME", direction: "INFLOW", source: entity("EXTERNAL", null), destination: entity("MONTH", month.id), amount: decimalToNumber(income.amount), balanceEffects: effects(decimalToNumber(income.amount), 0, 0, 0), metadata: { description: income.notes, paymentMethod: null, isSystemEvent: false } }));
+  const incomeEntries: Entry[] = (month.incomes ?? []).map((income) => ({ entryKey: income.id, occurredAt: businessDateFromPrisma(income.receivedAt), eventType: "MONTHLY_INCOME", direction: "INFLOW", source: entity("EXTERNAL", null), destination: entity("MONTH", month.id), amount: decimalToNumber(income.amount), balanceEffects: effects(decimalToNumber(income.amount), 0, 0, 0), metadata: { description: income.notes, paymentMethod: null, isSystemEvent: false } }));
   const openingBalance = month.openingBalance ? decimalToNumber(month.openingBalance) : 0;
   const openingEntries: Entry[] = openingBalance > 0 ? [{
-    entryKey: `opening:${month.id}`, occurredAt: month.openedAt.toISOString(), eventType: "OPENING_BALANCE", direction: "TRANSFER",
+    entryKey: `opening:${month.id}`, occurredAt: todayInBogota(month.openedAt), eventType: "OPENING_BALANCE", direction: "TRANSFER",
     source: entity("MONTH", month.openingSourceMonthId ?? null), destination: entity("MONTH", month.id), amount: openingBalance,
     balanceEffects: effects(openingBalance, 0, 0, 0),
     metadata: { description: "Saldo inicial del cierre anterior", paymentMethod: null, isSystemEvent: true },
   }] : [];
   const movementEntries = month.movements.map(mapMovement).filter((entry): entry is Entry => entry !== null);
-  return { monthId: month.id, status: month.status, entries: [...openingEntries, ...incomeEntries, ...movementEntries].filter((entry) => includeSystemEvents || !entry.metadata.isSystemEvent).sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt) || ranks[left.eventType] - ranks[right.eventType] || left.entryKey.localeCompare(right.entryKey)) };
+  const registrationTimes = new Map<string, number>([
+    [`opening:${month.id}`, month.openedAt.getTime()],
+    ...(month.incomes ?? []).map((income): [string, number] => [income.id, income.createdAt.getTime()]),
+    ...month.movements.map((movement): [string, number] => [movement.id ?? "", movement.createdAt?.getTime() ?? 0]),
+  ]);
+  return { monthId: month.id, status: month.status, entries: [...openingEntries, ...incomeEntries, ...movementEntries].filter((entry) => includeSystemEvents || !entry.metadata.isSystemEvent).sort((left, right) => right.occurredAt.localeCompare(left.occurredAt) || (registrationTimes.get(right.entryKey) ?? 0) - (registrationTimes.get(left.entryKey) ?? 0) || ranks[left.eventType] - ranks[right.eventType] || left.entryKey.localeCompare(right.entryKey)) };
 };

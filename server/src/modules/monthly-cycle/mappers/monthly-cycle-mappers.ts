@@ -6,6 +6,8 @@ import { calculateCashBalance } from "../shared/cash-ledger.js";
 import { decimalToNumber } from "../shared/money.js";
 import type { MonthRecord, TemplateCategoryRecord } from "../shared/service-types.js";
 
+import { businessDateFromPrisma, todayInBogota } from "../../../shared/business-date.js";
+
 export const mapTemplate = (categories: TemplateCategoryRecord[]): TemplateView => ({
   categories: categories.map((category) => ({
     id: category.id,
@@ -38,7 +40,7 @@ export const mapMonth = (month: MonthRecord): MonthView => {
       monthId: income.monthId,
       sourceName: income.sourceName,
       amount: decimalToNumber(income.amount),
-      receivedAt: income.receivedAt.toISOString(),
+      receivedAt: businessDateFromPrisma(income.receivedAt),
       notes: income.notes,
       createdAt: income.createdAt.toISOString(),
       updatedAt: income.updatedAt.toISOString(),
@@ -94,7 +96,7 @@ export const mapExpenseHistory = (month: MonthRecord, movements: MovementHistory
     if (!movement.sourceSubcategoryId) {
       return {
         id: movement.id ?? "",
-        occurredAt: (movement.occurredAt ?? month.openedAt).toISOString(),
+        occurredAt: movement.occurredAt ? businessDateFromPrisma(movement.occurredAt) : todayInBogota(month.openedAt),
         paymentMethod: movement.paymentMethod ?? PaymentMethod.NON_CASH,
         amount: decimalToNumber(movement.amount),
         description: movement.description ?? null,
@@ -113,7 +115,7 @@ export const mapExpenseHistory = (month: MonthRecord, movements: MovementHistory
 
     return {
       id: movement.id ?? "",
-      occurredAt: (movement.occurredAt ?? month.openedAt).toISOString(),
+      occurredAt: movement.occurredAt ? businessDateFromPrisma(movement.occurredAt) : todayInBogota(month.openedAt),
       paymentMethod: movement.paymentMethod ?? PaymentMethod.NON_CASH,
       amount: decimalToNumber(movement.amount),
       description: movement.description ?? null,
@@ -131,7 +133,7 @@ export const mapCashSummary = (month: MonthRecord, movements: MovementHistoryRec
     id: movement.id ?? "",
     type: movement.type,
     amount: decimalToNumber(movement.amount),
-    occurredAt: (movement.occurredAt ?? month.openedAt).toISOString(),
+    occurredAt: movement.occurredAt ? businessDateFromPrisma(movement.occurredAt) : todayInBogota(month.openedAt),
     description: movement.description ?? null,
   })),
 });

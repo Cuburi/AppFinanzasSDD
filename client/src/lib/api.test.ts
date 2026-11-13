@@ -72,7 +72,7 @@ const pocketPayload = {
       type: "POCKET_DEPOSIT_FROM_SUBCATEGORY",
       amount: 250,
       description: "Ahorro inicial",
-      occurredAt: "2026-05-10T12:00:00.000Z",
+      occurredAt: "2026-05-10",
       direction: "in",
     },
   ],
@@ -380,7 +380,7 @@ describe("monthly cash and expense api", () => {
       expenses: [
         {
           id: "expense-1",
-          occurredAt: "2026-05-12T00:00:00.000Z",
+          occurredAt: "2026-05-12",
           paymentMethod: "NON_CASH",
           amount: 75,
           description: "Groceries",
@@ -534,7 +534,7 @@ describe("monthly cash and expense api", () => {
           id: "cash-1",
           type: "CASH_WITHDRAWAL",
           amount: 125,
-          occurredAt: "2026-05-10T00:00:00.000Z",
+          occurredAt: "2026-05-10",
           description: "ATM",
         },
       ],

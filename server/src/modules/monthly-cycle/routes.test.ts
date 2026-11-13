@@ -230,7 +230,7 @@ test("monthlyCycleRouter delegates template, month lifecycle, and pocket deposit
     const depositResponse = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z", description: "Deposit" }),
+      body: JSON.stringify({ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10", description: "Deposit" }),
     });
 
     assert.equal(templateResponse.status, 200);
@@ -250,7 +250,7 @@ test("monthlyCycleRouter delegates template, month lifecycle, and pocket deposit
           sourceSubcategoryId: "sub-market",
           targetPocketId: "pocket-1",
           amount: 75,
-          occurredAt: "2026-05-10T00:00:00.000Z",
+          occurredAt: "2026-05-10",
           description: "Deposit",
         },
       },
@@ -280,12 +280,12 @@ test("monthlyCycleRouter cuts over pocket deposits to strict source contracts be
     const contradictoryResponse = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sourceKind: "EXTERNAL", monthId: "month-1", externalSourceLabel: "Bonus", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z" }),
+      body: JSON.stringify({ sourceKind: "EXTERNAL", monthId: "month-1", externalSourceLabel: "Bonus", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10" }),
     });
     const invalidAmountResponse = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 0, occurredAt: "2026-05-10T00:00:00.000Z" }),
+      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 0, occurredAt: "2026-05-10" }),
     });
     const invalidDateResponse = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
       method: "POST",
@@ -300,7 +300,7 @@ test("monthlyCycleRouter cuts over pocket deposits to strict source contracts be
     assert.equal(invalidAmountResponse.status, 400);
     assert.deepEqual(await invalidAmountResponse.json(), { code: "INVALID_AMOUNT", message: "Monto del depósito debe ser mayor que cero." });
     assert.equal(invalidDateResponse.status, 400);
-    assert.deepEqual(await invalidDateResponse.json(), { code: "INVALID_DATE", message: "Fecha del depósito al bolsillo debe ser una fecha válida." });
+    assert.deepEqual(await invalidDateResponse.json(), { code: "INVALID_DATE", message: "Fecha del depósito al bolsillo debe ser una fecha válida en formato YYYY-MM-DD." });
     assert.equal(calls, 0);
   } finally {
     server.close();
@@ -315,7 +315,7 @@ test("monthlyCycleRouter rejects missing and explicitly-null invalid deposit sou
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Test server did not bind to a port.");
     const postDeposit = (body: object) => fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    const base = { targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z" };
+    const base = { targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10" };
     for (const [body, message] of [
       [{ ...base, sourceKind: "SUBCATEGORY", monthId: "month-1" }, "Subcategoría de origen: valor obligatorio."],
       [{ ...base, sourceKind: "MONTH_AVAILABLE" }, "Identificador del mes: valor obligatorio."],
@@ -378,7 +378,7 @@ test("monthlyCycleRouter preserves strict pocket-deposit error codes", async () 
     const response = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z" }),
+      body: JSON.stringify({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10" }),
     });
 
     assert.equal(response.status, 409);
@@ -401,7 +401,7 @@ test("monthlyCycleRouter returns the service quiescence conflict for pocket depo
     const response = await fetch(`http://127.0.0.1:${address.port}/api/pockets/deposits`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z", description: "Deposit", externalSourceLabel: "Bonus" }),
+      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10", description: "Deposit", externalSourceLabel: "Bonus" }),
     });
 
     assert.equal(response.status, 409);
@@ -534,7 +534,7 @@ test("monthlyCycleRouter parses PATCH /api/months/:id/expenses/:expenseId and re
         sourceSubcategoryId: "sub-market",
         amount: 125,
         description: "Updated",
-        occurredAt: "2026-05-12T00:00:00.000Z",
+        occurredAt: "2026-05-12",
         paymentMethod: PaymentMethod.NON_CASH,
       }),
     });
@@ -548,7 +548,7 @@ test("monthlyCycleRouter parses PATCH /api/months/:id/expenses/:expenseId and re
         sourceSubcategoryId: "sub-market",
         amount: 125,
         description: "Updated",
-        occurredAt: "2026-05-12T00:00:00.000Z",
+        occurredAt: "2026-05-12",
         paymentMethod: PaymentMethod.NON_CASH,
       },
     ]);
@@ -607,7 +607,7 @@ test("monthlyCycleRouter rejects malformed PATCH expense payloads before service
       body: JSON.stringify({
         sourceSubcategoryId: "sub-market",
         amount: 125,
-        occurredAt: "2026-05-12T00:00:00.000Z",
+        occurredAt: "2026-05-12",
         paymentMethod: "CARD",
       }),
     });
@@ -627,7 +627,7 @@ test("monthlyCycleRouter rejects malformed PATCH expense payloads before service
       body: JSON.stringify({
         sourceSubcategoryId: "sub-market",
         amount: 125,
-        occurredAt: "2026-05-12T00:00:00.000Z",
+        occurredAt: "2026-05-12",
         paymentMethod: PaymentMethod.NON_CASH,
       }),
     });
@@ -640,7 +640,7 @@ test("monthlyCycleRouter rejects malformed PATCH expense payloads before service
     assert.equal(invalidPaymentResponse.status, 400);
     assert.deepEqual(await invalidPaymentResponse.json(), { message: "El medio de pago debe ser CASH o NON_CASH." });
     assert.equal(invalidDateResponse.status, 400);
-    assert.deepEqual(await invalidDateResponse.json(), { message: "Fecha del gasto debe ser una fecha válida." });
+    assert.deepEqual(await invalidDateResponse.json(), { message: "Fecha del gasto debe ser una fecha válida en formato YYYY-MM-DD." });
     assert.equal(blankMonthResponse.status, 400);
     assert.deepEqual(await blankMonthResponse.json(), { message: "Identificador del mes: valor obligatorio." });
     assert.equal(malformedJsonResponse.status, 400);
@@ -1172,7 +1172,7 @@ test("monthlyCycleRouter replays idempotent expense creates without calling the 
     const init = {
       method: "POST",
       headers: { "content-type": "application/json", "Idempotency-Key": "expense-key-1" },
-      body: JSON.stringify({ sourceSubcategoryId: "sub-market", amount: 125, occurredAt: "2026-05-12T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH }),
+      body: JSON.stringify({ sourceSubcategoryId: "sub-market", amount: 125, occurredAt: "2026-05-12", paymentMethod: PaymentMethod.NON_CASH }),
     };
 
     const first = await fetch(url, init);
@@ -1204,12 +1204,12 @@ test("monthlyCycleRouter rejects same-key financial creates with a different fin
     const first = await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z" }),
+      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 75, occurredAt: "2026-05-10" }),
     });
     const conflict = await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 80, occurredAt: "2026-05-10T00:00:00.000Z" }),
+      body: JSON.stringify({ sourceKind: "EXTERNAL", targetPocketId: "pocket-1", amount: 80, occurredAt: "2026-05-10" }),
     });
 
     assert.equal(first.status, 201);
@@ -1236,7 +1236,7 @@ test("monthlyCycleRouter keeps missing Idempotency-Key compatible for selected c
     const init = {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sourceName: "Salary", amount: 1000, receivedAt: "2026-05-01T00:00:00.000Z" }),
+      body: JSON.stringify({ sourceName: "Salary", amount: 1000, receivedAt: "2026-05-01" }),
     };
 
     const first = await fetch(`http://127.0.0.1:${address.port}/api/months/month-1/incomes`, init);

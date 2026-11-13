@@ -6,6 +6,8 @@ import { DomainError } from "../../shared/service-errors.js";
 import type { MonthRecord, MonthlyIncomeRecord } from "../../shared/service-types.js";
 import type { MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 
+import { businessDateFromPrisma, businessDateToPrisma, isBusinessDateInMonth, parseBusinessDate } from "../../../../shared/business-date.js";
+
 export const INCOME_USE_CASE_NAMES = ["createMonthlyIncome", "updateMonthlyIncome", "deleteMonthlyIncome"] as const;
 
 export type IncomeUseCases = {
@@ -15,20 +17,15 @@ export type IncomeUseCases = {
 };
 
 const parseReceivedAt = (receivedAt: string) => {
-  const date = new Date(receivedAt);
-
-  if (Number.isNaN(date.getTime())) {
-    throw new DomainError(400, "La fecha de recepción del ingreso debe ser una fecha ISO válida.");
+  try {
+    return businessDateToPrisma(parseBusinessDate(receivedAt, "La fecha de recepción del ingreso"));
+  } catch (error) {
+    throw new DomainError(400, (error as Error).message);
   }
-
-  return date;
 };
 
 const assertReceivedAtBelongsToMonth = (month: MonthRecord, receivedAt: Date) => {
-  const monthStart = new Date(Date.UTC(month.year, month.month - 1, 1));
-  const nextMonthStart = new Date(Date.UTC(month.year, month.month, 1));
-
-  if (receivedAt < monthStart || receivedAt >= nextMonthStart) {
+  if (!isBusinessDateInMonth(businessDateFromPrisma(receivedAt), month)) {
     throw new DomainError(400, "La fecha de recepción del ingreso debe estar dentro del período del mes vinculado.");
   }
 };

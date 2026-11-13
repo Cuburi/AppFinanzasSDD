@@ -22,27 +22,6 @@ const localCalendarDate = (date = new Date()) => {
 };
 const formatMonthDate = (month: Month) => `${month.year}-${String(month.month).padStart(2, "0")}-01`;
 const defaultMovementDate = (month: Month, date = new Date()) => (date.getFullYear() === month.year && date.getMonth() + 1 === month.month ? localCalendarDate(date) : formatMonthDate(month));
-const timestampForMovementDate = (dateValue: string, reference = new Date()) => {
-  const [year, month, day] = dateValue.split("-").map(Number);
-  if (!year || !month || !day) return dateValue;
-  return new Date(year, month - 1, day, reference.getHours(), reference.getMinutes(), reference.getSeconds(), reference.getMilliseconds()).toISOString();
-};
-// Keep the selected local calendar date and its offset without changing the real clock time.
-const timestampForExpenseDate = (dateValue: string, reference = new Date()) => {
-  const instant = new Date(timestampForMovementDate(dateValue, reference));
-  const offset = -instant.getTimezoneOffset();
-  const pad = (value: number) => String(value).padStart(2, "0");
-  const time = `${pad(instant.getHours())}:${pad(instant.getMinutes())}:${pad(instant.getSeconds())}.${String(instant.getMilliseconds()).padStart(3, "0")}`;
-  return `${localCalendarDate(instant)}T${time}${offset < 0 ? "-" : "+"}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
-};
-const expenseEditDate = (value: string, month: Month) => {
-  const utcDate = value.slice(0, 10);
-  const linkedPeriod = `${month.year}-${String(month.month).padStart(2, "0")}`;
-  const localDate = localCalendarDate(new Date(value));
-  // Preserve legacy date-only edits; recover the local date only across a month boundary.
-  return !utcDate.startsWith(linkedPeriod) && localDate.startsWith(linkedPeriod) ? localDate : utcDate;
-};
-const formatDisplayDate = (value: string) => new Date(value).toLocaleDateString("es-CO", { timeZone: "UTC" });
 const formatPaymentMethod = (paymentMethod: PaymentMethod) => (paymentMethod === "CASH" ? "Efectivo" : "No efectivo");
 const balanceTrend = (amount: number) => (amount < 0 ? "negative" : amount > 0 ? "positive" : "neutral");
 const formatCreditCardLabel = (card: CreditCardView) => `${card.issuer} ${card.name}`;
@@ -57,7 +36,6 @@ export const ActiveMonthPage = () => {
   const historyRequestId = useRef(0);
   const monthlyHistoryRequestId = useRef(0);
   const expenseAmountInputRef = useRef<HTMLInputElement>(null);
-  const boundaryExpenseEdit = useRef<{ occurredAt: string; date: string } | null>(null);
   const expenseSlipRef = useRef<HTMLElement>(null);
   const incomeSourceInputRef = useRef<HTMLInputElement>(null);
   const incomeSlipRef = useRef<HTMLElement>(null);
@@ -261,7 +239,7 @@ export const ActiveMonthPage = () => {
   const resetIncomeForm = (monthData = activeMonth) => {
     setIncomeSourceName("");
     setIncomeAmount("");
-    setIncomeReceivedAt(monthData ? formatMonthDate(monthData) : "");
+    setIncomeReceivedAt(monthData ? defaultMovementDate(monthData) : "");
     setIncomeNotes("");
     setEditingIncomeId(null);
     setSecondaryForm(null);
@@ -273,7 +251,6 @@ export const ActiveMonthPage = () => {
   };
 
   const resetExpenseForm = (monthData = activeMonth) => {
-    boundaryExpenseEdit.current = null;
     setExpenseCategoryId("");
     setExpenseSubcategoryId("");
     setExpenseAmount("");
@@ -349,7 +326,7 @@ export const ActiveMonthPage = () => {
     setIncomeFeedback(null);
     setIncomeSourceName(income.sourceName);
     setIncomeAmount(toMoneyInputValue(income.amount));
-    setIncomeReceivedAt(income.receivedAt.slice(0, 10));
+    setIncomeReceivedAt(income.receivedAt);
     setIncomeNotes(income.notes ?? "");
     setSecondaryForm("income");
     setEditingIncomeId(income.id);
@@ -364,9 +341,7 @@ export const ActiveMonthPage = () => {
     setExpenseSubcategoryId(categoryId ? expense.subcategory?.id ?? "" : "");
     setExpenseAmount(toMoneyInputValue(expense.amount));
     setExpenseDescription(expense.description ?? "");
-    const editDate = activeMonth ? expenseEditDate(expense.occurredAt, activeMonth) : expense.occurredAt.slice(0, 10);
-    boundaryExpenseEdit.current = editDate !== expense.occurredAt.slice(0, 10) ? { occurredAt: expense.occurredAt, date: editDate } : null;
-    setExpenseOccurredAt(editDate);
+    setExpenseOccurredAt(expense.occurredAt);
     setExpensePaymentMethod(expense.paymentMethod);
     setExpenseCreditCardId(expense.paymentMethod === "CASH" ? "" : expense.creditCardId ?? "");
     setEditingExpenseId(expense.id);
@@ -445,9 +420,7 @@ export const ActiveMonthPage = () => {
       sourceSubcategoryId: expenseSubcategoryId || null,
       amount: parseAmountInput(expenseAmount),
       description: expenseDescription,
-      occurredAt: editingExpenseId
-        ? boundaryExpenseEdit.current?.date === expenseOccurredAt ? boundaryExpenseEdit.current.occurredAt : expenseOccurredAt || formatMonthDate(activeMonth)
-        : timestampForExpenseDate(expenseOccurredAt || defaultMovementDate(activeMonth)),
+      occurredAt: expenseOccurredAt || defaultMovementDate(activeMonth),
       paymentMethod: expenseCreditCardId ? "NON_CASH" : expensePaymentMethod,
       creditCardId: expensePaymentMethod === "CASH" ? null : expenseCreditCardId || null,
     };
@@ -599,7 +572,7 @@ export const ActiveMonthPage = () => {
       const updatedMonth = await api.withdrawCash({
         monthId: activeMonth.id,
         amount: parseAmountInput(withdrawalAmount),
-        occurredAt: timestampForMovementDate(withdrawalOccurredAt || defaultMovementDate(activeMonth)),
+        occurredAt: withdrawalOccurredAt || defaultMovementDate(activeMonth),
         description: withdrawalDescription || undefined,
       });
       dashboard.replaceMonth(updatedMonth);
@@ -626,7 +599,7 @@ export const ActiveMonthPage = () => {
         monthId: activeMonth.id,
         sourceName: incomeSourceName,
         amount: parseAmountInput(incomeAmount),
-        receivedAt: editingIncomeId ? incomeReceivedAt || formatMonthDate(activeMonth) : timestampForMovementDate(incomeReceivedAt || defaultMovementDate(activeMonth)),
+        receivedAt: incomeReceivedAt || defaultMovementDate(activeMonth),
         notes: incomeNotes || null,
       };
       const updatedMonth = editingIncomeId
@@ -679,7 +652,7 @@ export const ActiveMonthPage = () => {
         monthId: activeMonth.id,
         targetPocketId: depositPocketId,
         amount: parseAmountInput(depositAmount),
-        occurredAt: timestampForMovementDate(depositOccurredAt || defaultMovementDate(activeMonth)),
+        occurredAt: depositOccurredAt || defaultMovementDate(activeMonth),
       };
       const updatedMonth = await api.depositToPocket(
         depositSourceKind === "SUBCATEGORY"
@@ -921,7 +894,7 @@ export const ActiveMonthPage = () => {
             formClassName="income-capture-form" mode={editingIncomeId ? "edit" : "create"} onSubmit={handleIncome}
             primaryFields={<><label className="field income-source-field"><span>Fuente del ingreso</span><input ref={incomeSourceInputRef} value={incomeSourceName} onChange={(event) => setIncomeSourceName(event.target.value)} required /></label><label className="field income-amount-field"><span>Monto</span><MoneyInput value={incomeAmount} onValueChange={setIncomeAmount} required /></label></>}
             purpose="Entrada del mes" slipRef={incomeSlipRef}
-            supportingFields={<><label className="field"><span>Fecha</span><input type="date" value={incomeReceivedAt || formatMonthDate(activeMonth)} onChange={(event) => setIncomeReceivedAt(event.target.value)} required /></label><label className="field income-notes-field"><span>Notas</span><input value={incomeNotes} onChange={(event) => setIncomeNotes(event.target.value)} /></label></>}
+            supportingFields={<><label className="field"><span>Fecha</span><input type="date" value={incomeReceivedAt || defaultMovementDate(activeMonth)} onChange={(event) => setIncomeReceivedAt(event.target.value)} required /></label><label className="field income-notes-field"><span>Notas</span><input value={incomeNotes} onChange={(event) => setIncomeNotes(event.target.value)} /></label></>}
             title={editingIncomeId ? "Editar ingreso" : "Registrar ingreso"} variant="secondary"
           /></div> : null}
           {secondaryForm === "withdrawal" ? <div className="secondary-form-panel"><RegistrationSlip actions={<><Button disabled={submitting || !canMutateActiveMonth} type="submit">Retirar efectivo</Button><Button variant="secondary" disabled={submitting} onClick={() => setSecondaryForm(null)} type="button">Cancelar retiro</Button></>} formClassName="secondary-movement-form" mode="create" onSubmit={handleCashWithdrawal} primaryFields={<><label className="field"><span>Monto a retirar</span><MoneyInput value={withdrawalAmount} onValueChange={setWithdrawalAmount} required /></label><label className="field"><span>Fecha del retiro</span><input type="date" value={withdrawalOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setWithdrawalOccurredAt(event.target.value)} required /></label></>} purpose="Salida a efectivo" supportingFields={<label className="field"><span>Descripción del retiro (opcional)</span><input value={withdrawalDescription} onChange={(event) => setWithdrawalDescription(event.target.value)} /></label>} title="Retirar efectivo" variant="secondary" /></div> : null}

@@ -10,6 +10,8 @@ import { DomainError } from "../shared/service-errors.js";
 import type { MonthRecord } from "../shared/service-types.js";
 import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflow-dependencies.js";
 
+import { businessDateToPrisma } from "../../../shared/business-date.js";
+
 const assertTemplateHasSubcategories = (input: TemplateInput) => {
   const count = input.categories.reduce((total, category) => total + category.subcategories.length, 0);
 
@@ -76,7 +78,7 @@ export const createMonthLifecycleService = (dependencies: MonthlyCycleWorkflowDe
               type: MovementType.CASH_CARRYOVER_IN,
               amount: decimal(carryover),
               description: "Cash carryover from previous closed month",
-              occurredAt: new Date(Date.UTC(input.year, input.month - 1, 1)),
+              occurredAt: businessDateToPrisma(`${String(input.year).padStart(4, "0")}-${String(input.month).padStart(2, "0")}-01`),
               monthId: createdMonth.id,
             });
 

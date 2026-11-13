@@ -8,6 +8,8 @@ import { DomainError } from "../../shared/service-errors.js";
 import type { MonthRecord } from "../../shared/service-types.js";
 import { MonthStatus, MovementType, type MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 
+import { businessDateToPrisma, todayInBogota } from "../../../../shared/business-date.js";
+
 export const CLOSURE_USE_CASE_NAMES = ["getClosureReview", "applyClosureAction", "closeMonth", "getMonth", "getLatestClosedMonth"] as const;
 
 export type ClosureUseCases = {
@@ -96,7 +98,7 @@ const readActionAmount = (requestedAmount: number | null | undefined, pendingAmo
   return amount;
 };
 
-export const createClosureUseCases = (ports: MonthlyCyclePorts): ClosureUseCases => ({
+export const createClosureUseCases = (ports: MonthlyCyclePorts, today: () => string = todayInBogota): ClosureUseCases => ({
   async getMonth(monthId) {
     return mapMonth(await ports.months.findById(monthId));
   },
@@ -152,6 +154,7 @@ export const createClosureUseCases = (ports: MonthlyCyclePorts): ClosureUseCases
 
         await txPorts.movements.create({
           type: MovementType.DEFICIT_COVER_FROM_SUBCATEGORY,
+          occurredAt: businessDateToPrisma(today()),
           amount: decimal(amount),
           description: input.description,
           monthId: input.monthId,
@@ -183,6 +186,7 @@ export const createClosureUseCases = (ports: MonthlyCyclePorts): ClosureUseCases
         await txPorts.pockets.ensurePocketIsActive(sourcePocketId, "Bolsillo de origen");
         await txPorts.movements.create({
           type: MovementType.DEFICIT_COVER_FROM_POCKET,
+          occurredAt: businessDateToPrisma(today()),
           amount: decimal(readActionAmount(input.amount, Math.abs(targetAvailable))),
           description: input.description,
           monthId: input.monthId,

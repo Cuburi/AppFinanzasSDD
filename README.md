@@ -230,7 +230,7 @@ Ejemplos del dominio:
 
 El mes activo expone saldos calculados por backend: ingresos del mes, dinero disponible y efectivo físico. El efectivo no se guarda como saldo mutable; se deriva de movimientos de retiro, arrastre y gastos pagados en efectivo.
 
-Al registrar gastos, la fecha seleccionada se envía con la hora real y el desfase horario local explícito. El mes vinculado se valida con ese calendario local, incluso al final del mes cuando el instante UTC ya cae en el mes siguiente. Se conserva el instante real almacenado; una corrección sin cambiar la fecha de ese gasto conserva ese instante. Las entradas antiguas con `Z` o solo fecha mantienen la validación UTC. Esto no cambia las reglas de retiros, depósitos ni los períodos UTC de las tarjetas.
+Las fechas de negocio (gastos, ingresos, retiros, depósitos, deudas y pagos de deudas) son días de calendario: se envían y se devuelven como `AAAA-MM-DD`, sin hora ni zona horaria, y se guardan como `DATE`. Una fecha con hora o desfase horario se rechaza con 400. El mes vinculado se valida comparando el año y el mes de ese día, así que el último día del mes es válido a cualquier hora. El historial muestra solo el día; los movimientos del mismo día se ordenan por orden de registro. El arrastre de efectivo al abrir un mes lleva el día 1 y los movimientos del cierre guiado la fecha del día en Colombia (`America/Bogota`). Los períodos de las tarjetas incluyen completos su día de inicio y su día de corte.
 
 ### Filtros del historial en Mes activo
 
