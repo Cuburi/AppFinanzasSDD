@@ -1,5 +1,7 @@
 import type { CreateDebtInput, DebtDirection, RegisterDebtPaymentInput } from "../shared/types.js";
 
+import { businessDateToPrisma, parseBusinessDate } from "../../../shared/business-date.js";
+
 const COP_CURRENCY = "COP";
 
 const toNumber = (value: unknown): number => {
@@ -38,18 +40,7 @@ const readPositiveAmount = (value: unknown, label: string): number => {
   return amount;
 };
 
-const readDate = (value: unknown, label: string): Date => {
-  if (typeof value !== "string" && !(value instanceof Date)) {
-    throw new Error(`${label} debe ser una fecha válida.`);
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`${label} debe ser una fecha válida.`);
-  }
-
-  return date;
-};
+const readDate = (value: unknown, label: string): Date => businessDateToPrisma(parseBusinessDate(value, label));
 
 const readDirection = (value: unknown): DebtDirection => {
   if (value === "I_OWE" || value === "OWED_TO_ME") {

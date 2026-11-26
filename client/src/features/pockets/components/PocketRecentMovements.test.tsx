@@ -19,8 +19,8 @@ describe("PocketRecentMovements", () => {
     render(
       <PocketRecentMovements
         movements={[
-          { id: "one", type: "POCKET_DEPOSIT_EXTERNAL", sourceKind: "EXTERNAL", amount: 50, occurredAt: "2026-05-14T12:00:00.000Z", description: "Ahorro", direction: "in" },
-          { id: "two", type: "POCKET_TRANSFER", amount: 20, occurredAt: "2026-05-13T12:00:00.000Z", description: "Transfer", direction: "out" },
+          { id: "one", type: "POCKET_DEPOSIT_EXTERNAL", sourceKind: "EXTERNAL", amount: 50, occurredAt: "2026-05-14", description: "Ahorro", direction: "in" },
+          { id: "two", type: "POCKET_TRANSFER", amount: 20, occurredAt: "2026-05-13", description: "Transfer", direction: "out" },
         ]}
       />,
     );
@@ -47,8 +47,8 @@ describe("PocketRecentMovements", () => {
     const user = userEvent.setup();
     render(
       <>
-        <PocketRecentMovements movements={[{ id: "a", type: "POCKET_TRANSFER", amount: 10, occurredAt: "2026-05-14T12:00:00.000Z", description: "First pocket", direction: "in" }]} />
-        <PocketRecentMovements movements={[{ id: "b", type: "POCKET_TRANSFER", amount: 20, occurredAt: "2026-05-14T12:00:00.000Z", description: "Second pocket", direction: "in" }]} />
+        <PocketRecentMovements movements={[{ id: "a", type: "POCKET_TRANSFER", amount: 10, occurredAt: "2026-05-14", description: "First pocket", direction: "in" }]} />
+        <PocketRecentMovements movements={[{ id: "b", type: "POCKET_TRANSFER", amount: 20, occurredAt: "2026-05-14", description: "Second pocket", direction: "in" }]} />
       </>,
     );
 
@@ -64,12 +64,12 @@ describe("PocketRecentMovements", () => {
     render(
       <PocketRecentMovements
         movements={[
-          { id: "external", type: "POCKET_DEPOSIT_EXTERNAL", sourceKind: "EXTERNAL", sourceLabel: "Employer", amount: 500, occurredAt: "2026-05-14T12:00:00.000Z", description: "Payroll", direction: "in" },
-          { id: "external-unlabelled", type: "POCKET_DEPOSIT_EXTERNAL", sourceKind: "EXTERNAL", amount: 75, occurredAt: "2026-05-13T12:00:00.000Z", description: null, direction: "in" },
-          { id: "month", type: "POCKET_DEPOSIT_FROM_AVAILABLE", amount: 50, occurredAt: "2026-05-12T12:00:00.000Z", description: "Savings", direction: "in" },
-          { id: "four", type: "POCKET_TRANSFER", amount: 20, occurredAt: "2026-05-11T12:00:00.000Z", description: "Transfer", direction: "out" },
-          { id: "five", type: "POCKET_TRANSFER", amount: 10, occurredAt: "2026-05-10T12:00:00.000Z", description: "Transfer two", direction: "out" },
-          { id: "six", type: "POCKET_TRANSFER", amount: 5, occurredAt: "2026-05-09T12:00:00.000Z", description: "Not shown", direction: "out" },
+          { id: "external", type: "POCKET_DEPOSIT_EXTERNAL", sourceKind: "EXTERNAL", sourceLabel: "Employer", amount: 500, occurredAt: "2026-05-14", description: "Payroll", direction: "in" },
+          { id: "external-unlabelled", type: "POCKET_DEPOSIT_EXTERNAL", sourceKind: "EXTERNAL", amount: 75, occurredAt: "2026-05-13", description: null, direction: "in" },
+          { id: "month", type: "POCKET_DEPOSIT_FROM_AVAILABLE", amount: 50, occurredAt: "2026-05-12", description: "Savings", direction: "in" },
+          { id: "four", type: "POCKET_TRANSFER", amount: 20, occurredAt: "2026-05-11", description: "Transfer", direction: "out" },
+          { id: "five", type: "POCKET_TRANSFER", amount: 10, occurredAt: "2026-05-10", description: "Transfer two", direction: "out" },
+          { id: "six", type: "POCKET_TRANSFER", amount: 5, occurredAt: "2026-05-09", description: "Not shown", direction: "out" },
         ]}
       />,
     );
@@ -81,7 +81,7 @@ describe("PocketRecentMovements", () => {
     expect(movements[1]).toHaveTextContent("Origen externo");
     expect(movements[1]).toHaveTextContent("Movimiento sin descripción");
     expect(movements[2]).toHaveTextContent("Financiado por mes — Disponible del mes");
-    expect(within(movements[0]!).getByRole("time")).toHaveAttribute("dateTime", "2026-05-14T12:00:00.000Z");
+    expect(within(movements[0]!).getByRole("time")).toHaveAttribute("dateTime", "2026-05-14");
     expect(screen.queryByText("Not shown")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ver 3 movimientos más" })).toBeInTheDocument();
 
@@ -97,7 +97,7 @@ describe("PocketRecentMovements", () => {
   it("labels a pocket withdrawal as an understandable outgoing spend", async () => {
     render(
       <PocketRecentMovements
-        movements={[{ id: "withdrawal", type: "DEFICIT_COVER_FROM_POCKET", amount: 25, occurredAt: "2026-05-14T12:00:00.000Z", description: "Groceries", direction: "out" }]}
+        movements={[{ id: "withdrawal", type: "DEFICIT_COVER_FROM_POCKET", amount: 25, occurredAt: "2026-05-14", description: "Groceries", direction: "out" }]}
       />,
     );
     await expandMovements();
@@ -119,16 +119,16 @@ describe("PocketRecentMovements", () => {
     expect(screen.queryByRole("button", { name: /movimientos/ })).not.toBeInTheDocument();
   });
 
-  it("preserves the UTC calendar date for a movement recorded at midnight", async () => {
+  it("displays the supplied business day without a clock time", async () => {
     const { container } = render(
       <PocketRecentMovements
         movements={[
-          { id: "midnight", type: "POCKET_DEPOSIT_EXTERNAL", sourceKind: "EXTERNAL", amount: 50, occurredAt: "2026-05-14T00:00:00.000Z", description: "Ingreso", direction: "in" },
+          { id: "midnight", type: "POCKET_DEPOSIT_EXTERNAL", sourceKind: "EXTERNAL", amount: 50, occurredAt: "2026-05-14", description: "Ingreso", direction: "in" },
         ]}
       />,
     );
     await expandMovements();
 
-    expect(within(container).getByRole("time")).toHaveTextContent("14/05/2026");
+    expect(within(container).getByRole("time").textContent).toBe("14/05/2026");
   });
 });

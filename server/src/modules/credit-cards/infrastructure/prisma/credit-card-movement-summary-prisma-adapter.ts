@@ -1,6 +1,8 @@
 import { MovementType } from "../../../../lib/prisma-client.js";
 import type { CreditCardMovementSummaryPort } from "../../application/ports/credit-card-movement-summary.port.js";
 
+import { businessDateFromPrisma, businessDateToPrisma } from "../../../../shared/business-date.js";
+
 type DecimalLike = { toString(): string };
 
 type PrismaMovementSummaryClient = {
@@ -26,7 +28,7 @@ export const createCreditCardMovementSummaryPrismaAdapter = (db: PrismaMovementS
         type: MovementType.EXPENSE,
         creditCardId: input.creditCardId,
         creditCard: { ownerId: input.ownerId },
-        occurredAt: { gte: input.from, lte: input.to },
+        occurredAt: { gte: businessDateToPrisma(businessDateFromPrisma(input.from)), lte: businessDateToPrisma(businessDateFromPrisma(input.to)) },
       },
       _sum: { amount: true },
     });

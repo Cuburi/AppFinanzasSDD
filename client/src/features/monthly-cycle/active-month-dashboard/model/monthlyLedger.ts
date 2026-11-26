@@ -1,7 +1,9 @@
+import type { BusinessDate } from "../../../../types";
+
 type SourceEntity = { kind: "MONTH" | "SUBCATEGORY" | "POCKET" | "CASH" | "EXTERNAL"; id: string | null };
 type DestinationEntity = { kind: "MONTH" | "SUBCATEGORY" | "POCKET" | "CASH" | "EXPENSE"; id: string | null };
 type Effects = { availableMoney: number; cashBalance: number; subcategoryAvailable: number; pocketBalance: number };
-export type MonthlyLedgerEntry = { entryKey: string; occurredAt: string; eventType: string; direction: "INFLOW" | "OUTFLOW" | "TRANSFER"; source: SourceEntity; destination: DestinationEntity; amount: number; balanceEffects: Effects; metadata: { description: string | null; paymentMethod: "CASH" | "NON_CASH" | null; isSystemEvent: boolean } };
+export type MonthlyLedgerEntry = { entryKey: string; occurredAt: BusinessDate; eventType: string; direction: "INFLOW" | "OUTFLOW" | "TRANSFER"; source: SourceEntity; destination: DestinationEntity; amount: number; balanceEffects: Effects; metadata: { description: string | null; paymentMethod: "CASH" | "NON_CASH" | null; isSystemEvent: boolean } };
 export type MonthlyLedger = { monthId: string; status: "ACTIVE" | "CLOSED"; entries: MonthlyLedgerEntry[] };
 export type LedgerViewEntry = MonthlyLedgerEntry & { typeLabel: string; isReadOnly: boolean };
 export type LedgerDay = { key: string; items: ({ kind: "entry"; entry: LedgerViewEntry } | { kind: "system-run"; entries: LedgerViewEntry[] })[] };
@@ -22,13 +24,12 @@ export function validateMonthlyLedger(value: unknown): MonthlyLedger {
   return { monthId: value.monthId, status: value.status as MonthlyLedger["status"], entries };
 }
 
-const localDay = (occurredAt: string) => { const date = new Date(occurredAt); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; };
 const viewEntry = (entry: MonthlyLedgerEntry): LedgerViewEntry => ({ ...entry, typeLabel: knownTypes[entry.eventType] ?? "Unknown event", isReadOnly: entry.metadata.isSystemEvent || !(entry.eventType in knownTypes) || !["MONTHLY_INCOME", "CASH_EXPENSE", "NON_CASH_EXPENSE"].includes(entry.eventType) });
 
 export function buildMonthlyLedgerViewModel(ledger: MonthlyLedger): { days: LedgerDay[] } {
   const days: LedgerDay[] = [];
   for (const sourceEntry of ledger.entries) {
-    const entry = viewEntry(sourceEntry); const key = localDay(entry.occurredAt); let day = days.at(-1);
+    const entry = viewEntry(sourceEntry); const key = entry.occurredAt; let day = days.at(-1);
     if (!day || day.key !== key) { day = { key, items: [] }; days.push(day); }
     const prior = day.items.at(-1);
     if (entry.metadata.isSystemEvent && prior?.kind === "system-run") prior.entries.push(entry);

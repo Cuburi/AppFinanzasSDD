@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 
+import { formatBusinessDate } from "../../../lib/businessDate";
 import type { SavingsPocketMovement } from "../../../types";
 
 type PocketRecentMovementsProps = {
@@ -53,7 +54,7 @@ export const PocketRecentMovements = ({ movements }: PocketRecentMovementsProps)
                   <span>{movement.description ?? "Movimiento sin descripción"}</span>
                 </div>
                 <div className="pocket-movement-meta">
-                  <time dateTime={movement.occurredAt}>{new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(movement.occurredAt))}</time>
+                  <time dateTime={movement.occurredAt}>{formatBusinessDate(movement.occurredAt, { dateStyle: "medium" })}</time>
                   <span>{movementProvenance(movement)}</span>
                 </div>
               </li>

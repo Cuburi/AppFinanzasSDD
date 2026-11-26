@@ -129,10 +129,10 @@ test("credit card use cases return separate closed and open statement buckets fo
   assert.deepEqual(
     movementCalls.map((call) => ({ creditCardId: (call as { creditCardId: string }).creditCardId, from: (call as { from: Date }).from.toISOString(), to: (call as { to: Date }).to.toISOString() })),
     [
-      { creditCardId: "card-1", from: "2026-05-16T00:00:00.000Z", to: "2026-06-15T23:59:59.999Z" },
-      { creditCardId: "card-1", from: "2026-06-16T00:00:00.000Z", to: "2026-07-15T23:59:59.999Z" },
-      { creditCardId: "card-2", from: "2026-05-16T00:00:00.000Z", to: "2026-06-15T23:59:59.999Z" },
-      { creditCardId: "card-2", from: "2026-06-16T00:00:00.000Z", to: "2026-07-15T23:59:59.999Z" },
+      { creditCardId: "card-1", from: "2026-05-16T00:00:00.000Z", to: "2026-06-15T00:00:00.000Z" },
+      { creditCardId: "card-1", from: "2026-06-16T00:00:00.000Z", to: "2026-07-15T00:00:00.000Z" },
+      { creditCardId: "card-2", from: "2026-05-16T00:00:00.000Z", to: "2026-06-15T00:00:00.000Z" },
+      { creditCardId: "card-2", from: "2026-06-16T00:00:00.000Z", to: "2026-07-15T00:00:00.000Z" },
     ],
   );
 });

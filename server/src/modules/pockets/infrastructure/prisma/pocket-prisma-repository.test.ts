@@ -53,8 +53,8 @@ test("pocket Prisma repository preserves include/orderBy and maps balance inputs
       where: { active: true },
       orderBy: { name: "asc" },
       include: {
-        incomingMovements: { orderBy: { occurredAt: "desc" } },
-        outgoingMovements: { orderBy: { occurredAt: "desc" } },
+        incomingMovements: { orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }] },
+        outgoingMovements: { orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }] },
       },
     },
   ]);
@@ -135,8 +135,8 @@ test("pocket Prisma repository normalizes writes and performs case-insensitive n
 
   assert.equal(deactivated.active, false);
   assert.deepEqual(calls.map((call) => JSON.stringify(call)), [
-    JSON.stringify({ where: { name: { equals: "Travel", mode: "insensitive" } }, include: { incomingMovements: { orderBy: { occurredAt: "desc" } }, outgoingMovements: { orderBy: { occurredAt: "desc" } } } }),
-    JSON.stringify({ data: { name: "Travel", goalAmount: money(500), active: true }, include: { incomingMovements: { orderBy: { occurredAt: "desc" } }, outgoingMovements: { orderBy: { occurredAt: "desc" } } } }),
-    JSON.stringify({ where: { id: "pocket-1" }, data: { active: false }, include: { incomingMovements: { orderBy: { occurredAt: "desc" } }, outgoingMovements: { orderBy: { occurredAt: "desc" } } } }),
+    JSON.stringify({ where: { name: { equals: "Travel", mode: "insensitive" } }, include: { incomingMovements: { orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }] }, outgoingMovements: { orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }] } } }),
+    JSON.stringify({ data: { name: "Travel", goalAmount: money(500), active: true }, include: { incomingMovements: { orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }] }, outgoingMovements: { orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }] } } }),
+    JSON.stringify({ where: { id: "pocket-1" }, data: { active: false }, include: { incomingMovements: { orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }] }, outgoingMovements: { orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }] } } }),
   ]);
 });

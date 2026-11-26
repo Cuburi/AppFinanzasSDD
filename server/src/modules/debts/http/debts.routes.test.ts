@@ -15,10 +15,10 @@ const openDebt: DebtView = {
   description: "Crédito",
   totalAmount: 100,
   currency: "COP",
-  originDate: "2026-05-01T00:00:00.000Z",
+  originDate: "2026-05-01",
   remainingBalance: 70,
   status: "OPEN",
-  payments: [{ id: "payment-1", amount: 30, paidAt: "2026-05-03T00:00:00.000Z", notes: "Abono" }],
+  payments: [{ id: "payment-1", amount: 30, paidAt: "2026-05-03", notes: "Abono" }],
 };
 
 const createTestServer = (service: Parameters<typeof createDebtsRouter>[0], idempotencyStore?: ReturnType<typeof createMemoryIdempotencyStore>) => {
@@ -87,7 +87,7 @@ test("createDebtsRouter parses POST /api/debts payloads and fixes currency to CO
         counterpartyName: "Banco",
         description: "Crédito",
         totalAmount: "100",
-        originDate: "2026-05-01T00:00:00.000Z",
+        originDate: "2026-05-01",
       }),
     });
 
@@ -126,11 +126,11 @@ test("createDebtsRouter rejects invalid create shapes before application executi
   try {
     const amountResponse = await request(server, "/api/debts", {
       method: "POST",
-      body: JSON.stringify({ direction: "I_OWE", counterpartyName: "Banco", totalAmount: 0, originDate: "2026-05-01T00:00:00.000Z" }),
+      body: JSON.stringify({ direction: "I_OWE", counterpartyName: "Banco", totalAmount: 0, originDate: "2026-05-01" }),
     });
     const currencyResponse = await request(server, "/api/debts", {
       method: "POST",
-      body: JSON.stringify({ direction: "I_OWE", counterpartyName: "Banco", totalAmount: 100, currency: "USD", originDate: "2026-05-01T00:00:00.000Z" }),
+      body: JSON.stringify({ direction: "I_OWE", counterpartyName: "Banco", totalAmount: 100, currency: "USD", originDate: "2026-05-01" }),
     });
 
     assert.equal(amountResponse.status, 400);
@@ -157,7 +157,7 @@ test("createDebtsRouter parses payment payloads and maps overpayment domain erro
       if (calls.length === 2) {
         throw new DomainError(409, "El pago supera el saldo pendiente de la deuda.");
       }
-      return { ...openDebt, remainingBalance: 50, payments: [...openDebt.payments, { id: "payment-2", amount: 20, paidAt: "2026-05-04T00:00:00.000Z", notes: null }] };
+      return { ...openDebt, remainingBalance: 50, payments: [...openDebt.payments, { id: "payment-2", amount: 20, paidAt: "2026-05-04", notes: null }] };
     },
   };
   const server = createTestServer(service);
@@ -165,11 +165,11 @@ test("createDebtsRouter parses payment payloads and maps overpayment domain erro
   try {
     const validResponse = await request(server, "/api/debts/debt-1/payments", {
       method: "POST",
-      body: JSON.stringify({ amount: "20", paidAt: "2026-05-04T00:00:00.000Z" }),
+      body: JSON.stringify({ amount: "20", paidAt: "2026-05-04" }),
     });
     const overpaymentResponse = await request(server, "/api/debts/debt-1/payments", {
       method: "POST",
-      body: JSON.stringify({ amount: 80, paidAt: "2026-05-05T00:00:00.000Z" }),
+      body: JSON.stringify({ amount: 80, paidAt: "2026-05-05" }),
     });
 
     assert.equal(validResponse.status, 201);
@@ -202,7 +202,7 @@ test("createDebtsRouter maps missing-debt payment errors to HTTP 404", async () 
   try {
     const response = await request(server, "/api/debts/missing-debt/payments", {
       method: "POST",
-      body: JSON.stringify({ amount: 20, paidAt: "2026-05-04T00:00:00.000Z" }),
+      body: JSON.stringify({ amount: 20, paidAt: "2026-05-04" }),
     });
 
     assert.equal(response.status, 404);
@@ -231,7 +231,7 @@ test("createDebtsRouter rejects invalid payment shapes before application execut
   try {
     const amountResponse = await request(server, "/api/debts/debt-1/payments", {
       method: "POST",
-      body: JSON.stringify({ amount: -1, paidAt: "2026-05-04T00:00:00.000Z" }),
+      body: JSON.stringify({ amount: -1, paidAt: "2026-05-04" }),
     });
     const dateResponse = await request(server, "/api/debts/debt-1/payments", {
       method: "POST",
@@ -241,7 +241,7 @@ test("createDebtsRouter rejects invalid payment shapes before application execut
     assert.equal(amountResponse.status, 400);
     assert.deepEqual(await amountResponse.json(), { message: "Monto del pago debe ser mayor que cero." });
     assert.equal(dateResponse.status, 400);
-    assert.deepEqual(await dateResponse.json(), { message: "Fecha del pago debe ser una fecha válida." });
+    assert.deepEqual(await dateResponse.json(), { message: "Fecha del pago debe ser una fecha válida en formato YYYY-MM-DD." });
     assert.equal(paymentCalls, 0);
   } finally {
     server.close();
@@ -270,7 +270,7 @@ test("createDebtsRouter replays idempotent debt payments without registering twi
     const init = {
       method: "POST",
       headers: { "Idempotency-Key": "payment-key-1" },
-      body: JSON.stringify({ amount: 70, paidAt: "2026-05-04T00:00:00.000Z" }),
+      body: JSON.stringify({ amount: 70, paidAt: "2026-05-04" }),
     };
 
     const first = await request(server, "/api/debts/debt-1/payments", init);
@@ -306,12 +306,12 @@ test("createDebtsRouter rejects reused payment keys with a different body before
     const first = await request(server, "/api/debts/debt-1/payments", {
       method: "POST",
       headers,
-      body: JSON.stringify({ amount: 20, paidAt: "2026-05-04T00:00:00.000Z" }),
+      body: JSON.stringify({ amount: 20, paidAt: "2026-05-04" }),
     });
     const conflict = await request(server, "/api/debts/debt-1/payments", {
       method: "POST",
       headers,
-      body: JSON.stringify({ amount: 25, paidAt: "2026-05-04T00:00:00.000Z" }),
+      body: JSON.stringify({ amount: 25, paidAt: "2026-05-04" }),
     });
 
     assert.equal(first.status, 201);

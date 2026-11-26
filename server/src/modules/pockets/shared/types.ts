@@ -18,6 +18,7 @@ export type PocketMovement = {
   type: string;
   amount: number;
   occurredAt: Date;
+  createdAt?: Date;
   description: string | null;
   externalSourceLabel?: string | null;
 };

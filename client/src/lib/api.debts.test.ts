@@ -10,14 +10,14 @@ const openDebt: DebtView = {
   description: "Rent split",
   totalAmount: 300000,
   currency: "COP",
-  originDate: "2026-05-20T00:00:00.000Z",
+  originDate: "2026-05-20",
   remainingBalance: 200000,
   status: "OPEN",
   payments: [
     {
       id: "payment-1",
       amount: 100000,
-      paidAt: "2026-05-21T00:00:00.000Z",
+      paidAt: "2026-05-21",
       notes: "First payment",
     },
   ],

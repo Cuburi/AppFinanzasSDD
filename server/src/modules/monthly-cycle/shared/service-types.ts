@@ -17,10 +17,10 @@ export const monthInclude = {
     },
   },
   movements: {
-    orderBy: { occurredAt: "asc" as const },
+    orderBy: [{ occurredAt: "asc" as const }, { createdAt: "asc" as const }],
   },
   incomes: {
-    orderBy: { receivedAt: "asc" as const },
+    orderBy: [{ receivedAt: "asc" as const }, { createdAt: "asc" as const }],
   },
 };
 
@@ -79,6 +79,7 @@ export type MonthRecord = {
     amount: MonthlyCycleMoney;
     monthId?: string | null;
     occurredAt?: Date;
+    createdAt?: Date;
     description?: string | null;
     paymentMethod?: PaymentMethod | null;
     sourceSubcategoryId: string | null;
@@ -174,6 +175,7 @@ export type MonthlyCycleDb = {
         type: MovementType;
         amount: MonthlyCycleMoney;
         occurredAt?: Date;
+        createdAt?: Date;
         description?: string | null;
         paymentMethod?: PaymentMethod | null;
         monthId?: string | null;

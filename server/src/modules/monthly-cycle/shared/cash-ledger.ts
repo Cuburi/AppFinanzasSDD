@@ -1,6 +1,8 @@
 import { MovementType, PaymentMethod } from "../application/monthly-cycle-types.js";
 import { decimalToNumber, roundMoney, type MonthlyCycleMoney } from "./money.js";
 
+import { businessDateFromPrisma, isBusinessDateInMonth } from "../../../shared/business-date.js";
+
 type CashMovement = {
   type: MovementType;
   paymentMethod?: PaymentMethod | null;
@@ -40,10 +42,7 @@ export const calculateCashBalance = (movements: CashMovement[]) => {
 };
 
 export const assertOccurredAtWithinMonth = (occurredAt: Date, month: MonthPeriod) => {
-  const occurredYear = occurredAt.getUTCFullYear();
-  const occurredMonth = occurredAt.getUTCMonth() + 1;
-
-  if (occurredYear !== month.year || occurredMonth !== month.month) {
+  if (!isBusinessDateInMonth(businessDateFromPrisma(occurredAt), month)) {
     throw new RangeError("La fecha occurredAt del movimiento debe estar dentro del mes de destino.");
   }
 };

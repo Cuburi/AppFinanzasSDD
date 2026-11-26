@@ -6,6 +6,8 @@ import { DomainError, SemanticError } from "../../shared/service-errors.js";
 import { monthInclude, templateInclude, type MonthRecord, type MonthlyCycleDb } from "../../shared/service-types.js";
 import type { TemplateInput } from "../../dto/index.js";
 
+import { businessDateToPrisma } from "../../../../shared/business-date.js";
+
 export type MonthlyCyclePrismaPortSet = Omit<MonthlyCyclePorts, "transactionRunner">;
 
 const readMonthById = async (db: MonthlyCycleDb, monthId: string): Promise<MonthRecord> => {
@@ -240,19 +242,19 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
           ...(input.from || input.to
             ? {
                 occurredAt: {
-                  ...(input.from ? { gte: new Date(input.from) } : {}),
-                  ...(input.to ? { lte: new Date(input.to) } : {}),
+                  ...(input.from ? { gte: businessDateToPrisma(input.from) } : {}),
+                  ...(input.to ? { lte: businessDateToPrisma(input.to) } : {}),
                 },
               }
             : {}),
         },
-        orderBy: { occurredAt: "desc" },
+        orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
       });
     },
     async findCashLedgerEvents(monthId) {
       const movements = await db.movement.findMany({
         where: { monthId, type: { in: [MovementType.CASH_WITHDRAWAL, MovementType.CASH_CARRYOVER_IN, MovementType.EXPENSE] } },
-        orderBy: { occurredAt: "asc" },
+        orderBy: [{ occurredAt: "asc" }, { createdAt: "asc" }],
       });
 
       return movements.filter(

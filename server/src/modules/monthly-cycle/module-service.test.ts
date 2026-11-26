@@ -549,7 +549,7 @@ test("depositToPocket rejects inactive or nonexistent target pockets", async () 
         sourceSubcategoryId: subcategoryId,
         targetPocketId: "pocket-inactive",
         amount: 10,
-        occurredAt: "2026-05-10T00:00:00.000Z",
+        occurredAt: "2026-05-10",
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
@@ -567,7 +567,7 @@ test("depositToPocket rejects inactive or nonexistent target pockets", async () 
         sourceSubcategoryId: subcategoryId,
         targetPocketId: "pocket-missing",
         amount: 10,
-        occurredAt: "2026-05-10T00:00:00.000Z",
+        occurredAt: "2026-05-10",
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
@@ -689,7 +689,7 @@ test("recordExpense persists an expense and returns recalculated balances", asyn
     sourceSubcategoryId: subcategoryId,
     amount: 75,
     description: "Supermercado",
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     paymentMethod: PaymentMethod.NON_CASH,
   });
   const movement = dbStub.getCapturedMovements()[0] as { data: { type: MovementType; sourceSubcategoryId: string; amount: Prisma.Decimal } };
@@ -738,7 +738,7 @@ test("updateExpense persists active-month expense changes and recalculates balan
     sourceSubcategoryId: subcategoryId,
     amount: 125,
     description: "Updated market",
-    occurredAt: "2026-05-11T00:00:00.000Z",
+    occurredAt: "2026-05-11",
     paymentMethod: PaymentMethod.CASH,
   });
   const updateArgs = dbStub.getCapturedMovementUpdates()[0] as {
@@ -794,7 +794,7 @@ test("updateExpense rejects cash changes that would exceed physical cash", async
         expenseId: "expense-1",
         sourceSubcategoryId: subcategoryId,
         amount: 45,
-        occurredAt: "2026-05-10T00:00:00.000Z",
+        occurredAt: "2026-05-10",
         paymentMethod: PaymentMethod.CASH,
       }),
     (error: unknown) => {
@@ -871,7 +871,7 @@ test("updateExpense and deleteExpense reject expenses that belong to closed mont
         expenseId: "expense-1",
         sourceSubcategoryId: subcategoryId,
         amount: 90,
-        occurredAt: "2026-05-10T00:00:00.000Z",
+        occurredAt: "2026-05-10",
         paymentMethod: PaymentMethod.NON_CASH,
       }),
     (error: unknown) => {
@@ -914,7 +914,7 @@ test("updateExpense and deleteExpense reject movements outside the active month 
         expenseId: "foreign-expense",
         sourceSubcategoryId: subcategoryId,
         amount: 90,
-        occurredAt: "2026-05-10T00:00:00.000Z",
+        occurredAt: "2026-05-10",
         paymentMethod: PaymentMethod.NON_CASH,
       }),
     (error: unknown) => {
@@ -1272,7 +1272,7 @@ test("createMonthlyIncome persists active-month income and recalculates availabl
     monthId: month.id,
     sourceName: "Salary",
     amount: 1000,
-    receivedAt: "2026-05-15T00:00:00.000Z",
+    receivedAt: "2026-05-15",
     notes: "Main job",
   });
   const income = dbStub.getCapturedIncomes()[0] as { data: { sourceName: string; amount: Prisma.Decimal; notes: string | null } };
@@ -1294,7 +1294,7 @@ test("createMonthlyIncome rejects income dates outside the linked month", async 
         monthId: month.id,
         sourceName: "Salary",
         amount: 1000,
-        receivedAt: "2026-04-30T23:59:59.999Z",
+        receivedAt: "2026-04-30",
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
@@ -1310,7 +1310,7 @@ test("createMonthlyIncome rejects income dates outside the linked month", async 
         monthId: month.id,
         sourceName: "Salary",
         amount: 1000,
-        receivedAt: "2026-06-01T00:00:00.000Z",
+        receivedAt: "2026-06-01",
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
@@ -1340,7 +1340,7 @@ test("updateMonthlyIncome rejects received dates outside the linked month", asyn
       service.updateMonthlyIncome({
         monthId: month.id,
         incomeId: "income-1",
-        receivedAt: "2026-06-01T00:00:00.000Z",
+        receivedAt: "2026-06-01",
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
@@ -1391,7 +1391,7 @@ test("createMonthlyIncome rejects closed months", async () => {
         monthId: month.id,
         sourceName: "Salary",
         amount: 1000,
-        receivedAt: "2026-05-10T00:00:00.000Z",
+        receivedAt: "2026-05-10",
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
@@ -1416,7 +1416,7 @@ test("depositToPocket rejects source subcategory deposits in closed months", asy
         sourceSubcategoryId: subcategoryId,
         targetPocketId: "pocket-home",
         amount: 10,
-        occurredAt: "2026-05-10T00:00:00.000Z",
+        occurredAt: "2026-05-10",
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);

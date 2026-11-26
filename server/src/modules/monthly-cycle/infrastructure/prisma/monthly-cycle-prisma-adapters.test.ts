@@ -231,7 +231,7 @@ test("monthly-cycle Prisma movements persist null classifications and filter unc
   assert.deepEqual(calls, [
     ["create", { data: { type: "EXPENSE", amount: amount(75), monthId: "month-1", sourceSubcategoryId: null, creditCardId: "card-1" } }],
     ["update", { where: { id: "expense-1" }, data: { amount: amount(90), description: undefined, occurredAt: new Date("2026-05-11T00:00:00.000Z"), paymentMethod: "NON_CASH", sourceSubcategoryId: null, creditCardId: null } }],
-    ["findMany", { where: { monthId: "month-1", type: "EXPENSE", sourceSubcategoryId: null }, orderBy: { occurredAt: "desc" } }],
+    ["findMany", { where: { monthId: "month-1", type: "EXPENSE", sourceSubcategoryId: null }, orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }] }],
   ]);
 });
 

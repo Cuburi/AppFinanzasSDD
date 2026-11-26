@@ -218,7 +218,7 @@ test("registerPayment use case persists a valid payment and returns the updated 
 
   assert.equal(updated.remainingBalance, 60);
   assert.equal(updated.status, "OPEN");
-  assert.deepEqual(updated.payments, [{ id: "payment-1", amount: 40, paidAt: fixedDate.toISOString(), notes: "Abono" }]);
+  assert.deepEqual(updated.payments, [{ id: "payment-1", amount: 40, paidAt: "2026-05-23", notes: "Abono" }]);
 });
 
 test("registerPayment use case preserves debt balance when conflicting payments run concurrently", async () => {

@@ -9,7 +9,7 @@ const assertInvalidDepositSource = (payload: unknown) => assert.throws(() => par
 );
 
 test("pocket deposit DTO parses every strict source shape", () => {
-  const base = { targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00-03:00" };
+  const base = { targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10" };
 
   assert.deepEqual(parseDepositToPocketInput({ ...base, sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "subcategory-food" }), {
     ...base, description: null, sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "subcategory-food",
@@ -23,7 +23,7 @@ test("pocket deposit DTO parses every strict source shape", () => {
 });
 
 test("pocket deposit DTO rejects compatibility and contradictory source shapes", () => {
-  const base = { targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" };
+  const base = { targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10" };
 
   assert.throws(() => parseDepositToPocketInput({ ...base, monthId: "month-1", sourceSubcategoryId: "subcategory-food" }), /tipo de origen del depósito al bolsillo debe/i);
   assert.throws(() => parseDepositToPocketInput({ ...base, sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: "subcategory-food" }), /no pueden indicar/i);
@@ -32,12 +32,12 @@ test("pocket deposit DTO rejects compatibility and contradictory source shapes",
 });
 
 test("pocket deposit DTO classifies missing branch-required fields as invalid sources", () => {
-  const base = { targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" };
+  const base = { targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10" };
 
   assertInvalidDepositSource({ ...base, sourceKind: "SUBCATEGORY", monthId: "month-1" });
   assertInvalidDepositSource({ ...base, sourceKind: "MONTH_AVAILABLE" });
 });
 
 test("pocket deposit DTO rejects impossible calendar dates", () => {
-  const base = { sourceKind: "EXTERNAL", targetPocketId: "pocket-safe", amount: 25 }; for (const occurredAt of ["2026-02-29T00:00:00.000Z", "2026-02-30T00:00:00.000Z"]) assert.throws(() => parseDepositToPocketInput({ ...base, occurredAt }), (error: unknown) => error instanceof SemanticError && error.code === "INVALID_DATE" && error.statusCode === 400);
+  const base = { sourceKind: "EXTERNAL", targetPocketId: "pocket-safe", amount: 25 }; for (const occurredAt of ["2026-02-29", "2026-02-30", "2026-05-10T00:00:00.000Z", "2026-10-31T20:00:00.000-05:00"]) assert.throws(() => parseDepositToPocketInput({ ...base, occurredAt }), (error: unknown) => error instanceof SemanticError && error.code === "INVALID_DATE" && error.statusCode === 400);
 });

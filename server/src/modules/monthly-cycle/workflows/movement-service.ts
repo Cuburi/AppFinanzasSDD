@@ -10,27 +10,14 @@ import { DomainError } from "../shared/service-errors.js";
 import type { MovementRecord } from "../application/ports/monthly-cycle-ports.js";
 import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflow-dependencies.js";
 
+import { businessDateToPrisma, isBusinessDateInMonth, todayInBogota } from "../../../shared/business-date.js";
+
 const SINGLE_USER_OWNER_ID = "single-user";
 
-const assertExpenseDateWithinMonth = (value: string, month: Parameters<typeof assertOccurredAtWithinMonth>[1], unchangedInstant?: Date) => {
-  const validated = readIsoDateString(value, "Fecha del gasto");
-  const occurredAt = new Date(validated);
-  // History returns UTC instants, so an owned expense may retain its original instant on edit.
-  if (unchangedInstant?.getTime() === occurredAt.getTime()) return;
-  try {
-    if (/^\d{4}-\d{2}-\d{2}T.*[+-]\d{2}:\d{2}$/.test(validated)) {
-      if (Number(validated.slice(0, 4)) !== month.year || Number(validated.slice(5, 7)) !== month.month) {
-        throw new RangeError("El mes calendario del gasto no coincide.");
-      }
-    } else {
-      assertOccurredAtWithinMonth(occurredAt, month);
-    }
-  } catch (error) {
-    if (error instanceof RangeError) {
-      throw new DomainError(400, "La fecha del gasto debe estar dentro del mes vinculado.");
-    }
-
-    throw error;
+const assertExpenseDateWithinMonth = (value: string, month: Parameters<typeof assertOccurredAtWithinMonth>[1]) => {
+  const day = readIsoDateString(value, "Fecha del gasto");
+  if (!isBusinessDateInMonth(day, month)) {
+    throw new DomainError(400, "La fecha del gasto debe estar dentro del mes vinculado.");
   }
 };
 
@@ -57,8 +44,8 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
           throw new DomainError(404, "No se encontró la subcategoría en este mes.");
         }
 
-        const occurredAt = new Date(input.occurredAt);
         assertExpenseDateWithinMonth(input.occurredAt, existingMonth);
+        const occurredAt = businessDateToPrisma(input.occurredAt);
 
         if (input.paymentMethod === PaymentMethod.CASH && calculateCashBalance(existingMonth.movements) < input.amount) {
           throw new DomainError(409, "Efectivo insuficiente para este gasto.");
@@ -95,8 +82,8 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
           throw new DomainError(404, "No se encontró la subcategoría en este mes.");
         }
 
-        const occurredAt = new Date(input.occurredAt);
-        assertExpenseDateWithinMonth(input.occurredAt, existingMonth, existingExpense.occurredAt);
+        assertExpenseDateWithinMonth(input.occurredAt, existingMonth);
+        const occurredAt = businessDateToPrisma(input.occurredAt);
 
         const movementsWithoutCurrentExpense = existingMonth.movements.filter((movement) => movement.id !== existingExpense.id);
         if (input.paymentMethod === PaymentMethod.CASH && calculateCashBalance(movementsWithoutCurrentExpense) < input.amount) {
@@ -158,6 +145,7 @@ export const createMovementService = (dependencies: MonthlyCycleWorkflowDependen
 
         await txPorts.movements.create({
           type: input.sourceSubcategoryId ? MovementType.POCKET_DEPOSIT_FROM_SUBCATEGORY : MovementType.POCKET_DEPOSIT_EXTERNAL,
+          occurredAt: businessDateToPrisma(todayInBogota()),
           amount: decimal(input.amount),
           description: input.description,
           monthId: input.monthId,

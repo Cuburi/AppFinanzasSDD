@@ -18,7 +18,7 @@ test("pocket domain normalizes names and calculates balance from incoming minus 
   assert.equal(pocket.name, "Emergency");
 });
 
-test("pocket domain projects the latest five movements with directions and ISO dates", () => {
+test("pocket domain projects the latest five movements with directions and calendar days", () => {
   const pocket = rehydratePocket({
     id: "pocket-1",
     name: "Emergency",
@@ -33,7 +33,7 @@ test("pocket domain projects the latest five movements with directions and ISO d
   assert.deepEqual(recentMovements.map((movement) => movement.id), ["out-6", "out-5", "out-4", "in-3", "in-2"]);
   assert.equal(recentMovements[0]?.direction, "out");
   assert.equal(recentMovements[4]?.direction, "in");
-  assert.equal(toPocketView(pocket).recentMovements[0]?.occurredAt, "2026-05-06T00:00:00.000Z");
+  assert.equal(toPocketView(pocket).recentMovements[0]?.occurredAt, "2026-05-06");
 });
 
 test("pocket history identifies true external funding without a month source", () => {
@@ -54,7 +54,7 @@ test("pocket history identifies true external funding without a month source", (
     sourceKind: "EXTERNAL",
     sourceLabel: "Tax refund",
     amount: 125,
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     description: null,
     direction: "in",
   });

@@ -20,7 +20,7 @@ test("credit card movement summary adapter sums only owned expense movements for
     ownerId: "owner-1",
     creditCardId: "card-1",
     from: new Date("2026-06-16T00:00:00.000Z"),
-    to: new Date("2026-07-15T23:59:59.999Z"),
+    to: new Date("2026-07-15T00:00:00.000Z"),
   });
 
   assert.equal(total, 123.45);
@@ -30,7 +30,7 @@ test("credit card movement summary adapter sums only owned expense movements for
         type: MovementType.EXPENSE,
         creditCardId: "card-1",
         creditCard: { ownerId: "owner-1" },
-        occurredAt: { gte: new Date("2026-06-16T00:00:00.000Z"), lte: new Date("2026-07-15T23:59:59.999Z") },
+        occurredAt: { gte: new Date("2026-06-16T00:00:00.000Z"), lte: new Date("2026-07-15T00:00:00.000Z") },
       },
       _sum: { amount: true },
     },
@@ -49,7 +49,7 @@ test("credit card movement summary adapter returns zero when no expense total ex
   const adapter = createCreditCardMovementSummaryPrismaAdapter(db as Parameters<typeof createCreditCardMovementSummaryPrismaAdapter>[0]);
 
   assert.equal(
-    await adapter.sumExpensesByCardInWindow({ ownerId: "owner-1", creditCardId: "card-1", from: new Date("2026-01-01T00:00:00.000Z"), to: new Date("2026-01-31T23:59:59.999Z") }),
+    await adapter.sumExpensesByCardInWindow({ ownerId: "owner-1", creditCardId: "card-1", from: new Date("2026-01-01T00:00:00.000Z"), to: new Date("2026-01-31T00:00:00.000Z") }),
     0,
   );
 });
@@ -66,8 +66,8 @@ test("credit card movement summary adapter keeps each split window isolated by o
   };
   const adapter = createCreditCardMovementSummaryPrismaAdapter(db as Parameters<typeof createCreditCardMovementSummaryPrismaAdapter>[0]);
 
-  await adapter.sumExpensesByCardInWindow({ ownerId: "owner-1", creditCardId: "card-1", from: new Date("2026-06-16T00:00:00.000Z"), to: new Date("2026-07-15T23:59:59.999Z") });
-  await adapter.sumExpensesByCardInWindow({ ownerId: "owner-1", creditCardId: "card-1", from: new Date("2026-07-16T00:00:00.000Z"), to: new Date("2026-08-15T23:59:59.999Z") });
+  await adapter.sumExpensesByCardInWindow({ ownerId: "owner-1", creditCardId: "card-1", from: new Date("2026-06-16T00:00:00.000Z"), to: new Date("2026-07-15T00:00:00.000Z") });
+  await adapter.sumExpensesByCardInWindow({ ownerId: "owner-1", creditCardId: "card-1", from: new Date("2026-07-16T00:00:00.000Z"), to: new Date("2026-08-15T00:00:00.000Z") });
 
   assert.deepEqual(calls, [
     {
@@ -75,7 +75,7 @@ test("credit card movement summary adapter keeps each split window isolated by o
         type: MovementType.EXPENSE,
         creditCardId: "card-1",
         creditCard: { ownerId: "owner-1" },
-        occurredAt: { gte: new Date("2026-06-16T00:00:00.000Z"), lte: new Date("2026-07-15T23:59:59.999Z") },
+        occurredAt: { gte: new Date("2026-06-16T00:00:00.000Z"), lte: new Date("2026-07-15T00:00:00.000Z") },
       },
       _sum: { amount: true },
     },
@@ -84,7 +84,7 @@ test("credit card movement summary adapter keeps each split window isolated by o
         type: MovementType.EXPENSE,
         creditCardId: "card-1",
         creditCard: { ownerId: "owner-1" },
-        occurredAt: { gte: new Date("2026-07-16T00:00:00.000Z"), lte: new Date("2026-08-15T23:59:59.999Z") },
+        occurredAt: { gte: new Date("2026-07-16T00:00:00.000Z"), lte: new Date("2026-08-15T00:00:00.000Z") },
       },
       _sum: { amount: true },
     },
