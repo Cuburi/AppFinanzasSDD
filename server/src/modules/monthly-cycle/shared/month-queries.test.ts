@@ -19,6 +19,6 @@ test("lockMutableMonthForMutation rejects a month that closed before its mutatio
 
   await assert.rejects(
     () => lockMutableMonthForMutation({ async lockForMutation() { return closedMonth; } }, "month-1"),
-    { statusCode: 409, message: "Closed months are immutable." },
+    { statusCode: 409, message: "Los meses cerrados no se pueden modificar." },
   );
 });

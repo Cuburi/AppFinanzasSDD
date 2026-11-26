@@ -30,13 +30,13 @@ export type ClosureAllocationView = CloseMonthInput & { availableMoney: number }
 export const parseCloseMonthInput = (payload: unknown): CloseMonthInput | undefined => {
   if (payload === undefined) return undefined;
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    throw new DomainError(400, "Closure allocation must contain carryAmount and excludedAmount.");
+    throw new DomainError(400, "La distribución del cierre debe incluir carryAmount y excludedAmount.");
   }
   const { carryAmount, excludedAmount } = payload as CloseMonthInput;
   for (const value of [carryAmount, excludedAmount]) {
     if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 9_999_999_999.99 ||
         !/^(?:\d+)(?:\.\d{1,2})?$/.test(String(value))) {
-      throw new DomainError(400, "Closure amounts must be finite nonnegative numbers with at most two decimals.");
+      throw new DomainError(400, "Los montos del cierre deben ser números finitos no negativos con máximo dos decimales.");
     }
   }
   return { carryAmount, excludedAmount };
@@ -76,7 +76,7 @@ const readOptionalPositiveAmount = (value: unknown, label: string): number | nul
 
 export const parseClosureActionInput = (monthId: string, payload: unknown): ClosureActionInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Closure action payload is required.");
+    throw new Error("Se requieren los datos de la acción de cierre.");
   }
 
   const rawPayload = payload as {
@@ -88,24 +88,24 @@ export const parseClosureActionInput = (monthId: string, payload: unknown): Clos
     amount?: unknown;
     description?: unknown;
   };
-  const type = readNonEmptyString(rawPayload.type, "Closure action type");
+  const type = readNonEmptyString(rawPayload.type, "Tipo de acción de cierre");
 
   if (
     type !== "SURPLUS_TO_POCKET_ON_CLOSE" &&
     type !== "DEFICIT_COVER_FROM_SUBCATEGORY" &&
     type !== "DEFICIT_COVER_FROM_POCKET"
   ) {
-    throw new Error("Closure action type is invalid.");
+    throw new Error("El tipo de acción de cierre no es válido.");
   }
 
   return {
-    monthId: readNonEmptyString(monthId, "Month id"),
+    monthId: readNonEmptyString(monthId, "Identificador del mes"),
     type,
     sourceSubcategoryId: readOptionalString(rawPayload.sourceSubcategoryId),
     targetSubcategoryId: readOptionalString(rawPayload.targetSubcategoryId),
     sourcePocketId: readOptionalString(rawPayload.sourcePocketId),
     targetPocketId: readOptionalString(rawPayload.targetPocketId),
-    amount: readOptionalPositiveAmount(rawPayload.amount, "Closure action amount"),
+    amount: readOptionalPositiveAmount(rawPayload.amount, "Monto de la acción de cierre"),
     description: readOptionalString(rawPayload.description),
   };
 };

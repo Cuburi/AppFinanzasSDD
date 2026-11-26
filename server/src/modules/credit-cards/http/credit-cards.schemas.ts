@@ -6,24 +6,24 @@ const toNumber = (value: unknown): number => {
     const parsed = Number(value);
     if (!Number.isNaN(parsed)) return parsed;
   }
-  throw new Error("Expected a valid number.");
+  throw new Error("Se esperaba un número válido.");
 };
 
 const readText = (value: unknown, label: string): string => {
-  if (typeof value !== "string" || value.trim() === "") throw new Error(`${label} is required.`);
+  if (typeof value !== "string" || value.trim() === "") throw new Error(`${label}: valor obligatorio.`);
   return value.trim();
 };
 
 const readOptionalLimit = (value: unknown): number | null => {
   if (value === undefined || value === null || value === "") return null;
   const limit = toNumber(value);
-  if (!Number.isFinite(limit) || limit <= 0) throw new Error("Credit card limit must be positive.");
+  if (!Number.isFinite(limit) || limit <= 0) throw new Error("El cupo de la tarjeta de crédito debe ser mayor que cero.");
   return limit;
 };
 
 const readDay = (value: unknown, label: string) => {
   const day = toNumber(value);
-  if (!Number.isInteger(day) || day < 1 || day > 31) throw new Error(`${label} must be between 1 and 31.`);
+  if (!Number.isInteger(day) || day < 1 || day > 31) throw new Error(`${label} debe estar entre 1 y 31.`);
   return day;
 };
 
@@ -32,7 +32,7 @@ const readOptionalBoolean = (value: unknown): boolean | undefined => {
   if (typeof value === "boolean") return value;
   if (value === "true") return true;
   if (value === "false") return false;
-  throw new Error("Credit card active flag must be a boolean.");
+  throw new Error("El indicador de tarjeta de crédito activa debe ser un booleano.");
 };
 
 export const parseCreditCardListFilter = (value: unknown): CreditCardListFilter => {
@@ -42,26 +42,26 @@ export const parseCreditCardListFilter = (value: unknown): CreditCardListFilter 
 };
 
 export const parseCreateCreditCardInput = (payload: unknown): CreateCreditCardInput => {
-  if (!payload || typeof payload !== "object") throw new Error("Credit card payload is required.");
+  if (!payload || typeof payload !== "object") throw new Error("Se requieren los datos de la tarjeta de crédito.");
   const raw = payload as { issuer?: unknown; name?: unknown; limit?: unknown; closingDay?: unknown; dueDay?: unknown };
   return {
-    issuer: readText(raw.issuer, "Credit card issuer"),
-    name: readText(raw.name, "Credit card name"),
+    issuer: readText(raw.issuer, "Emisor de la tarjeta de crédito"),
+    name: readText(raw.name, "Nombre de la tarjeta de crédito"),
     limit: readOptionalLimit(raw.limit),
-    closingDay: readDay(raw.closingDay, "Credit card closing day"),
-    dueDay: readDay(raw.dueDay, "Credit card due day"),
+    closingDay: readDay(raw.closingDay, "Día de corte de la tarjeta de crédito"),
+    dueDay: readDay(raw.dueDay, "Día de pago de la tarjeta de crédito"),
   };
 };
 
 export const parseUpdateCreditCardInput = (payload: unknown): UpdateCreditCardInput => {
-  if (!payload || typeof payload !== "object") throw new Error("Credit card update payload is required.");
+  if (!payload || typeof payload !== "object") throw new Error("Se requieren los datos para actualizar la tarjeta de crédito.");
   const raw = payload as { issuer?: unknown; name?: unknown; limit?: unknown; closingDay?: unknown; dueDay?: unknown; active?: unknown };
   const input: UpdateCreditCardInput = {};
-  if (raw.issuer !== undefined) input.issuer = readText(raw.issuer, "Credit card issuer");
-  if (raw.name !== undefined) input.name = readText(raw.name, "Credit card name");
+  if (raw.issuer !== undefined) input.issuer = readText(raw.issuer, "Emisor de la tarjeta de crédito");
+  if (raw.name !== undefined) input.name = readText(raw.name, "Nombre de la tarjeta de crédito");
   if (raw.limit !== undefined) input.limit = readOptionalLimit(raw.limit);
-  if (raw.closingDay !== undefined) input.closingDay = readDay(raw.closingDay, "Credit card closing day");
-  if (raw.dueDay !== undefined) input.dueDay = readDay(raw.dueDay, "Credit card due day");
+  if (raw.closingDay !== undefined) input.closingDay = readDay(raw.closingDay, "Día de corte de la tarjeta de crédito");
+  if (raw.dueDay !== undefined) input.dueDay = readDay(raw.dueDay, "Día de pago de la tarjeta de crédito");
   if (raw.active !== undefined) input.active = readOptionalBoolean(raw.active);
   return input;
 };

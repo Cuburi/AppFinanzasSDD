@@ -36,7 +36,7 @@ const readPaymentMethod = (value: unknown): PaymentMethod => {
     return value;
   }
 
-  throw new Error("Payment method must be CASH or NON_CASH.");
+  throw new Error("El medio de pago debe ser CASH o NON_CASH.");
 };
 
 const readExpenseSubcategoryId = (value: unknown): string | null => {
@@ -44,22 +44,22 @@ const readExpenseSubcategoryId = (value: unknown): string | null => {
     return null;
   }
 
-  return readNonEmptyString(value, "Source subcategory");
+  return readNonEmptyString(value, "Subcategoría de origen");
 };
 
 export const parseRecordExpenseInput = (monthId: string, payload: unknown): RecordExpenseInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Expense payload is required.");
+    throw new Error("Se requieren los datos del gasto.");
   }
 
   const rawPayload = payload as { sourceSubcategoryId?: unknown; amount?: unknown; description?: unknown; occurredAt?: unknown; paymentMethod?: unknown; creditCardId?: unknown };
 
   return {
-    monthId: readNonEmptyString(monthId, "Month id"),
+    monthId: readNonEmptyString(monthId, "Identificador del mes"),
     sourceSubcategoryId: readExpenseSubcategoryId(rawPayload.sourceSubcategoryId),
-    amount: readPositiveAmount(rawPayload.amount, "Expense amount"),
+    amount: readPositiveAmount(rawPayload.amount, "Monto del gasto"),
     description: readOptionalString(rawPayload.description),
-    occurredAt: readIsoDateString(rawPayload.occurredAt, "Expense date"),
+    occurredAt: readIsoDateString(rawPayload.occurredAt, "Fecha del gasto"),
     paymentMethod: readPaymentMethod(rawPayload.paymentMethod),
     ...(rawPayload.creditCardId === undefined ? {} : { creditCardId: readOptionalString(rawPayload.creditCardId) }),
   };
@@ -70,13 +70,13 @@ export const parseUpdateExpenseInput = (monthId: string, expenseId: string, payl
 
   return {
     ...recordInput,
-    expenseId: readNonEmptyString(expenseId, "Expense id"),
+    expenseId: readNonEmptyString(expenseId, "Identificador del gasto"),
   };
 };
 
 export const parseDeleteExpenseInput = (monthId: string, expenseId: string): DeleteExpenseInput => ({
-  monthId: readNonEmptyString(monthId, "Month id"),
-  expenseId: readNonEmptyString(expenseId, "Expense id"),
+  monthId: readNonEmptyString(monthId, "Identificador del mes"),
+  expenseId: readNonEmptyString(expenseId, "Identificador del gasto"),
 });
 
 export const parseExpenseHistoryQueryInput = (monthId: string, query: unknown): ExpenseHistoryQueryInput => {
@@ -84,17 +84,17 @@ export const parseExpenseHistoryQueryInput = (monthId: string, query: unknown): 
   const paymentMethod = rawQuery.paymentMethod === undefined ? undefined : readPaymentMethod(rawQuery.paymentMethod);
 
   return {
-    monthId: readNonEmptyString(monthId, "Month id"),
-    from: rawQuery.from === undefined ? undefined : readIsoDateString(rawQuery.from, "From date"),
-    to: rawQuery.to === undefined ? undefined : readIsoDateString(rawQuery.to, "To date"),
+    monthId: readNonEmptyString(monthId, "Identificador del mes"),
+    from: rawQuery.from === undefined ? undefined : readIsoDateString(rawQuery.from, "Fecha inicial"),
+    to: rawQuery.to === undefined ? undefined : readIsoDateString(rawQuery.to, "Fecha final"),
     paymentMethod,
-    subcategoryId: rawQuery.subcategoryId === undefined ? undefined : readNonEmptyString(rawQuery.subcategoryId, "Subcategory"),
+    subcategoryId: rawQuery.subcategoryId === undefined ? undefined : readNonEmptyString(rawQuery.subcategoryId, "Subcategoría"),
     classification: rawQuery.classification === undefined ? undefined : readUncategorizedClassification(rawQuery.classification),
-    ...(rawQuery.creditCardId === undefined ? {} : { creditCardId: readNonEmptyString(rawQuery.creditCardId, "Credit card") }),
+    ...(rawQuery.creditCardId === undefined ? {} : { creditCardId: readNonEmptyString(rawQuery.creditCardId, "Tarjeta de crédito") }),
   };
 };
 
 const readUncategorizedClassification = (value: unknown): "UNCATEGORIZED" => {
   if (value === "UNCATEGORIZED") return value;
-  throw new Error("Classification must be UNCATEGORIZED.");
+  throw new Error("La clasificación debe ser UNCATEGORIZED.");
 };

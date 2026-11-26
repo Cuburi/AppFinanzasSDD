@@ -8,6 +8,8 @@ import { calculateMonthBalances } from "../../balance-calculator.js";
 import type { MonthRecord } from "../../shared/service-types.js";
 import { MovementType, type MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 
+import { businessDateToPrisma } from "../../../../shared/business-date.js";
+
 export const CASH_USE_CASE_NAMES = ["withdrawCash", "getCashSummary"] as const;
 
 export type CashUseCases = {
@@ -20,7 +22,7 @@ const assertDateInsideMonth = (occurredAt: Date, month: Pick<MonthRecord, "year"
     assertOccurredAtWithinMonth(occurredAt, month);
   } catch (error) {
     if (error instanceof RangeError) {
-      throw new DomainError(400, "Cash withdrawal date must be inside the linked month.");
+      throw new DomainError(400, "La fecha del retiro de efectivo debe estar dentro del mes vinculado.");
     }
 
     throw error;
@@ -31,12 +33,12 @@ export const createCashUseCases = (ports: MonthlyCyclePorts): CashUseCases => ({
   async withdrawCash(input) {
     const month = await ports.transactionRunner.run(async (txPorts) => {
       const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
-      const occurredAt = new Date(input.occurredAt);
+      const occurredAt = businessDateToPrisma(input.occurredAt);
       assertDateInsideMonth(occurredAt, existingMonth);
 
       const balances = calculateMonthBalances(existingMonth);
       if (balances.availableMoney < input.amount) {
-        throw new DomainError(409, "Insufficient available money for this cash withdrawal.");
+        throw new DomainError(409, "Dinero disponible insuficiente para este retiro de efectivo.");
       }
 
       await txPorts.movements.create({

@@ -7,7 +7,7 @@ const month = {
 };
 
 const ledger = (entryKey: string, eventType: string, description: string, isSystemEvent = false) => ({
-  entryKey, occurredAt: "2026-08-02T14:30:00.000Z", eventType, direction: isSystemEvent ? "TRANSFER" : "OUTFLOW", amount: 12000,
+  entryKey, occurredAt: "2026-08-02", eventType, direction: isSystemEvent ? "TRANSFER" : "OUTFLOW", amount: 12000,
   source: { kind: "MONTH", id: "browser-month" }, destination: { kind: isSystemEvent ? "CASH" : "EXPENSE", id: entryKey },
   balanceEffects: { availableMoney: -12000, cashBalance: 0, subcategoryAvailable: -12000, pocketBalance: 0 },
   metadata: { description, paymentMethod: "CASH", isSystemEvent },

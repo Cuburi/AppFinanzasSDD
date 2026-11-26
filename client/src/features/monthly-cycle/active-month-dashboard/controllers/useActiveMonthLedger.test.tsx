@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { useActiveMonthLedger } from "./useActiveMonthLedger";
 import type { MonthlyLedgerApi } from "../api/monthlyLedgerApi";
 
-const payload = (key: string, sourceKind = "CASH", destinationKind = "EXPENSE") => ({ monthId: "month-1", status: "ACTIVE", entries: [{ entryKey: key, occurredAt: "2026-08-01T12:00:00.000Z", eventType: "CASH_EXPENSE", direction: "OUTFLOW", source: { kind: sourceKind, id: null }, destination: { kind: destinationKind, id: null }, amount: 1, balanceEffects: { availableMoney: -1, cashBalance: -1, subcategoryAvailable: -1, pocketBalance: 0 }, metadata: { description: null, paymentMethod: "CASH", isSystemEvent: false } }] });
+const payload = (key: string, sourceKind = "CASH", destinationKind = "EXPENSE") => ({ monthId: "month-1", status: "ACTIVE", entries: [{ entryKey: key, occurredAt: "2026-08-01", eventType: "CASH_EXPENSE", direction: "OUTFLOW", source: { kind: sourceKind, id: null }, destination: { kind: destinationKind, id: null }, amount: 1, balanceEffects: { availableMoney: -1, cashBalance: -1, subcategoryAvailable: -1, pocketBalance: 0 }, metadata: { description: null, paymentMethod: "CASH", isSystemEvent: false } }] });
 const deferred = <T,>() => { let resolve!: (value: T) => void; let reject!: (reason: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, reject, resolve }; };
 function Probe({ api, monthId, resolver, unstableResolver }: { api: MonthlyLedgerApi; monthId: string | null; resolver?: () => Promise<void>; unstableResolver?: () => Promise<void> }) {
   const resolveExpenses = unstableResolver ? () => unstableResolver() : resolver;

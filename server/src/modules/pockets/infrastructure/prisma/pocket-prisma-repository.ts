@@ -3,7 +3,7 @@ import type { PocketRepository } from "../../application/ports/pocket-repository
 import { rehydratePocket } from "../../domain/pocket.js";
 import type { PocketListFilter } from "../../shared/types.js";
 
-const recentMovementOrder = { occurredAt: "desc" as const };
+const recentMovementOrder = [{ occurredAt: "desc" as const }, { createdAt: "desc" as const }];
 
 const pocketInclude = {
   incomingMovements: { orderBy: recentMovementOrder },
@@ -15,6 +15,7 @@ type PocketMovementRecord = {
   type: string;
   amount: { toString(): string };
   occurredAt: Date;
+  createdAt?: Date;
   description: string | null;
   externalSourceLabel?: string | null;
   sourcePocketId: string | null;
@@ -47,6 +48,7 @@ const mapMovementRecord = (movement: PocketMovementRecord) => ({
   type: movement.type,
   amount: decimalLikeToNumber(movement.amount),
   occurredAt: movement.occurredAt,
+  createdAt: movement.createdAt,
   description: movement.description,
   externalSourceLabel: movement.externalSourceLabel ?? null,
 });

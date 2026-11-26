@@ -8,8 +8,8 @@ test("filters expenses without changing balances and stays contained on mobile a
     description: id, amount: 12000, creditCardId: null,
   });
   const expenses = [
-    expense("Compra en efectivo", "CASH", "2026-08-02T00:30:00Z", { id: "food", name: "Alimentación" }),
-    expense("Compra sin categoría", "NON_CASH", "2026-08-03T14:30:00Z", null),
+    expense("Compra en efectivo", "CASH", "2026-08-01", { id: "food", name: "Alimentación" }),
+    expense("Compra sin categoría", "NON_CASH", "2026-08-03", null),
   ];
   const entries = expenses.map((item) => ({
     entryKey: item.id, occurredAt: item.occurredAt, eventType: item.paymentMethod === "CASH" ? "CASH_EXPENSE" : "NON_CASH_EXPENSE",
@@ -33,8 +33,8 @@ test("filters expenses without changing balances and stays contained on mobile a
   const ledger = page.getByRole("region", { name: "Movimientos del mes" });
   await expect(ledger.getByLabel("Filtrar por categoría")).toBeEnabled();
   const firstExpense = ledger.locator("article").filter({ hasText: "Compra en efectivo" });
-  await expect(firstExpense.locator("time")).toContainText("1/08/2026");
-  await expect(firstExpense.locator("time")).toContainText("7:30 p. m.");
+  await expect(firstExpense.locator("time")).toHaveText("1/08/2026");
+  await expect(firstExpense.locator("time")).toHaveAttribute("datetime", "2026-08-01");
   await ledger.getByLabel("Desde").fill("2026-08-01");
   await ledger.getByLabel("Hasta").fill("2026-08-01");
   await ledger.getByLabel("Filtrar por categoría").selectOption("food");

@@ -54,7 +54,7 @@ import { DomainError, SemanticError } from "./shared/service-errors.js";
 
 const isDomainError = (error: unknown): error is DomainError => error instanceof DomainError;
 
-const readMessage = (error: unknown) => (error instanceof Error ? error.message : "Unexpected error.");
+const readMessage = (error: unknown) => (error instanceof Error ? error.message : "Error inesperado.");
 
 export type TemplateRouteService = TemplateUseCases;
 export type IncomeRouteService = IncomeUseCases;
@@ -310,7 +310,7 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
         response.status(error.statusCode).json({ message: error.message });
         return;
       }
-      response.status(500).json({ message: "Internal server error." });
+      response.status(500).json({ message: "Error interno del servidor." });
     }
   });
 

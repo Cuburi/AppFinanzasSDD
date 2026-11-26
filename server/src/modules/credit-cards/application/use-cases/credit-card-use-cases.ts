@@ -8,14 +8,14 @@ export class CreditCardNotFoundError extends Error {
   public readonly statusCode = 404;
 
   constructor() {
-    super("Credit card was not found.");
+    super("No se encontró Tarjeta de crédito.");
     this.name = "CreditCardNotFoundError";
   }
 }
 
 const ensureUniqueName = async (creditCards: CreditCardRepository, ownerId: string, name: string, currentId?: string) => {
   const existing = await creditCards.findByNameForOwner(ownerId, normalizeCreditCardName(name));
-  if (existing && existing.id !== currentId) throw new CreditCardValidationError("A credit card with that name already exists.");
+  if (existing && existing.id !== currentId) throw new CreditCardValidationError("Ya existe una tarjeta de crédito con ese nombre.");
 };
 
 export const createCreditCardUseCases = ({ creditCards, movementSummary }: { creditCards: CreditCardRepository; movementSummary: CreditCardMovementSummaryPort }) => ({

@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 import { api } from "../lib/api";
-import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
-import { Button, Card, FeedbackBanner, SectionHeader, StatusPill } from "../components/ui";
+import { formatCop, parseAmountInput } from "../lib/money";
+import { Button, Card, FeedbackBanner, MoneyInput, SectionHeader, StatusPill } from "../components/ui";
 import type { DebtDirection, DebtView } from "../types";
 
 const formatMoney = (amount: number, _currency: string) => formatCop(amount);
@@ -125,7 +125,7 @@ export const DebtsPage = () => {
           </label>
           <label className="field small-field">
             <span>Monto total</span>
-            <input min="0.01" step="0.01" type="number" value={totalAmount} onChange={(event) => setTotalAmount(normalizeAmountInput(event.target.value))} required />
+            <MoneyInput value={totalAmount} onValueChange={setTotalAmount} required />
           </label>
           <label className="field small-field">
             <span>Fecha de origen</span>
@@ -185,12 +185,9 @@ export const DebtsPage = () => {
                 <form className="row gap-sm wrap align-start" onSubmit={(event) => event.preventDefault()}>
                   <label className="field small-field">
                     <span>Monto del pago</span>
-                    <input
-                      min="0.01"
-                      step="0.01"
-                      type="number"
+                    <MoneyInput
                       value={paymentAmounts[debt.id] ?? ""}
-                      onChange={(event) => setPaymentAmounts((current) => ({ ...current, [debt.id]: normalizeAmountInput(event.target.value) }))}
+                      onValueChange={(digits) => setPaymentAmounts((current) => ({ ...current, [debt.id]: digits }))}
                       required
                     />
                   </label>

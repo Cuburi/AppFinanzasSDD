@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
-import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
-import { Button, Card, FeedbackBanner, SectionHeader, StatusPill } from "../components/ui";
+import { formatCop, parseAmountInput, toMoneyInputValue } from "../lib/money";
+import { Button, Card, FeedbackBanner, MoneyInput, SectionHeader, StatusPill } from "../components/ui";
 import type { PocketListFilter, SavingsPocket } from "../types";
 import { PocketRecentMovements } from "../features/pockets/components/PocketRecentMovements";
 
@@ -66,7 +66,7 @@ export const PocketsPage = () => {
     const nextPockets = await api.getPockets(nextFilter);
     setPockets(nextPockets);
     setEditNames(Object.fromEntries(nextPockets.map((pocket) => [pocket.id, pocket.name])));
-    setEditGoals(Object.fromEntries(nextPockets.map((pocket) => [pocket.id, pocket.goalAmount?.toString() ?? ""])));
+    setEditGoals(Object.fromEntries(nextPockets.map((pocket) => [pocket.id, toMoneyInputValue(pocket.goalAmount)])));
   };
 
   useEffect(() => {
@@ -130,7 +130,7 @@ export const PocketsPage = () => {
       });
       setPockets((current) => (filter === "inactive" ? current : [createdPocket, ...current]));
       setEditNames((current) => ({ ...current, [createdPocket.id]: createdPocket.name }));
-      setEditGoals((current) => ({ ...current, [createdPocket.id]: createdPocket.goalAmount?.toString() ?? "" }));
+      setEditGoals((current) => ({ ...current, [createdPocket.id]: toMoneyInputValue(createdPocket.goalAmount) }));
       setNewPocketName("");
       setNewPocketGoal("");
       setNewPocketInitialBalance("");
@@ -193,7 +193,7 @@ export const PocketsPage = () => {
 
   const cancelPocketEdit = (pocket: SavingsPocket) => {
     setEditNames((current) => ({ ...current, [pocket.id]: pocket.name }));
-    setEditGoals((current) => ({ ...current, [pocket.id]: pocket.goalAmount?.toString() ?? "" }));
+    setEditGoals((current) => ({ ...current, [pocket.id]: toMoneyInputValue(pocket.goalAmount) }));
     setEditingPocketId(null);
   };
 
@@ -306,11 +306,11 @@ export const PocketsPage = () => {
           </label>
           <label className="field small-field">
             <span>Meta opcional</span>
-            <input min="0" step="0.01" type="number" value={newPocketGoal} onChange={(event) => setNewPocketGoal(normalizeAmountInput(event.target.value))} />
+            <MoneyInput value={newPocketGoal} onValueChange={setNewPocketGoal} />
           </label>
           <label className="field small-field">
             <span>Saldo inicial</span>
-            <input min="0" step="0.01" type="number" value={newPocketInitialBalance} onChange={(event) => setNewPocketInitialBalance(normalizeAmountInput(event.target.value))} />
+            <MoneyInput value={newPocketInitialBalance} onValueChange={setNewPocketInitialBalance} />
           </label>
           <Button disabled={submitting} type="submit">
             Crear bolsillo
@@ -337,7 +337,7 @@ export const PocketsPage = () => {
           </label>
           <label className="field small-field">
             <span>Monto del ingreso externo</span>
-            <input disabled={submitting} min="0.01" step="0.01" type="number" value={externalAmount} onChange={(event) => setExternalAmount(normalizeAmountInput(event.target.value))} required />
+            <MoneyInput disabled={submitting} value={externalAmount} onValueChange={setExternalAmount} required />
           </label>
           <label className="field small-field">
             <span>Fecha del ingreso externo</span>
@@ -369,7 +369,7 @@ export const PocketsPage = () => {
           </label>
           <label className="field small-field">
             <span>Monto del retiro o gasto</span>
-            <input disabled={submitting} min="0.01" step="0.01" type="number" value={withdrawalAmount} onChange={(event) => setWithdrawalAmount(normalizeAmountInput(event.target.value))} required />
+            <MoneyInput disabled={submitting} value={withdrawalAmount} onValueChange={setWithdrawalAmount} required />
           </label>
           <label className="field small-field">
             <span>Fecha del retiro o gasto</span>
@@ -442,12 +442,9 @@ export const PocketsPage = () => {
                     </label>
                     <label className="field small-field">
                       <span>Editar meta</span>
-                      <input
-                        min="0"
-                        step="0.01"
-                        type="number"
+                      <MoneyInput
                         value={editGoals[pocket.id] ?? ""}
-                        onChange={(event) => setEditGoals((current) => ({ ...current, [pocket.id]: normalizeAmountInput(event.target.value) }))}
+                        onValueChange={(digits) => setEditGoals((current) => ({ ...current, [pocket.id]: digits }))}
                       />
                     </label>
                     <div className="pocket-edit-actions">

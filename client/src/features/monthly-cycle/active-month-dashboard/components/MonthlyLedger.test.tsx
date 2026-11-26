@@ -7,7 +7,7 @@ import type { LedgerDay, LedgerViewEntry } from "../model/monthlyLedger";
 
 const entry = (entryKey: string, eventType: string, options: Partial<LedgerViewEntry> = {}): LedgerViewEntry => ({
   entryKey,
-  occurredAt: "2026-08-02T14:30:00.000Z",
+  occurredAt: "2026-08-02",
   eventType,
   direction: "OUTFLOW",
   source: { kind: "MONTH", id: "month-1" },
@@ -36,9 +36,9 @@ describe("MonthlyLedger", () => {
   it("combines inclusive expense filters, excludes other movements, and restores the full ledger on reset", async () => {
     const user = userEvent.setup();
     const history = [
-      { id: "cash", occurredAt: "2026-08-02T14:30:00Z", amount: 12000, description: "Cash food", paymentMethod: "CASH" as const, creditCardId: null, category: { id: "food", name: "Alimentación" }, subcategory: { id: "market", name: "Mercado" } },
-      { id: "card", occurredAt: "2026-08-03T14:30:00Z", amount: 12000, description: "Card food", paymentMethod: "NON_CASH" as const, creditCardId: null, category: { id: "food", name: "Alimentación" }, subcategory: { id: "restaurant", name: "Restaurantes" } },
-      { id: "other", occurredAt: "2026-08-04T14:30:00Z", amount: 12000, description: "Other expense", paymentMethod: "CASH" as const, creditCardId: null, category: null, subcategory: null },
+      { id: "cash", occurredAt: "2026-08-02", amount: 12000, description: "Cash food", paymentMethod: "CASH" as const, creditCardId: null, category: { id: "food", name: "Alimentación" }, subcategory: { id: "market", name: "Mercado" } },
+      { id: "card", occurredAt: "2026-08-03", amount: 12000, description: "Card food", paymentMethod: "NON_CASH" as const, creditCardId: null, category: { id: "food", name: "Alimentación" }, subcategory: { id: "restaurant", name: "Restaurantes" } },
+      { id: "other", occurredAt: "2026-08-04", amount: 12000, description: "Other expense", paymentMethod: "CASH" as const, creditCardId: null, category: null, subcategory: null },
     ];
     const filterDays: LedgerDay[] = history.map((expense) => ({ key: expense.occurredAt.slice(0, 10), items: [{ kind: "entry", entry: entry(expense.id, expense.paymentMethod === "CASH" ? "CASH_EXPENSE" : "NON_CASH_EXPENSE", { occurredAt: expense.occurredAt, metadata: { description: expense.description, paymentMethod: expense.paymentMethod, isSystemEvent: false } }) }] }));
     filterDays[0].items.unshift({ kind: "entry", entry: entry("income", "MONTHLY_INCOME", { metadata: { description: "Salary", paymentMethod: null, isSystemEvent: false } }) });
@@ -102,21 +102,20 @@ describe("MonthlyLedger", () => {
     expect(screen.getByText("Este tipo de movimiento no se reconoce y no se puede editar ni eliminar desde este historial.")).toBeInTheDocument();
   });
 
-  it("keeps a near-midnight UTC occurrence aligned with its Colombian local-day group", () => {
+  it("renders a month-end calendar day in Colombia without a clock time", () => {
     const originalTimeZone = process.env.TZ;
     process.env.TZ = "America/Bogota";
     const colombianDay: LedgerDay[] = [{
-      key: "2026-08-01",
-      items: [{ kind: "entry", entry: entry("late-utc", "CASH_EXPENSE", { occurredAt: "2026-08-02T00:30:00.000Z" }) }],
+      key: "2026-10-31",
+      items: [{ kind: "entry", entry: entry("month-end", "CASH_EXPENSE", { occurredAt: "2026-10-31" }) }],
     }];
 
     try {
       render(<MonthlyLedger days={colombianDay} status="ready" />);
 
-      expect(screen.getByRole("heading", { name: "1 de agosto de 2026" })).toBeInTheDocument();
-      expect(document.querySelector("time")).toHaveTextContent("1/08/2026");
-      expect(document.querySelector("time")).toHaveTextContent("7:30 p. m.");
-      expect(document.querySelector("time")).toHaveAttribute("dateTime", "2026-08-02T00:30:00.000Z");
+      expect(screen.getByRole("heading", { name: "31 de octubre de 2026" })).toBeInTheDocument();
+      expect(document.querySelector("time")?.textContent).toBe("31/10/2026");
+      expect(document.querySelector("time")).toHaveAttribute("dateTime", "2026-10-31");
     } finally {
       process.env.TZ = originalTimeZone;
     }
@@ -153,7 +152,7 @@ describe("MonthlyLedger", () => {
     expect(details).not.toHaveAttribute("open");
     expect(disclosure).toHaveTextContent("Ver detalles de Market groceries");
     expect(disclosure).not.toHaveAttribute("aria-controls");
-    expect(document.querySelector("time")).toHaveAttribute("dateTime", "2026-08-02T14:30:00.000Z");
+    expect(document.querySelector("time")).toHaveAttribute("dateTime", "2026-08-02");
     expect(screen.getByRole("button", { name: "Editar Market groceries" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Eliminar Market groceries" })).toBeInTheDocument();
 

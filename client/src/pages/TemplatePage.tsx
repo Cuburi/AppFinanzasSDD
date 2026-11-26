@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, PointerEvent } from "react";
 
-import { FeedbackBanner } from "../components/ui";
+import { FeedbackBanner, MoneyInput } from "../components/ui";
 import { api } from "../lib/api";
-import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
+import { formatCop, parseAmountInput, toMoneyInputValue } from "../lib/money";
 import type { EditableTemplate, EditableTemplateCategory, SavingsPocket } from "../types";
 
 type TemplateDraftSubcategory = Omit<EditableTemplateCategory["subcategories"][number], "plannedAmount"> & { plannedAmount: string };
@@ -24,7 +24,7 @@ const toTemplateDraft = (template: Awaited<ReturnType<typeof api.getTemplate>>):
           subcategories: category.subcategories.map((subcategory) => ({
             id: subcategory.id,
             name: subcategory.name,
-            plannedAmount: String(subcategory.plannedAmount),
+            plannedAmount: toMoneyInputValue(subcategory.plannedAmount),
             defaultPocketId: subcategory.defaultPocketId,
           })),
         }))
@@ -282,13 +282,10 @@ export const TemplatePage = () => {
 
                         <label className="field field-amount">
                           <span className="sr-only">Monto planificado</span>
-                          <input
+                          <MoneyInput
                             aria-label={`Monto planificado de ${subcategory.name || subcategoryIndex + 1}`}
-                            min="0"
-                            step="0.01"
-                            type="number"
                             value={subcategory.plannedAmount}
-                            onChange={(event) => updateSubcategory(categoryIndex, subcategoryIndex, "plannedAmount", normalizeAmountInput(event.target.value))}
+                            onValueChange={(digits) => updateSubcategory(categoryIndex, subcategoryIndex, "plannedAmount", digits)}
                           />
                         </label>
 

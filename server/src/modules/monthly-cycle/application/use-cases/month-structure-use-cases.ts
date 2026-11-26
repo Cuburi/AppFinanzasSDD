@@ -23,10 +23,10 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
       const existingMonth = await lockMutableMonthForMutation(txPorts.months, input.monthId);
 
       const name = input.name.trim();
-      assertUniqueStructureName(existingMonth.categories, name, "Category already exists in this month.");
+      assertUniqueStructureName(existingMonth.categories, name, "La categoría ya existe en este mes.");
 
       const templateCategories = input.addToTemplate ? await txPorts.templates.readCategories() : [];
-      if (input.addToTemplate) assertUniqueStructureName(templateCategories, name, "Category already exists in the template.");
+      if (input.addToTemplate) assertUniqueStructureName(templateCategories, name, "La categoría ya existe en la plantilla.");
 
       const monthCategory = await txPorts.structure.createMonthCategory({ monthId: input.monthId, name, sortOrder: nextSortOrder(existingMonth.categories), templateCategoryId: null });
 
@@ -50,8 +50,8 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
       if (input.updateTemplate) {
         const template = await txPorts.templates.readCategories();
         const target = template.find((item) => item.id === category.templateCategoryId);
-        if (!target) throw new DomainError(409, "Linked template category is unavailable.");
-        assertUniqueStructureName(template.filter((item) => item.id !== target.id), input.name, "Category already exists in the template.");
+        if (!target) throw new DomainError(409, "La categoría vinculada de la plantilla no está disponible.");
+        assertUniqueStructureName(template.filter((item) => item.id !== target.id), input.name, "La categoría ya existe en la plantilla.");
         await txPorts.structure.updateTemplateCategory({ categoryId: target.id, name: input.name });
       }
 
@@ -68,7 +68,7 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
       const existingMonth = await lockMutableMonthForMutation(txPorts.months, monthId);
       const category = assertMonthCategory(existingMonth, categoryId);
 
-      if (category.subcategories.length > 0) throw new DomainError(409, "Delete subcategories first before deleting this category.");
+      if (category.subcategories.length > 0) throw new DomainError(409, "Elimine primero las subcategorías antes de eliminar esta categoría.");
 
       await txPorts.structure.deleteMonthCategory(categoryId);
 
@@ -84,16 +84,16 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
       const parentCategory = assertMonthCategory(existingMonth, input.categoryId);
 
       const name = input.name.trim();
-      assertUniqueStructureName(parentCategory.subcategories, name, "Subcategory already exists in this month category.");
+      assertUniqueStructureName(parentCategory.subcategories, name, "La subcategoría ya existe en esta categoría del mes.");
 
-      if (input.defaultPocketId) await txPorts.pockets.ensurePocketIsActive(input.defaultPocketId, "Default pocket");
+      if (input.defaultPocketId) await txPorts.pockets.ensurePocketIsActive(input.defaultPocketId, "Bolsillo predeterminado");
 
       const templateCategories = input.addToTemplate ? await txPorts.templates.readCategories() : [];
       const linkedTemplateCategory = parentCategory.templateCategoryId ? templateCategories.find((category) => category.id === parentCategory.templateCategoryId) : undefined;
       const matchingTemplateCategory = linkedTemplateCategory ? undefined : templateCategories.find((category) => normalizeStructureName(category.name) === normalizeStructureName(parentCategory.name));
       const resolvedTemplateCategory = linkedTemplateCategory ?? matchingTemplateCategory;
 
-      if (input.addToTemplate && resolvedTemplateCategory) assertUniqueStructureName(resolvedTemplateCategory.subcategories, name, "Subcategory already exists in the template category.");
+      if (input.addToTemplate && resolvedTemplateCategory) assertUniqueStructureName(resolvedTemplateCategory.subcategories, name, "La subcategoría ya existe en la categoría de la plantilla.");
 
       const monthSubcategory = await txPorts.structure.createMonthSubcategory({
         categoryId: input.categoryId,
@@ -134,16 +134,16 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
       const subcategory = assertMonthSubcategory(existingMonth, input.subcategoryId);
       const defaultPocketId = input.defaultPocketId !== undefined ? input.defaultPocketId : subcategory.defaultPocketId;
 
-      if (input.defaultPocketId) await txPorts.pockets.ensurePocketIsActive(input.defaultPocketId, "Default pocket");
+      if (input.defaultPocketId) await txPorts.pockets.ensurePocketIsActive(input.defaultPocketId, "Bolsillo predeterminado");
 
       if (input.updateTemplate) {
         const parent = existingMonth.categories.find((category) => category.subcategories.some((item) => item.id === subcategory.id))!;
         const template = await txPorts.templates.readCategories();
         const targetParent = template.find((category) => category.id === parent.templateCategoryId);
         const target = targetParent?.subcategories.find((item) => item.id === subcategory.templateSubcategoryId);
-        if (!target || !target.active) throw new DomainError(409, "Linked template subcategory is unavailable or belongs to another category.");
-        assertUniqueStructureName(targetParent!.subcategories.filter((item) => item.id !== target.id), input.name, "Subcategory already exists in the template category.");
-        if (defaultPocketId && input.defaultPocketId === undefined) await txPorts.pockets.ensurePocketIsActive(defaultPocketId, "Default pocket");
+        if (!target || !target.active) throw new DomainError(409, "La subcategoría vinculada de la plantilla no está disponible o pertenece a otra categoría.");
+        assertUniqueStructureName(targetParent!.subcategories.filter((item) => item.id !== target.id), input.name, "La subcategoría ya existe en la categoría de la plantilla.");
+        if (defaultPocketId && input.defaultPocketId === undefined) await txPorts.pockets.ensurePocketIsActive(defaultPocketId, "Bolsillo predeterminado");
         await txPorts.structure.updateTemplateSubcategory({
           subcategoryId: target.id,
           name: input.name,
@@ -170,7 +170,7 @@ export const createMonthStructureUseCases = (ports: MonthlyCyclePorts): MonthStr
       const existingMonth = await lockMutableMonthForMutation(txPorts.months, monthId);
       assertMonthSubcategory(existingMonth, subcategoryId);
 
-      if (hasAssociatedMonthMovements(existingMonth, subcategoryId)) throw new DomainError(409, "Cannot delete subcategory with associated movements.");
+      if (hasAssociatedMonthMovements(existingMonth, subcategoryId)) throw new DomainError(409, "No se puede eliminar una subcategoría con movimientos asociados.");
 
       await txPorts.structure.deleteMonthSubcategory(subcategoryId);
 

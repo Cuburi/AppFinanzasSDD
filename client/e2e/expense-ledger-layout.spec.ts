@@ -15,7 +15,7 @@ for (const width of [1280, 320]) {
   test(`expense capture stays stable through ledger expansion and details at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     const expenses = Array.from({ length: 14 }, (_, index) => ({
-      id: `expense-${index}`, paymentMethod: "NON_CASH", occurredAt: "2026-08-03T14:30:00Z",
+      id: `expense-${index}`, paymentMethod: "NON_CASH", occurredAt: "2026-08-03",
       category: null, subcategory: null, description: `Compra ${index}`, amount: 12000, creditCardId: null,
     }));
     const entries = expenses.map((expense) => ({
@@ -61,7 +61,7 @@ for (const width of [1280, 320]) {
         expect(box.x + box.width).toBeLessThanOrEqual(width);
         expect(box.height).toBeGreaterThan(0);
       }
-      await expect(capture.getByLabel("Monto", { exact: true })).toHaveValue("34567");
+      await expect(capture.getByLabel("Monto", { exact: true })).toHaveValue("$ 34.567");
       await expect(capture.getByLabel("Descripción (opcional)", { exact: true })).toHaveValue("Borrador conservado");
       await expect(capture.getByLabel("Fecha del gasto")).toHaveValue("2026-08-05");
       await expect(capture.getByLabel("Método de pago")).toHaveValue("CASH");

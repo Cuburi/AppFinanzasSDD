@@ -3,6 +3,8 @@ import type { CreateDebtInput, DebtDirection, DebtStatus, DebtView } from "../sh
 import { DomainError } from "./debt-errors.js";
 import type { DebtPayment, NewDebtPayment } from "./debt-payment.js";
 
+import { businessDateFromPrisma } from "../../../shared/business-date.js";
+
 const COP_CURRENCY = "COP";
 
 export type Debt = {
@@ -36,14 +38,14 @@ const assertPositiveAmount = (amount: number, message: string) => {
 const normalizeCurrency = (currency?: string) => {
   const normalizedCurrency = currency ?? COP_CURRENCY;
   if (normalizedCurrency !== COP_CURRENCY) {
-    throw new DomainError(400, "Debt currency must be COP.");
+    throw new DomainError(400, "La moneda de la deuda debe ser COP.");
   }
 
   return normalizedCurrency;
 };
 
 const sortPayments = (payments: DebtPayment[]) =>
-  [...payments].sort((left, right) => left.paidAt.getTime() - right.paidAt.getTime());
+  [...payments].sort((left, right) => left.paidAt.getTime() - right.paidAt.getTime() || (left.createdAt?.getTime() ?? 0) - (right.createdAt?.getTime() ?? 0));
 
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
@@ -56,7 +58,7 @@ export const calculateRemainingBalance = (debt: Debt, { clampOverpayment = false
       return 0;
     }
 
-    throw new DomainError(409, "Debt payments exceed total debt amount.");
+    throw new DomainError(409, "Los pagos de la deuda superan su monto total.");
   }
 
   return remainingBalance;
@@ -66,7 +68,7 @@ export const getDebtStatus = (debt: Debt, options?: { clampOverpayment?: boolean
   calculateRemainingBalance(debt, options) === 0 ? "PAID" : "OPEN";
 
 export const createDebt = (input: CreateDebtInput): NewDebt => {
-  assertPositiveAmount(input.totalAmount, "Debt amount must be positive.");
+  assertPositiveAmount(input.totalAmount, "Monto de la deuda debe ser mayor que cero.");
 
   return {
     direction: input.direction,
@@ -85,19 +87,19 @@ export const rehydrateDebt = (debt: Debt): Debt => ({
 });
 
 export const assertPaymentCanBeRegistered = (debt: Debt, amount: number) => {
-  assertPositiveAmount(amount, "Payment amount must be positive.");
+  assertPositiveAmount(amount, "Monto del pago debe ser mayor que cero.");
 
   const remainingBalance = calculateRemainingBalance(debt);
   if (remainingBalance === 0) {
-    throw new DomainError(409, "Debt is already paid.");
+    throw new DomainError(409, "La deuda ya está pagada.");
   }
   if (amount > remainingBalance) {
-    throw new DomainError(409, "Payment exceeds remaining debt balance.");
+    throw new DomainError(409, "El pago supera el saldo pendiente de la deuda.");
   }
 };
 
 export const createDebtPayment = (payment: NewDebtPayment & { id: string }) => {
-  assertPositiveAmount(payment.amount, "Payment amount must be positive.");
+  assertPositiveAmount(payment.amount, "Monto del pago debe ser mayor que cero.");
 
   return {
     id: payment.id,
@@ -114,13 +116,13 @@ export const toDebtView = (debt: Debt, options?: { clampOverpayment?: boolean })
   description: debt.description,
   totalAmount: debt.totalAmount,
   currency: debt.currency,
-  originDate: debt.originDate.toISOString(),
+  originDate: businessDateFromPrisma(debt.originDate),
   remainingBalance: calculateRemainingBalance(debt, options),
   status: getDebtStatus(debt, options),
   payments: sortPayments(debt.payments).map((payment) => ({
     id: payment.id,
     amount: payment.amount,
-    paidAt: payment.paidAt.toISOString(),
+    paidAt: businessDateFromPrisma(payment.paidAt),
     notes: payment.notes,
   })),
 });

@@ -17,7 +17,7 @@ export type CreditCardsHttpService = {
 
 export type CreditCardOwnerProvider = () => string;
 
-const readMessage = (error: unknown) => (error instanceof Error ? error.message : "Unexpected error.");
+const readMessage = (error: unknown) => (error instanceof Error ? error.message : "Error inesperado.");
 
 const handleError = (response: Response, error: unknown) => {
   if (error instanceof CreditCardNotFoundError) {

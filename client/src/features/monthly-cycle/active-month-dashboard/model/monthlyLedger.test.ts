@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildMonthlyLedgerViewModel, validateMonthlyLedger } from "./monthlyLedger";
 
-const entry = (key: string, eventType = "CASH_EXPENSE", occurredAt = "2026-08-01T12:00:00.000Z", system = false) => ({
+const entry = (key: string, eventType = "CASH_EXPENSE", occurredAt = "2026-08-01", system = false) => ({
   entryKey: key, occurredAt, eventType, direction: "OUTFLOW", source: { kind: "CASH", id: null }, destination: { kind: "EXPENSE", id: "expense-1" }, amount: 20,
   balanceEffects: { availableMoney: -20, cashBalance: -20, subcategoryAvailable: -20, pocketBalance: 0 }, metadata: { description: null, paymentMethod: "CASH", isSystemEvent: system },
 });
@@ -35,19 +35,19 @@ describe("monthly ledger validation", () => {
 });
 
 describe("monthly ledger timeline", () => {
-  it("groups entries by their local calendar day without sorting backend order", () => {
+  it("groups bare calendar days without timezone conversion or sorting backend registration order", () => {
     const ledger = validateMonthlyLedger({ monthId: "month-1", status: "ACTIVE", entries: [
-      entry("new", "CASH_EXPENSE", "2026-08-02T12:00:00.000Z"), entry("old", "MONTHLY_INCOME", "2026-08-01T12:00:00.000Z"),
+      entry("second-registered", "CASH_EXPENSE", "2026-10-31"), entry("first-registered", "MONTHLY_INCOME", "2026-10-31"), entry("older-day", "CASH_EXPENSE", "2026-10-30"),
     ] });
     const days = buildMonthlyLedgerViewModel(ledger).days;
 
-    expect(days.flatMap((day) => day.items).map((item) => item.kind === "entry" ? item.entry.entryKey : item.entries[0].entryKey)).toEqual(["new", "old"]);
-    expect(days.map((day) => day.key)).toEqual(["2026-08-02", "2026-08-01"]);
+    expect(days.flatMap((day) => day.items).map((item) => item.kind === "entry" ? item.entry.entryKey : item.entries[0].entryKey)).toEqual(["second-registered", "first-registered", "older-day"]);
+    expect(days.map((day) => day.key)).toEqual(["2026-10-31", "2026-10-30"]);
   });
 
   it("segments maximal contiguous system runs without moving A/B/C interleaving", () => {
     const ledger = validateMonthlyLedger({ monthId: "month-1", status: "ACTIVE", entries: [
-      entry("A", "CASH_CARRYOVER", "2026-08-01T12:00:00.000Z", true), entry("B"), entry("C", "CLOSURE_SURPLUS", "2026-08-01T11:00:00.000Z", true), entry("D", "DEFICIT_RESOLUTION", "2026-08-01T10:00:00.000Z", true),
+      entry("A", "CASH_CARRYOVER", "2026-08-01", true), entry("B"), entry("C", "CLOSURE_SURPLUS", "2026-08-01", true), entry("D", "DEFICIT_RESOLUTION", "2026-08-01", true),
     ] });
     const items = buildMonthlyLedgerViewModel(ledger).days[0].items;
 

@@ -89,7 +89,7 @@ const createCashPorts = () => {
 test("cash withdrawal locks the owning month before evaluating mutable state", async () => {
   const { ports, getLockCalls } = createCashPorts();
 
-  await createCashUseCases(ports).withdrawCash({ monthId: "month-1", amount: 75, occurredAt: "2026-05-12T00:00:00.000Z" });
+  await createCashUseCases(ports).withdrawCash({ monthId: "month-1", amount: 75, occurredAt: "2026-05-12" });
 
   assert.equal(getLockCalls(), 1);
 });
@@ -103,7 +103,7 @@ test("withdrawCash persists a cash withdrawal inside the transaction runner and 
   const { calls, ports } = createCashPorts();
   const useCases = createCashUseCases(ports);
 
-  const result = await useCases.withdrawCash({ monthId: "month-1", amount: 75, occurredAt: "2026-05-12T00:00:00.000Z", description: "ATM" });
+  const result = await useCases.withdrawCash({ monthId: "month-1", amount: 75, occurredAt: "2026-05-12", description: "ATM" });
 
   assert.equal(result.month.id, "month-1");
   assert.deepEqual(calls, [

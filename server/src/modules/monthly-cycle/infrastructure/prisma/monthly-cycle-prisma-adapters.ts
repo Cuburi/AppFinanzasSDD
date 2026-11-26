@@ -6,13 +6,15 @@ import { DomainError, SemanticError } from "../../shared/service-errors.js";
 import { monthInclude, templateInclude, type MonthRecord, type MonthlyCycleDb } from "../../shared/service-types.js";
 import type { TemplateInput } from "../../dto/index.js";
 
+import { businessDateToPrisma } from "../../../../shared/business-date.js";
+
 export type MonthlyCyclePrismaPortSet = Omit<MonthlyCyclePorts, "transactionRunner">;
 
 const readMonthById = async (db: MonthlyCycleDb, monthId: string): Promise<MonthRecord> => {
   const month = await db.month.findUnique({ where: { id: monthId }, include: monthInclude });
 
   if (!month) {
-    throw new SemanticError("NOT_FOUND", 404, "Month was not found.");
+    throw new SemanticError("NOT_FOUND", 404, "No se encontró el mes.");
   }
 
   return month as MonthRecord;
@@ -25,8 +27,8 @@ const ensurePocketIsActive = async (db: MonthlyCycleDb, pocketId: string, label:
   });
 
   if (!pocket || !pocket.active) {
-    if (strict) throw new SemanticError("NOT_FOUND", 404, `${label} was not found.`);
-    throw new DomainError(400, `${label} must exist and be active.`);
+    if (strict) throw new SemanticError("NOT_FOUND", 404, `No se encontró ${label}.`);
+    throw new DomainError(400, `${label}: debe existir y tener estado activo.`);
   }
 };
 
@@ -37,7 +39,7 @@ const ensureCreditCardIsActive = async (db: MonthlyCycleDb, ownerId: string, cre
   });
 
   if (!creditCard) {
-    throw new DomainError(400, "Credit card must exist, be owned by the current user, and be active.");
+    throw new DomainError(400, "La tarjeta de crédito debe existir, pertenecer al usuario actual y estar activa.");
   }
 };
 
@@ -148,14 +150,14 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       for (const category of input.categories) {
         if (category.id !== undefined) {
           if (!knownCategories.has(category.id) || retainedCategories.has(category.id)) {
-            throw new DomainError(400, "Template category id must be known and unique.");
+            throw new DomainError(400, "El identificador de la categoría de la plantilla debe ser conocido y único.");
           }
           retainedCategories.add(category.id);
         }
         for (const subcategory of category.subcategories) {
           if (subcategory.id === undefined) continue;
           if (!subcategoryParents.has(subcategory.id) || retainedSubcategories.has(subcategory.id) || subcategoryParents.get(subcategory.id) !== category.id) {
-            throw new DomainError(400, "Template subcategory id must be known, unique, and belong to its category.");
+            throw new DomainError(400, "El identificador de la subcategoría de la plantilla debe ser conocido, único y pertenecer a su categoría.");
           }
           retainedSubcategories.add(subcategory.id);
         }
@@ -240,19 +242,19 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
           ...(input.from || input.to
             ? {
                 occurredAt: {
-                  ...(input.from ? { gte: new Date(input.from) } : {}),
-                  ...(input.to ? { lte: new Date(input.to) } : {}),
+                  ...(input.from ? { gte: businessDateToPrisma(input.from) } : {}),
+                  ...(input.to ? { lte: businessDateToPrisma(input.to) } : {}),
                 },
               }
             : {}),
         },
-        orderBy: { occurredAt: "desc" },
+        orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
       });
     },
     async findCashLedgerEvents(monthId) {
       const movements = await db.movement.findMany({
         where: { monthId, type: { in: [MovementType.CASH_WITHDRAWAL, MovementType.CASH_CARRYOVER_IN, MovementType.EXPENSE] } },
-        orderBy: { occurredAt: "asc" },
+        orderBy: [{ occurredAt: "asc" }, { createdAt: "asc" }],
       });
 
       return movements.filter(
@@ -357,7 +359,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       return ensurePocketIsActive(db, pocketId, label);
     },
     ensureStrictDepositTargetPocketIsActive(pocketId) {
-      return ensurePocketIsActive(db, pocketId, "Target pocket", true);
+      return ensurePocketIsActive(db, pocketId, "Bolsillo de destino", true);
     },
     ensureStrictPocketIsActive(pocketId, label) {
       return ensurePocketIsActive(db, pocketId, label, true);
@@ -383,7 +385,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
       );
 
       for (const defaultPocketId of defaultPocketIds) {
-        await ensurePocketIsActive(db, defaultPocketId, "Default pocket");
+        await ensurePocketIsActive(db, defaultPocketId, "Bolsillo predeterminado");
       }
     },
   },
@@ -466,7 +468,7 @@ export const createMonthlyCyclePrismaTransactionRunner = (
             eventObserver,
             Object.freeze({ attempt, maxAttempts: MAX_SERIALIZABLE_ATTEMPTS, classification, outcome: "exhausted" }),
           );
-          throw new SemanticError("CONCURRENT_MODIFICATION", 409, "Concurrent modification prevented this pocket movement.");
+          throw new SemanticError("CONCURRENT_MODIFICATION", 409, "Una modificación simultánea impidió este movimiento del bolsillo.");
         }
         lastRetryClassification = classification;
         observeSerializableTransactionEvent(

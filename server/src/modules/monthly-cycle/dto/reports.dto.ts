@@ -40,5 +40,5 @@ export type BasicMonthlyReportView = {
 };
 
 export const parseBasicReportInput = (monthId: unknown): BasicReportInput => ({
-  monthId: readNonEmptyString(monthId, "Month id"),
+  monthId: readNonEmptyString(monthId, "Identificador del mes"),
 });

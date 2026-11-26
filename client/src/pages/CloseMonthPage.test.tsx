@@ -90,9 +90,9 @@ describe("guided monthly closure", () => {
   });
 
   it.each([
-    ["100000", "200000", 100000, 200000],
-    ["100000.01", "199999.99", 100000.01, 199999.99],
-  ])("accepts exact split %s/%s preserving cents and navigation", async (a, b, carryAmount, excludedAmount) => {
+    ["100000", "200000", "$ 100.000", 100000, 200000],
+    ["150000", "150000", "$ 150.000", 150000, 150000],
+  ])("accepts exact whole-peso split %s/%s preserving navigation", async (a, b, shownA, carryAmount, excludedAmount) => {
     render(<CloseMonthPage />);
     await destination();
     await userEvent.click(screen.getByRole("radio", { name: /Dividir el sobrante/ }));
@@ -100,7 +100,7 @@ describe("guided monthly closure", () => {
     await userEvent.type(screen.getByLabelText("Fuera del seguimiento (COP)"), b as string);
     await confirmation();
     await userEvent.click(screen.getByRole("button", { name: "← Cambiar destino" }));
-    expect(screen.getByLabelText("Al siguiente mes (COP)")).toHaveValue(a);
+    expect(screen.getByLabelText("Al siguiente mes (COP)")).toHaveValue(shownA);
 
     await confirmation();
     await userEvent.click(screen.getByRole("button", { name: "Confirmar cierre" }));
@@ -108,13 +108,13 @@ describe("guided monthly closure", () => {
   });
 
   it.each([
-    "100000", "-1", "NaN", "Infinity", "1e5", "100000xyz", "100000.001", "9007199254740991", "",
-  ])('blocks invalid split "%s" without posting', async (amount) => {
+    "99999", "100001", "1e5", "9007199254740991", "",
+  ])('blocks split "%s" that does not add up exactly without posting', async (amount) => {
     render(<CloseMonthPage />);
     await destination();
     await userEvent.click(screen.getByRole("radio", { name: /Dividir el sobrante/ }));
     if (amount) await userEvent.type(screen.getByLabelText("Al siguiente mes (COP)"), amount);
-    await userEvent.type(screen.getByLabelText("Fuera del seguimiento (COP)"), "199999.99");
+    await userEvent.type(screen.getByLabelText("Fuera del seguimiento (COP)"), "200000");
 
     expect(screen.getByRole("button", { name: "Revisar cierre →" })).toBeDisabled();
     expect(screen.getByRole("status", { name: "Distribución" })).toHaveTextContent(/sumen exactamente/);

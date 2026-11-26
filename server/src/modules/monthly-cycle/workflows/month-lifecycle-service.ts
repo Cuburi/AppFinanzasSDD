@@ -10,11 +10,13 @@ import { DomainError } from "../shared/service-errors.js";
 import type { MonthRecord } from "../shared/service-types.js";
 import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflow-dependencies.js";
 
+import { businessDateToPrisma } from "../../../shared/business-date.js";
+
 const assertTemplateHasSubcategories = (input: TemplateInput) => {
   const count = input.categories.reduce((total, category) => total + category.subcategories.length, 0);
 
   if (count === 0) {
-    throw new DomainError(400, "Template must contain at least one subcategory before opening a month.");
+    throw new DomainError(400, "La plantilla debe contener al menos una subcategoría antes de abrir un mes.");
   }
 };
 
@@ -27,13 +29,13 @@ export const createMonthLifecycleService = (dependencies: MonthlyCycleWorkflowDe
         const activeMonth = await txPorts.months.findActiveSummary(MonthStatus.ACTIVE);
 
         if (activeMonth) {
-          throw new DomainError(409, `There is already an active month (${activeMonth.year}-${String(activeMonth.month).padStart(2, "0")}).`);
+          throw new DomainError(409, `Ya existe un mes activo (${activeMonth.year}-${String(activeMonth.month).padStart(2, "0")}).`);
         }
 
         const existingTargetMonth = await txPorts.months.findByYearMonth(input.year, input.month);
 
         if (existingTargetMonth) {
-          throw new DomainError(409, "That month already exists.");
+          throw new DomainError(409, "Ese mes ya existe.");
         }
 
         const template = await txPorts.templates.readCategories();
@@ -54,7 +56,7 @@ export const createMonthLifecycleService = (dependencies: MonthlyCycleWorkflowDe
         if (priorClosedMonth) {
           await txPorts.months.lockForMutation(priorClosedMonth.id);
           if (await txPorts.months.findOpeningRecipient(priorClosedMonth.id)) {
-            throw new DomainError(409, "Previous closed month has already funded another month.");
+            throw new DomainError(409, "El mes cerrado anterior ya financió otro mes.");
           }
         }
 
@@ -76,7 +78,7 @@ export const createMonthLifecycleService = (dependencies: MonthlyCycleWorkflowDe
               type: MovementType.CASH_CARRYOVER_IN,
               amount: decimal(carryover),
               description: "Cash carryover from previous closed month",
-              occurredAt: new Date(Date.UTC(input.year, input.month - 1, 1)),
+              occurredAt: businessDateToPrisma(`${String(input.year).padStart(4, "0")}-${String(input.month).padStart(2, "0")}-01`),
               monthId: createdMonth.id,
             });
 
@@ -107,7 +109,7 @@ export const createMonthLifecycleService = (dependencies: MonthlyCycleWorkflowDe
         const review = buildClosureReview(existingMonth);
 
         if (!review.canClose) {
-          throw new DomainError(409, "Month cannot be closed while pending subcategory balances or available money remain unresolved.");
+          throw new DomainError(409, "No se puede cerrar el mes mientras haya saldos pendientes de subcategorías o dinero disponible sin resolver.");
         }
 
         return txPorts.months.close(monthId);

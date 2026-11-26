@@ -37,6 +37,6 @@ test("assertOccurredAtWithinMonth accepts matching UTC month and rejects outside
 
   assert.throws(
     () => assertOccurredAtWithinMonth(new Date("2026-06-01T00:00:00.000Z"), { year: 2026, month: 5 }),
-    /within the target month/,
+    /dentro del mes de destino/,
   );
 });

@@ -5,6 +5,8 @@ export type { CardProps, Tone } from "./Card";
 export { FeedbackBanner } from "./FeedbackBanner";
 export type { FeedbackBannerProps } from "./FeedbackBanner";
 export { KpiCard } from "./KpiCard";
+export { MoneyInput } from "./MoneyInput";
+export type { MoneyInputProps } from "./MoneyInput";
 export type { KpiCardProps, KpiTrend } from "./KpiCard";
 export { SectionHeader } from "./SectionHeader";
 export type { SectionHeaderProps } from "./SectionHeader";

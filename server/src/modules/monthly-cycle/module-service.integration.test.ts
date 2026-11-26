@@ -12,7 +12,7 @@ const recordUncategorizedExpense = (service: ReturnType<typeof createMonthlyCycl
     monthId,
     sourceSubcategoryId: null,
     amount,
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     paymentMethod: PaymentMethod.NON_CASH,
   });
 
@@ -729,7 +729,7 @@ test("service integration: opening a second active month is rejected", async () 
   await assert.rejects(() => service.openMonth({ year: 2026, month: 6 }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /already an active month/i);
+    assert.match(error.message, /Ya existe un mes activo/i);
     return true;
   });
 });
@@ -744,7 +744,7 @@ test("service integration: closed months are immutable", async () => {
     monthId: month.id,
     sourceName: "Salary",
     amount: 300,
-    receivedAt: "2026-05-05T00:00:00.000Z",
+    receivedAt: "2026-05-05",
   });
   await recordUncategorizedExpense(service, month.id, 300);
 
@@ -756,13 +756,13 @@ test("service integration: closed months are immutable", async () => {
         monthId: month.id,
         sourceSubcategoryId: subcategoryId,
         amount: 10,
-        occurredAt: "2026-05-10T00:00:00.000Z",
+        occurredAt: "2026-05-10",
         paymentMethod: PaymentMethod.NON_CASH,
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -778,17 +778,17 @@ test("service integration: rejects cash withdrawal for closed months", async () 
     monthId: month.id,
     sourceName: "Salary",
     amount: 300,
-    receivedAt: "2026-05-05T00:00:00.000Z",
+    receivedAt: "2026-05-05",
   });
   await recordUncategorizedExpense(service, month.id, 300);
   await service.closeMonth(month.id);
 
   await assert.rejects(
-    () => service.withdrawCash({ monthId: month.id, amount: 20, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    () => service.withdrawCash({ monthId: month.id, amount: 20, occurredAt: "2026-05-10" }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -804,7 +804,7 @@ test("service integration: rejects reopening a previously closed month", async (
     monthId: month.id,
     sourceName: "Salary",
     amount: 300,
-    receivedAt: "2026-05-05T00:00:00.000Z",
+    receivedAt: "2026-05-05",
   });
   await recordUncategorizedExpense(service, month.id, 300);
   await service.closeMonth(month.id);
@@ -812,7 +812,7 @@ test("service integration: rejects reopening a previously closed month", async (
   await assert.rejects(() => service.openMonth({ year: 2026, month: 5 }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /already exists/i);
+    assert.match(error.message, /ya existe/i);
     return true;
   });
 });
@@ -827,7 +827,7 @@ test("service integration: rejects unknown month and subcategory references for 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /month was not found/i);
+      assert.match(error.message, /No se encontró el mes/i);
       return true;
     },
   );
@@ -837,7 +837,7 @@ test("service integration: rejects unknown month and subcategory references for 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /subcategory was not found/i);
+      assert.match(error.message, /No se encontró la subcategoría/i);
       return true;
     },
   );
@@ -848,13 +848,13 @@ test("service integration: rejects unknown month and subcategory references for 
         monthId: month.id,
         sourceSubcategoryId: "missing-subcategory",
         amount: 10,
-        occurredAt: "2026-05-10T00:00:00.000Z",
+        occurredAt: "2026-05-10",
         paymentMethod: PaymentMethod.NON_CASH,
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /subcategory was not found/i);
+      assert.match(error.message, /No se encontró la subcategoría/i);
       return true;
     },
   );
@@ -869,14 +869,14 @@ test("service integration: closing is rejected while closure review has pending 
     monthId: month.id,
     sourceSubcategoryId: month.categories[0]?.subcategories[0]?.id ?? "",
     amount: 350,
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     paymentMethod: PaymentMethod.NON_CASH,
   });
 
   await assert.rejects(() => service.closeMonth(month.id), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /pending subcategory balances or available money/i);
+    assert.match(error.message, /saldos pendientes de subcategorías o dinero disponible/i);
     return true;
   });
 });
@@ -894,7 +894,7 @@ test("service integration: valid subcategory deposits persist and decrease the s
     targetPocketId: "pocket-buffer",
     amount: 40,
     description: "Reserva mensual",
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
   });
   const movement = getCapturedMovements()[0];
 
@@ -916,7 +916,7 @@ test("service integration: valid external deposits persist without a month ledge
     amount: 75,
     externalSourceLabel: "Ingreso aislado",
     description: "Regalo",
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
   });
   const movement = getCapturedMovements()[0];
 
@@ -938,7 +938,7 @@ test("service integration: income CRUD updates month totals while active", async
     monthId: month.id,
     sourceName: "Salary",
     amount: 1000,
-    receivedAt: "2026-05-05T00:00:00.000Z",
+    receivedAt: "2026-05-05",
   });
   const incomeId = withIncome.incomes[0]?.id ?? "";
   const updated = await service.updateMonthlyIncome({ monthId: month.id, incomeId, amount: 1200, notes: "net" });
@@ -961,18 +961,18 @@ test("service integration: income CRUD rejects closed month mutations", async ()
     monthId: month.id,
     sourceName: "Salary",
     amount: 300,
-    receivedAt: "2026-05-05T00:00:00.000Z",
+    receivedAt: "2026-05-05",
   });
   const incomeId = withIncome.incomes[0]?.id ?? "";
   await recordUncategorizedExpense(service, month.id, 300);
   const closed = await service.closeMonth(month.id);
 
   await assert.rejects(
-    () => service.createMonthlyIncome({ monthId: closed.id, sourceName: "Bonus", amount: 10, receivedAt: "2026-05-06T00:00:00.000Z" }),
+    () => service.createMonthlyIncome({ monthId: closed.id, sourceName: "Bonus", amount: 10, receivedAt: "2026-05-06" }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -982,7 +982,7 @@ test("service integration: income CRUD rejects closed month mutations", async ()
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -992,7 +992,7 @@ test("service integration: income CRUD rejects closed month mutations", async ()
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -1008,7 +1008,7 @@ test("service integration: opening next month does not carry forward prior incom
     monthId: may.id,
     sourceName: "Salary",
     amount: 300,
-    receivedAt: "2026-05-05T00:00:00.000Z",
+    receivedAt: "2026-05-05",
   });
   await recordUncategorizedExpense(service, may.id, 300);
   await service.closeMonth(may.id);
@@ -1033,7 +1033,7 @@ test("service integration: overspend is persisted and recalculates the month as 
     sourceSubcategoryId: subcategoryId,
     amount: 350,
     description: "Compra grande",
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     paymentMethod: PaymentMethod.NON_CASH,
   });
   const movement = getCapturedMovements()[0];
@@ -1080,7 +1080,7 @@ test("service integration: deficit coverage from one subcategory persists a sing
     monthId: month.id,
     sourceSubcategoryId: deficitTargetId,
     amount: 150,
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     paymentMethod: PaymentMethod.NON_CASH,
   });
   const review = await service.applyClosureAction({
@@ -1127,7 +1127,7 @@ test("service integration: records non-cash expense with occurred date and expos
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
-  const updatedMonth = await service.recordExpense({ monthId: month.id, sourceSubcategoryId: subcategoryId, amount: 75, description: "Supermercado", occurredAt: "2026-05-17T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH });
+  const updatedMonth = await service.recordExpense({ monthId: month.id, sourceSubcategoryId: subcategoryId, amount: 75, description: "Supermercado", occurredAt: "2026-05-17", paymentMethod: PaymentMethod.NON_CASH });
   const movement = getCapturedMovements()[0];
 
   assert.equal(movement?.type, MovementType.EXPENSE);
@@ -1148,7 +1148,7 @@ test("service integration: records card-paid expenses once and exposes the credi
     sourceSubcategoryId: subcategoryId,
     amount: 75,
     description: "Card market",
-    occurredAt: "2026-05-17T00:00:00.000Z",
+    occurredAt: "2026-05-17",
     paymentMethod: PaymentMethod.NON_CASH,
     creditCardId: "card-active",
   });
@@ -1174,14 +1174,14 @@ test("service integration: rejects inactive missing or unowned card expense link
           monthId: month.id,
           sourceSubcategoryId: subcategoryId,
           amount: 25,
-          occurredAt: "2026-05-17T00:00:00.000Z",
+          occurredAt: "2026-05-17",
           paymentMethod: PaymentMethod.NON_CASH,
           creditCardId,
         }),
       (error: unknown) => {
         assert.ok(error instanceof DomainError);
         assert.equal(error.statusCode, 400);
-        assert.match(error.message, /credit card must exist/i);
+        assert.match(error.message, /La tarjeta de crédito debe existir/i);
         return true;
       },
     );
@@ -1200,11 +1200,11 @@ test("service integration: rejects expense dates outside the linked month", asyn
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
   await assert.rejects(
-    () => service.recordExpense({ monthId: month.id, sourceSubcategoryId: subcategoryId, amount: 10, occurredAt: "2026-06-01T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH }),
+    () => service.recordExpense({ monthId: month.id, sourceSubcategoryId: subcategoryId, amount: 10, occurredAt: "2026-06-01", paymentMethod: PaymentMethod.NON_CASH }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 400);
-      assert.match(error.message, /inside the linked month/i);
+      assert.match(error.message, /dentro del mes vinculado/i);
       return true;
     },
   );
@@ -1216,17 +1216,17 @@ test("service integration: withdraws cash only when available money is sufficien
   const month = await service.openMonth({ year: 2026, month: 5 });
 
   await assert.rejects(
-    () => service.withdrawCash({ monthId: month.id, amount: 50, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    () => service.withdrawCash({ monthId: month.id, amount: 50, occurredAt: "2026-05-10" }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /insufficient available money/i);
+      assert.match(error.message, /Dinero disponible insuficiente/i);
       return true;
     },
   );
 
-  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 100, receivedAt: "2026-05-05T00:00:00.000Z" });
-  const result = await service.withdrawCash({ monthId: month.id, amount: 40, occurredAt: "2026-05-10T00:00:00.000Z", description: "ATM" });
+  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 100, receivedAt: "2026-05-05" });
+  const result = await service.withdrawCash({ monthId: month.id, amount: 40, occurredAt: "2026-05-10", description: "ATM" });
   const withdrawal = getCapturedMovements().find((movement) => movement.type === MovementType.CASH_WITHDRAWAL);
 
   assert.equal(withdrawal?.type, MovementType.CASH_WITHDRAWAL);
@@ -1242,11 +1242,11 @@ test("service integration: cash expense is rejected when physical cash is insuff
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
 
   await assert.rejects(
-    () => service.recordExpense({ monthId: month.id, sourceSubcategoryId: subcategoryId, amount: 25, occurredAt: "2026-05-11T00:00:00.000Z", paymentMethod: PaymentMethod.CASH }),
+    () => service.recordExpense({ monthId: month.id, sourceSubcategoryId: subcategoryId, amount: 25, occurredAt: "2026-05-11", paymentMethod: PaymentMethod.CASH }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /insufficient cash/i);
+      assert.match(error.message, /Efectivo insuficiente/i);
       return true;
     },
   );
@@ -1257,14 +1257,14 @@ test("service integration: updates active-month expenses and recalculates balanc
   const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
-  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 200, receivedAt: "2026-05-01T00:00:00.000Z" });
-  await service.withdrawCash({ monthId: month.id, amount: 200, occurredAt: "2026-05-02T00:00:00.000Z" });
+  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 200, receivedAt: "2026-05-01" });
+  await service.withdrawCash({ monthId: month.id, amount: 200, occurredAt: "2026-05-02" });
   await service.recordExpense({
     monthId: month.id,
     sourceSubcategoryId: subcategoryId,
     amount: 75,
     description: "Supermercado",
-    occurredAt: "2026-05-17T00:00:00.000Z",
+    occurredAt: "2026-05-17",
     paymentMethod: PaymentMethod.CASH,
   });
   const expenseId = getCapturedMovements().find((movement) => movement.type === MovementType.EXPENSE)?.id ?? "";
@@ -1275,7 +1275,7 @@ test("service integration: updates active-month expenses and recalculates balanc
     sourceSubcategoryId: subcategoryId,
     amount: 120,
     description: "Supermercado corregido",
-    occurredAt: "2026-05-18T00:00:00.000Z",
+    occurredAt: "2026-05-18",
     paymentMethod: PaymentMethod.CASH,
   });
   const updatedMovement = getCapturedMovements().find((movement) => movement.id === expenseId);
@@ -1293,13 +1293,13 @@ test("service integration: deletes active-month expenses and recalculates balanc
   const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
-  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 100, receivedAt: "2026-05-01T00:00:00.000Z" });
-  await service.withdrawCash({ monthId: month.id, amount: 100, occurredAt: "2026-05-02T00:00:00.000Z" });
+  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 100, receivedAt: "2026-05-01" });
+  await service.withdrawCash({ monthId: month.id, amount: 100, occurredAt: "2026-05-02" });
   await service.recordExpense({
     monthId: month.id,
     sourceSubcategoryId: subcategoryId,
     amount: 75,
-    occurredAt: "2026-05-17T00:00:00.000Z",
+    occurredAt: "2026-05-17",
     paymentMethod: PaymentMethod.CASH,
   });
   const expenseId = getCapturedMovements().find((movement) => movement.type === MovementType.EXPENSE)?.id ?? "";
@@ -1321,11 +1321,11 @@ test("service integration: rejects expense corrections for expenses that belong 
     monthId: may.id,
     sourceSubcategoryId: subcategoryId,
     amount: 50,
-    occurredAt: "2026-05-17T00:00:00.000Z",
+    occurredAt: "2026-05-17",
     paymentMethod: PaymentMethod.NON_CASH,
   });
   const expenseId = getCapturedMovements()[0]?.id ?? "";
-  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01T00:00:00.000Z" });
+  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01" });
   await recordUncategorizedExpense(service, may.id, 250);
   await service.closeMonth(may.id);
 
@@ -1336,13 +1336,13 @@ test("service integration: rejects expense corrections for expenses that belong 
         expenseId,
         sourceSubcategoryId: subcategoryId,
         amount: 55,
-        occurredAt: "2026-05-17T00:00:00.000Z",
+        occurredAt: "2026-05-17",
         paymentMethod: PaymentMethod.NON_CASH,
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -1350,7 +1350,7 @@ test("service integration: rejects expense corrections for expenses that belong 
   await assert.rejects(() => service.deleteExpense(may.id, expenseId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /closed months are immutable/i);
+    assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
     return true;
   });
 });
@@ -1364,11 +1364,11 @@ test("service integration: rejects foreign expense ids from another month", asyn
     monthId: may.id,
     sourceSubcategoryId: subcategoryId,
     amount: 50,
-    occurredAt: "2026-05-17T00:00:00.000Z",
+    occurredAt: "2026-05-17",
     paymentMethod: PaymentMethod.NON_CASH,
   });
   const expenseId = getCapturedMovements()[0]?.id ?? "";
-  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01T00:00:00.000Z" });
+  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01" });
   await recordUncategorizedExpense(service, may.id, 250);
   await service.closeMonth(may.id);
   const june = await service.openMonth({ year: 2026, month: 6 });
@@ -1381,13 +1381,13 @@ test("service integration: rejects foreign expense ids from another month", asyn
         expenseId,
         sourceSubcategoryId: juneSubcategoryId,
         amount: 55,
-        occurredAt: "2026-06-17T00:00:00.000Z",
+        occurredAt: "2026-06-17",
         paymentMethod: PaymentMethod.NON_CASH,
       }),
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 404);
-      assert.match(error.message, /expense was not found in this month/i);
+      assert.match(error.message, /No se encontró el gasto en este mes/i);
       return true;
     },
   );
@@ -1395,7 +1395,7 @@ test("service integration: rejects foreign expense ids from another month", asyn
   await assert.rejects(() => service.deleteExpense(june.id, expenseId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 404);
-    assert.match(error.message, /expense was not found in this month/i);
+    assert.match(error.message, /No se encontró el gasto en este mes/i);
     return true;
   });
 });
@@ -1503,7 +1503,7 @@ test("service integration: deletes empty subcategories before deleting their cat
   await assert.rejects(() => service.deleteMonthCategory(month.id, categoryId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /delete subcategories first/i);
+    assert.match(error.message, /Elimine primero las subcategorías/i);
     return true;
   });
 
@@ -1524,21 +1524,21 @@ test("service integration: rejects deleting movement-linked month structure node
     monthId: month.id,
     sourceSubcategoryId: subcategoryId,
     amount: 30,
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     paymentMethod: PaymentMethod.NON_CASH,
   });
 
   await assert.rejects(() => service.deleteMonthSubcategory(month.id, subcategoryId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /associated movements/i);
+    assert.match(error.message, /movimientos asociados/i);
     return true;
   });
 
   await assert.rejects(() => service.deleteMonthCategory(month.id, categoryId), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 409);
-    assert.match(error.message, /delete subcategories first/i);
+    assert.match(error.message, /Elimine primero las subcategorías/i);
     return true;
   });
 });
@@ -1548,7 +1548,7 @@ test("service integration: month structure corrections reject closed months and 
   const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = month.categories[0]?.subcategories[0]?.id ?? "";
-  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01T00:00:00.000Z" });
+  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 300, receivedAt: "2026-05-01" });
   await recordUncategorizedExpense(service, month.id, 300);
   await service.closeMonth(month.id);
 
@@ -1557,7 +1557,7 @@ test("service integration: month structure corrections reject closed months and 
     (error: unknown) => {
       assert.ok(error instanceof DomainError);
       assert.equal(error.statusCode, 409);
-      assert.match(error.message, /closed months are immutable/i);
+      assert.match(error.message, /Los meses cerrados no se pueden modificar/i);
       return true;
     },
   );
@@ -1566,14 +1566,14 @@ test("service integration: month structure corrections reject closed months and 
   await assert.rejects(() => service.updateMonthCategory({ monthId: nextMonth.id, categoryId: "missing-category", name: "Missing" }), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 404);
-    assert.match(error.message, /category was not found/i);
+    assert.match(error.message, /No se encontró la categoría/i);
     return true;
   });
 
   await assert.rejects(() => service.deleteMonthSubcategory(nextMonth.id, "missing-subcategory"), (error: unknown) => {
     assert.ok(error instanceof DomainError);
     assert.equal(error.statusCode, 404);
-    assert.match(error.message, /subcategory was not found/i);
+    assert.match(error.message, /No se encontró la subcategoría/i);
     return true;
   });
 });
@@ -1584,12 +1584,12 @@ test("service integration: filters expense history by payment method, date range
   const month = await service.openMonth({ year: 2026, month: 5 });
   const foodId = month.categories[0]?.subcategories[0]?.id ?? "";
   const transportId = month.categories[0]?.subcategories[1]?.id ?? "";
-  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 200, receivedAt: "2026-05-01T00:00:00.000Z" });
-  await service.withdrawCash({ monthId: month.id, amount: 60, occurredAt: "2026-05-02T00:00:00.000Z" });
-  await service.recordExpense({ monthId: month.id, sourceSubcategoryId: foodId, amount: 30, occurredAt: "2026-05-03T00:00:00.000Z", paymentMethod: PaymentMethod.CASH, description: "Feria" });
-  await service.recordExpense({ monthId: month.id, sourceSubcategoryId: transportId, amount: 20, occurredAt: "2026-05-20T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH, description: "Sube" });
+  await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 200, receivedAt: "2026-05-01" });
+  await service.withdrawCash({ monthId: month.id, amount: 60, occurredAt: "2026-05-02" });
+  await service.recordExpense({ monthId: month.id, sourceSubcategoryId: foodId, amount: 30, occurredAt: "2026-05-03", paymentMethod: PaymentMethod.CASH, description: "Feria" });
+  await service.recordExpense({ monthId: month.id, sourceSubcategoryId: transportId, amount: 20, occurredAt: "2026-05-20", paymentMethod: PaymentMethod.NON_CASH, description: "Sube" });
 
-  const history = await service.listExpenseHistory({ monthId: month.id, from: "2026-05-01T00:00:00.000Z", to: "2026-05-10T23:59:59.999Z", paymentMethod: PaymentMethod.CASH, subcategoryId: foodId });
+  const history = await service.listExpenseHistory({ monthId: month.id, from: "2026-05-01", to: "2026-05-10", paymentMethod: PaymentMethod.CASH, subcategoryId: foodId });
 
   assert.equal(history.expenses.length, 1);
   assert.equal(history.expenses[0]?.description, "Feria");
@@ -1603,14 +1603,15 @@ test("service integration: opening next month creates cash carryover from latest
   const service = createMonthlyCycleTestService(db);
   const may = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = may.categories[0]?.subcategories[0]?.id ?? "";
-  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 50, receivedAt: "2026-05-01T00:00:00.000Z" });
-  await service.withdrawCash({ monthId: may.id, amount: 50, occurredAt: "2026-05-02T00:00:00.000Z" });
-  await service.recordExpense({ monthId: may.id, sourceSubcategoryId: subcategoryId, amount: 20, occurredAt: "2026-05-03T00:00:00.000Z", paymentMethod: PaymentMethod.CASH });
+  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 50, receivedAt: "2026-05-01" });
+  await service.withdrawCash({ monthId: may.id, amount: 50, occurredAt: "2026-05-02" });
+  await service.recordExpense({ monthId: may.id, sourceSubcategoryId: subcategoryId, amount: 20, occurredAt: "2026-05-03", paymentMethod: PaymentMethod.CASH });
   await service.closeMonth(may.id);
 
   const june = await service.openMonth({ year: 2026, month: 6 });
   const carryover = getCapturedMovements().find((movement) => movement.type === MovementType.CASH_CARRYOVER_IN);
 
+  assert.equal(carryover?.occurredAt?.toISOString(), "2026-06-01T00:00:00.000Z");
   assert.equal(carryover?.monthId, june.id);
   assert.equal(Number(carryover?.amount.toString()), 30);
   assert.equal(june.cashBalance, 30);
@@ -1622,9 +1623,9 @@ test("service integration: opening next month creates no cash carryover when pri
   const may = await service.openMonth({ year: 2026, month: 5 });
   const subcategoryId = may.categories[0]?.subcategories[0]?.id ?? "";
 
-  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 20, receivedAt: "2026-05-01T00:00:00.000Z" });
-  await service.withdrawCash({ monthId: may.id, amount: 20, occurredAt: "2026-05-02T00:00:00.000Z" });
-  await service.recordExpense({ monthId: may.id, sourceSubcategoryId: subcategoryId, amount: 20, occurredAt: "2026-05-03T00:00:00.000Z", paymentMethod: PaymentMethod.CASH });
+  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 20, receivedAt: "2026-05-01" });
+  await service.withdrawCash({ monthId: may.id, amount: 20, occurredAt: "2026-05-02" });
+  await service.recordExpense({ monthId: may.id, sourceSubcategoryId: subcategoryId, amount: 20, occurredAt: "2026-05-03", paymentMethod: PaymentMethod.CASH });
   await service.closeMonth(may.id);
 
   const june = await service.openMonth({ year: 2026, month: 6 });
@@ -1639,8 +1640,8 @@ for (const [carryAmount, excludedAmount] of [[100_000, 200_000], [300_000, 0], [
     const { db, getCapturedMovements } = createIntegrationDb();
     let service = createMonthlyCycleTestService(db);
     const opened = await service.openMonth({ year: 2026, month: 12 });
-    await service.createMonthlyIncome({ monthId: opened.id, sourceName: "Salary", amount: 1_000_000, receivedAt: "2026-12-01T00:00:00.000Z" });
-    const before = await service.recordExpense({ monthId: opened.id, sourceSubcategoryId: null, amount: 700_000, occurredAt: "2026-12-02T00:00:00.000Z", paymentMethod: "NON_CASH" });
+    await service.createMonthlyIncome({ monthId: opened.id, sourceName: "Salary", amount: 1_000_000, receivedAt: "2026-12-01" });
+    const before = await service.recordExpense({ monthId: opened.id, sourceSubcategoryId: null, amount: 700_000, occurredAt: "2026-12-02", paymentMethod: "NON_CASH" });
     const ledgerBefore = await service.getMonthlyLedger({ monthId: opened.id, includeSystemEvents: true });
     const closed = await service.closeMonth(opened.id, { carryAmount, excludedAmount });
     assert.equal(closed.availableMoney, 300_000);
@@ -1679,7 +1680,7 @@ test("guided closure rejects partial, imprecise, nonfinite and stale allocations
   const { db } = createIntegrationDb();
   const service = createMonthlyCycleTestService(db);
   const month = await service.openMonth({ year: 2026, month: 5 });
-  const before = await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 0.3, receivedAt: "2026-05-01T00:00:00.000Z" });
+  const before = await service.createMonthlyIncome({ monthId: month.id, sourceName: "Salary", amount: 0.3, receivedAt: "2026-05-01" });
   const ledger = await service.getMonthlyLedger({ monthId: month.id, includeSystemEvents: true });
   for (const [payload, statusCode] of [
     [{ carryAmount: 0.1 }, 400], [{ carryAmount: -0.1, excludedAmount: 0.4 }, 400],
@@ -1699,9 +1700,9 @@ test("guided closure keeps physical cash independent and rejects consumed predec
   const { db } = createIntegrationDb();
   const service = createMonthlyCycleTestService(db);
   const may = await service.openMonth({ year: 2026, month: 5 });
-  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 100, receivedAt: "2026-05-01T00:00:00.000Z" });
-  await service.withdrawCash({ monthId: may.id, amount: 40, occurredAt: "2026-05-02T00:00:00.000Z" });
-  await service.recordExpense({ monthId: may.id, sourceSubcategoryId: null, amount: 10, occurredAt: "2026-05-03T00:00:00.000Z", paymentMethod: "CASH" });
+  await service.createMonthlyIncome({ monthId: may.id, sourceName: "Salary", amount: 100, receivedAt: "2026-05-01" });
+  await service.withdrawCash({ monthId: may.id, amount: 40, occurredAt: "2026-05-02" });
+  await service.recordExpense({ monthId: may.id, sourceSubcategoryId: null, amount: 10, occurredAt: "2026-05-03", paymentMethod: "CASH" });
   const closed = await service.closeMonth(may.id, { carryAmount: 20, excludedAmount: 40 });
   assert.equal(closed.cashBalance, 30);
   assert.equal(closed.availableMoney, 60);

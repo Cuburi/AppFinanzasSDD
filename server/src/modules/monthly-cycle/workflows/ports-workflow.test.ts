@@ -161,7 +161,7 @@ test("movement workflow validates pocket deposits through ports inside the trans
   assert.deepEqual(calls, [
     ["transactionRunner.run"],
     ["depositWriterGate.isEnabled"],
-    ["pockets.ensurePocketIsActive", "pocket-home", "Target pocket"],
+    ["pockets.ensurePocketIsActive", "pocket-home", "Bolsillo de destino"],
     ["movements.create", "POCKET_DEPOSIT_EXTERNAL", "25", "pocket-home"],
   ]);
 });

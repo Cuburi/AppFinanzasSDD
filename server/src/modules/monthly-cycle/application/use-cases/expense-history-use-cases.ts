@@ -14,7 +14,7 @@ export const createExpenseHistoryUseCases = (ports: MonthlyCyclePorts): ExpenseH
   async listExpenseHistory(input) {
     const month = await ports.months.findById(input.monthId);
     if (input.subcategoryId && !findMonthSubcategory(month, input.subcategoryId)) {
-      throw new DomainError(404, "Subcategory was not found in this month.");
+      throw new DomainError(404, "No se encontró la subcategoría en este mes.");
     }
 
     const movements = await ports.movements.findExpenseHistory(input);

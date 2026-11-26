@@ -2,11 +2,25 @@
 
 Use this file to capture real-use frictions and follow-up ideas before they become scoped issues/PRs.
 
+## Agreed order
+
+1. Small daily-use fixes, together: translate server error messages, currency format while typing, collapsible pocket movements.
+2. RM-027 UI diagnosis, before any serious screen redesign.
+3. Credit cards: screen improvements and statement payments as one piece of work.
+4. Recurring expenses and recurring incomes together.
+5. Excel export last, so it includes the data added by the previous items.
+
 ## Inbox
 
 - [ ] Recurring expenses.
-- [ ] Translate server error messages shown to the user (some arrive in English, e.g. "Insufficient funds for this pocket deposit.").
+- [x] Translate server error messages shown to the user (some arrive in English, e.g. "Insufficient funds for this pocket deposit.").
+- [x] Format money inputs as currency while typing (thousands separators as the user types, keeping the stored value exact). User report: "que lo campos de dinero, me gustaria que tenga formato de moneda a medida que se vaya copiando".
+- [x] Pockets screen: let each pocket collapse/expand its movements instead of always showing them, so the page stays short as movements accumulate. User report: "que en la pantalla de bolsillos pueda hacer wrap a cada bolsillo y no siempre esten los movimientos porque cuando ya llevo varios empieza a hacer largo esa pantalla".
 - [ ] Improve the credit-card screen and logic after reviewing its current capabilities and defining the desired changes.
+- [ ] Recurring incomes.
+- [ ] Export data to Excel.
+- [ ] Credit-card statement payments: keep the original statement amount and track paid amount, remaining balance, payment status and payment date through non-expense financial movements (deferred decision; pairs with the credit-card improvement above).
+- [ ] RM-027 UI direction audit (issue #195): read-only, screen-by-screen UI diagnosis from a usage perspective (findings per screen plus a prioritized direction for later redesign work), done before any redesign. Checklist and scope live in `odd/tasks/rm027-ui-direction-audit.md`.
 
 ### User reports — monthly-use review
 
@@ -14,6 +28,7 @@ Additional report: "Me falto algo, el hacer un deposito a un bolsillo el campo d
 
 1. "Mejorar las alertas de exito y error, solo son un texto verde"
 2. "Intente guardar gastos el 31 de Oct y me decia que deberia de estar linkeado al mes activo que wefectivamente era octubre pero el 30 si me dejo, sospecho que son los meses que tienen 31 dias"
+   - Resolved by storing business dates as calendar days (`odd/tasks/date-only-business-dates.md`, branch `feat/date-only-business-dates`). Root cause: month validation used the UTC instant, so any month's last day from 19:00 in Colombia (UTC-5) fell into the next month.
 3. "Mejorar ui y logica del apartado del credit card (recurdame que permite hacer ahora mismo en este aspecto)"
 4. "Mejorar pantalla de cierre de mes y lógica porque no se si siempre convenga que el mes quede en 0, me refiero si me sobro plata pero que no ira a ningun bolsillo"
 

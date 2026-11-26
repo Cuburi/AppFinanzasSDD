@@ -126,10 +126,10 @@ test("movement mutations lock the owning month before evaluating mutable state",
   const { ports, getLockCalls } = createMovementPorts();
   const useCases = createMovementUseCases(ports);
 
-  await useCases.recordExpense({ monthId: "month-1", sourceSubcategoryId: "sub-market", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH });
-  await useCases.updateExpense({ monthId: "month-1", expenseId: "expense-1", sourceSubcategoryId: "sub-market", amount: 75, occurredAt: "2026-05-10T00:00:00.000Z", paymentMethod: PaymentMethod.NON_CASH });
+  await useCases.recordExpense({ monthId: "month-1", sourceSubcategoryId: "sub-market", amount: 75, occurredAt: "2026-05-10", paymentMethod: PaymentMethod.NON_CASH });
+  await useCases.updateExpense({ monthId: "month-1", expenseId: "expense-1", sourceSubcategoryId: "sub-market", amount: 75, occurredAt: "2026-05-10", paymentMethod: PaymentMethod.NON_CASH });
   await useCases.deleteExpense("month-1", "expense-1");
-  await useCases.depositToPocket({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" });
+  await useCases.depositToPocket({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10" });
 
   assert.equal(getLockCalls(), 4);
 });
@@ -159,7 +159,7 @@ test("withdrawFromPocket records an unlinked outgoing pocket movement after chec
   const result = await createMovementUseCases(ports).withdrawFromPocket({
     sourcePocketId: "pocket-safe",
     amount: 25,
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     description: "Groceries",
   });
 
@@ -169,7 +169,7 @@ test("withdrawFromPocket records an unlinked outgoing pocket movement after chec
   assert.equal((created[0] as { monthId?: string | null }).monthId, undefined);
   assert.deepEqual(calls, [
     ["transactionRunner.runSerializable"],
-    ["tx.pockets.ensureStrictPocketIsActive", "pocket-safe", "Source pocket"],
+    ["tx.pockets.ensureStrictPocketIsActive", "pocket-safe", "Bolsillo de origen"],
     ["tx.pockets.getBalance", "pocket-safe"],
     ["tx.movements.create", "DEFICIT_COVER_FROM_POCKET", "25", null, null],
   ]);
@@ -184,28 +184,28 @@ test("withdrawFromPocket rejects inactive, missing, insufficient, and invalid so
     });
   });
   txPorts.pockets.ensureStrictPocketIsActive = async () => {
-    throw new SemanticError("NOT_FOUND", 404, "Source pocket was not found.");
+    throw new SemanticError("NOT_FOUND", 404, "No se encontró Bolsillo de origen.");
   };
   txPorts.pockets.getBalance = async () => 10;
 
   await assert.rejects(
-    () => createMovementUseCases(ports).withdrawFromPocket({ sourcePocketId: "missing", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    () => createMovementUseCases(ports).withdrawFromPocket({ sourcePocketId: "missing", amount: 25, occurredAt: "2026-05-10" }),
     { code: "NOT_FOUND" },
   );
   txPorts.pockets.ensureStrictPocketIsActive = async () => {};
   await assert.rejects(
-    () => createMovementUseCases(ports).withdrawFromPocket({ sourcePocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    () => createMovementUseCases(ports).withdrawFromPocket({ sourcePocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10" }),
     { code: "INSUFFICIENT_FUNDS" },
   );
   await assert.rejects(
-    () => (createMovementUseCases(ports).withdrawFromPocket as (input: unknown) => Promise<unknown>)({ sourcePocketId: "pocket-safe", amount: 0, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    () => (createMovementUseCases(ports).withdrawFromPocket as (input: unknown) => Promise<unknown>)({ sourcePocketId: "pocket-safe", amount: 0, occurredAt: "2026-05-10" }),
     { code: "INVALID_AMOUNT" },
   );
   assert.deepEqual(created, []);
 });
 
-test("expense month validation respects explicit offsets without changing the stored instant", async () => {
-  for (const occurredAt of [
+test("expense month validation accepts calendar boundaries and rejects the former offset inputs without writes", async () => {
+  for (const timestamp of [
     "2026-10-30T20:00:00.000-05:00",
     "2026-10-31T18:00:00.000-05:00",
     "2026-10-31T19:00:00.000-05:00",
@@ -215,41 +215,54 @@ test("expense month validation respects explicit offsets without changing the st
     "2028-02-29T20:00:00.000-05:00",
     "2026-01-01T01:00:00.000+05:00",
   ]) {
+    const occurredAt = timestamp.slice(0, 10);
     const { ports, created, updated } = createMovementPorts({ year: Number(occurredAt.slice(0, 4)), month: Number(occurredAt.slice(5, 7)) });
     const useCases = createMovementUseCases(ports);
     const input = { monthId: "month-1", sourceSubcategoryId: null, amount: 20, occurredAt, paymentMethod: PaymentMethod.NON_CASH };
+    const before = JSON.stringify(month);
+    for (const action of [
+      () => useCases.recordExpense({ ...input, occurredAt: timestamp }),
+      () => useCases.updateExpense({ ...input, expenseId: "expense-1", occurredAt: timestamp }),
+    ]) {
+      await assert.rejects(action, { message: "Fecha del gasto debe ser una fecha válida en formato YYYY-MM-DD." });
+      assert.deepEqual(created, []);
+      assert.deepEqual(updated, []);
+      assert.equal(JSON.stringify(month), before);
+    }
     const result = await useCases.recordExpense(input);
     assert.equal(result.id, "month-1");
     assert.equal(created.length, 1);
-    assert.equal((created[0] as { occurredAt: Date }).occurredAt.getTime(), Date.parse(occurredAt));
+    assert.equal((created[0] as { occurredAt: Date }).occurredAt.toISOString(), `${occurredAt}T00:00:00.000Z`);
     await useCases.updateExpense({ ...input, expenseId: "expense-1" });
-    assert.equal(updated[0]!.occurredAt.getTime(), Date.parse(occurredAt));
-    await useCases.updateExpense({ ...input, expenseId: "expense-1", description: "Metadata only", occurredAt: new Date(occurredAt).toISOString() });
-    assert.equal(updated[1]!.occurredAt.getTime(), Date.parse(occurredAt));
+    assert.equal(updated[0]!.occurredAt.toISOString(), `${occurredAt}T00:00:00.000Z`);
+    await useCases.updateExpense({ ...input, expenseId: "expense-1", description: "Metadata only" });
+    assert.equal(updated[1]!.occurredAt.toISOString(), `${occurredAt}T00:00:00.000Z`);
   }
 });
 
-test("unchanged expense instants still require ownership and changed wrong-month instants do not write", async () => {
+test("unchanged wrong-month expense days cannot bypass validation and corrections still require ownership", async () => {
   const { ports, updated, setStoredExpense } = createMovementPorts({ year: 2026, month: 10 });
-  const occurredAt = "2026-11-01T01:00:00.000Z";
+  const occurredAt = "2026-11-01";
   const input = { monthId: "month-1", expenseId: "expense-1", sourceSubcategoryId: null, amount: 20, occurredAt, paymentMethod: PaymentMethod.NON_CASH };
   const useCases = createMovementUseCases(ports);
-  setStoredExpense({ id: "expense-1", type: MovementType.EXPENSE, monthId: "other-month", occurredAt: new Date(occurredAt) });
-  await assert.rejects(() => useCases.updateExpense(input), { statusCode: 404, message: "Expense was not found in this month." });
-  setStoredExpense({ id: "expense-1", type: MovementType.EXPENSE, monthId: "month-1", occurredAt: new Date(occurredAt) });
-  await assert.rejects(() => useCases.updateExpense({ ...input, occurredAt: "2026-11-01T02:00:00.000Z" }), { statusCode: 400, message: "Expense date must be inside the linked month." });
-  assert.equal(updated.length, 0);
-  await useCases.updateExpense(input);
-  assert.equal(updated[0]!.occurredAt.toISOString(), occurredAt);
+  setStoredExpense({ id: "expense-1", type: MovementType.EXPENSE, monthId: "other-month", occurredAt: new Date(`${occurredAt}T00:00:00.000Z`) });
+  await assert.rejects(() => useCases.updateExpense(input), { statusCode: 404, message: "No se encontró el gasto en este mes." });
+  setStoredExpense({ id: "expense-1", type: MovementType.EXPENSE, monthId: "month-1", occurredAt: new Date(`${occurredAt}T00:00:00.000Z`) });
+  for (const day of ["2026-11-02", occurredAt]) {
+    await assert.rejects(() => useCases.updateExpense({ ...input, occurredAt: day }), { statusCode: 400, message: "La fecha del gasto debe estar dentro del mes vinculado." });
+    assert.equal(updated.length, 0);
+  }
+  await useCases.updateExpense({ ...input, occurredAt: "2026-10-31" });
+  assert.equal(updated[0]!.occurredAt.toISOString(), "2026-10-31T00:00:00.000Z");
 });
 
 test("expense month validation still rejects dates outside the submitted month without writes", async () => {
-  for (const occurredAt of ["2026-06-01T00:00:00.000+05:00", "2026-04-30T23:00:00.000-05:00", "2026-06-01T00:00:00.000Z", "2026-06-01"]) {
+  for (const occurredAt of ["2026-06-01", "2026-04-30"]) {
     const { ports, calls, created } = createMovementPorts();
     const useCases = createMovementUseCases(ports);
     const input = { monthId: "month-1", sourceSubcategoryId: null, amount: 20, occurredAt, paymentMethod: PaymentMethod.NON_CASH };
     for (const action of [() => useCases.recordExpense(input), () => useCases.updateExpense({ ...input, expenseId: "expense-1" })]) {
-      await assert.rejects(action, { statusCode: 400, message: "Expense date must be inside the linked month." });
+      await assert.rejects(action, { statusCode: 400, message: "La fecha del gasto debe estar dentro del mes vinculado." });
     }
     assert.deepEqual(created, []);
     assert.equal(calls.some((call) => Array.isArray(call) && ["tx.movements.create", "tx.movements.updateExpense"].includes(call[0])), false);
@@ -265,7 +278,7 @@ test("recordExpense persists an expense inside the transaction runner and return
     sourceSubcategoryId: "sub-market",
     amount: 75,
     description: "Market",
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     paymentMethod: PaymentMethod.NON_CASH,
   });
 
@@ -286,7 +299,7 @@ test("recordExpense and updateExpense allow an active expense to be uncategorize
     monthId: "month-1",
     sourceSubcategoryId: null,
     amount: 75,
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     paymentMethod: PaymentMethod.NON_CASH,
   });
   await useCases.updateExpense({
@@ -294,7 +307,7 @@ test("recordExpense and updateExpense allow an active expense to be uncategorize
     expenseId: "expense-1",
     sourceSubcategoryId: "sub-market",
     amount: 75,
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     paymentMethod: PaymentMethod.NON_CASH,
   });
 
@@ -312,7 +325,7 @@ test("updateExpense rejects recategorization of an uncategorized expense after c
         expenseId: "expense-1",
         sourceSubcategoryId: "sub-market",
         amount: 75,
-        occurredAt: "2026-05-10T00:00:00.000Z",
+        occurredAt: "2026-05-10",
         paymentMethod: PaymentMethod.NON_CASH,
       }),
       { code: "MONTH_NOT_ACTIVE" },
@@ -331,7 +344,7 @@ test("recordExpense validates an active owned credit card before persisting the 
     sourceSubcategoryId: "sub-market",
     amount: 75,
     description: "Market",
-    occurredAt: "2026-05-10T00:00:00.000Z",
+    occurredAt: "2026-05-10",
     paymentMethod: PaymentMethod.NON_CASH,
     creditCardId: "card-1",
   });
@@ -356,7 +369,7 @@ test("recordExpense rejects inactive or unowned credit-card links before creatin
   });
   txPorts.creditCards.ensureCreditCardIsActive = async (ownerId: string, creditCardId: string) => {
     calls.push(["tx.creditCards.ensureCreditCardIsActive", ownerId, creditCardId]);
-    throw new Error("Credit card must exist, be owned by the current user, and be active.");
+    throw new Error("La tarjeta de crédito debe existir, pertenecer al usuario actual y estar activa.");
   };
   calls.splice(0, calls.length);
   const useCases = createMovementUseCases(ports);
@@ -367,11 +380,11 @@ test("recordExpense rejects inactive or unowned credit-card links before creatin
         monthId: "month-1",
         sourceSubcategoryId: "sub-market",
         amount: 75,
-        occurredAt: "2026-05-10T00:00:00.000Z",
+        occurredAt: "2026-05-10",
         paymentMethod: PaymentMethod.NON_CASH,
         creditCardId: "inactive-card",
       }),
-    /credit card must exist/i,
+    /La tarjeta de crédito debe existir/i,
   );
   assert.deepEqual(calls, [
     ["transactionRunner.run"],
@@ -389,7 +402,7 @@ test("updateExpense and deleteExpense operate on the transaction-scoped expense 
     expenseId: "expense-1",
     sourceSubcategoryId: "sub-market",
     amount: 90,
-    occurredAt: "2026-05-11T00:00:00.000Z",
+    occurredAt: "2026-05-11",
       paymentMethod: PaymentMethod.NON_CASH,
       creditCardId: "card-1",
     });
@@ -416,13 +429,13 @@ test("movement use cases expose the strict pocket-deposit command", async () => 
   const { calls, ports } = createMovementPorts();
   const useCases = createMovementUseCases(ports);
 
-  const updated = await useCases.depositToPocket({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" });
+  const updated = await useCases.depositToPocket({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10" });
 
   assert.equal(updated?.id, "month-1");
   assert.deepEqual(calls, [
     ["transactionRunner.runSerializable"],
     ["tx.depositWriterGate.isEnabled"],
-    ["tx.pockets.ensurePocketIsActive", "pocket-safe", "Target pocket"],
+    ["tx.pockets.ensurePocketIsActive", "pocket-safe", "Bolsillo de destino"],
     ["tx.months.findById", "month-1"],
     ["tx.movements.create", "POCKET_DEPOSIT_FROM_AVAILABLE", "25", "pocket-safe", null],
     ["tx.months.findById", "month-1"],
@@ -434,7 +447,7 @@ test("movement use cases reject legacy pocket-deposit payloads", async () => {
   const legacyDeposit = createMovementUseCases(ports).depositToPocket as (input: unknown) => Promise<unknown>;
 
   await assert.rejects(
-    () => legacyDeposit({ monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    () => legacyDeposit({ monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10" }),
     { code: "INVALID_DEPOSIT_SOURCE" },
   );
   assert.deepEqual(calls, []);
@@ -455,8 +468,8 @@ test("depositToPocket fails closed when the durable legacy-writer gate is disabl
   calls.splice(0, calls.length);
 
   await assert.rejects(
-    () => createMovementUseCases(ports).depositToPocket({ sourceKind: "EXTERNAL", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z", externalSourceLabel: "Bonus" }),
-    { message: "Pocket deposits are temporarily disabled." },
+    () => createMovementUseCases(ports).depositToPocket({ sourceKind: "EXTERNAL", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10", externalSourceLabel: "Bonus" }),
+    { message: "Los depósitos a bolsillos están deshabilitados temporalmente." },
   );
   assert.deepEqual(calls, [
     ["transactionRunner.runSerializable"],
@@ -477,7 +490,7 @@ test("strict pocket deposits persist each declared funding source only after val
       ...source,
       targetPocketId: "pocket-safe",
       amount: 25,
-      occurredAt: "2026-05-10T00:00:00.000Z",
+      occurredAt: "2026-05-10",
     });
 
     assert.equal(result?.id ?? null, source.sourceKind === "EXTERNAL" ? null : "month-1");
@@ -494,11 +507,11 @@ test("strict pocket deposits reject invalid source shapes and insufficient fundi
   const uncheckedDeposit = deposit as (input: unknown) => ReturnType<typeof deposit>;
 
   await assert.rejects(
-    () => uncheckedDeposit({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    () => uncheckedDeposit({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10" }),
     { code: "INVALID_DEPOSIT_SOURCE" },
   );
   await assert.rejects(
-    () => deposit({ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-safe", amount: 300, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    () => deposit({ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-safe", amount: 300, occurredAt: "2026-05-10" }),
     { code: "INSUFFICIENT_FUNDS" },
   );
   await assert.rejects(
@@ -507,7 +520,7 @@ test("strict pocket deposits reject invalid source shapes and insufficient fundi
   );
   month.status = MonthStatus.CLOSED as never;
   await assert.rejects(
-    () => deposit({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10T00:00:00.000Z" }),
+    () => deposit({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-safe", amount: 25, occurredAt: "2026-05-10" }),
     { code: "MONTH_NOT_ACTIVE" },
   );
   month.status = MonthStatus.ACTIVE;
@@ -530,10 +543,10 @@ test("strict pocket deposits validate and compare the normalized currency amount
 
   try {
     await assert.rejects(
-      () => (deposit as (input: unknown) => ReturnType<typeof deposit>)({ sourceKind: "EXTERNAL", targetPocketId: "pocket-safe", amount: 0.004, occurredAt: "2026-05-10T00:00:00.000Z" }),
+      () => (deposit as (input: unknown) => ReturnType<typeof deposit>)({ sourceKind: "EXTERNAL", targetPocketId: "pocket-safe", amount: 0.004, occurredAt: "2026-05-10" }),
       { code: "INVALID_AMOUNT", statusCode: 400 },
     );
-    await deposit({ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-safe", amount: 0.2, occurredAt: "2026-05-10T00:00:00.000Z" });
+    await deposit({ sourceKind: "SUBCATEGORY", monthId: "month-1", sourceSubcategoryId: "sub-market", targetPocketId: "pocket-safe", amount: 0.2, occurredAt: "2026-05-10" });
     assert.deepEqual(calls.filter((call) => Array.isArray(call) && call[0] === "tx.movements.create"), [
       ["tx.movements.create", "POCKET_DEPOSIT_FROM_SUBCATEGORY", "0.2", "pocket-safe", null],
     ]);

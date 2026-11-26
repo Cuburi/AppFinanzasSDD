@@ -30,7 +30,7 @@ export type UpdateMonthlyIncomeInput = {
 
 export const parseCreateMonthlyIncomeInput = (monthId: string, payload: unknown): CreateMonthlyIncomeInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Monthly income payload is required.");
+    throw new Error("Se requieren los datos del ingreso mensual.");
   }
 
   const rawPayload = payload as {
@@ -41,17 +41,17 @@ export const parseCreateMonthlyIncomeInput = (monthId: string, payload: unknown)
   };
 
   return {
-    monthId: readNonEmptyString(monthId, "Month id"),
-    sourceName: readNonEmptyString(rawPayload.sourceName, "Income source"),
-    amount: readPositiveAmount(rawPayload.amount, "Income amount"),
-    receivedAt: readIsoDateString(rawPayload.receivedAt, "Income received date"),
+    monthId: readNonEmptyString(monthId, "Identificador del mes"),
+    sourceName: readNonEmptyString(rawPayload.sourceName, "Origen del ingreso"),
+    amount: readPositiveAmount(rawPayload.amount, "Monto del ingreso"),
+    receivedAt: readIsoDateString(rawPayload.receivedAt, "Fecha de recepción del ingreso"),
     notes: readOptionalString(rawPayload.notes),
   };
 };
 
 export const parseUpdateMonthlyIncomeInput = (monthId: string, incomeId: string, payload: unknown): UpdateMonthlyIncomeInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Monthly income payload is required.");
+    throw new Error("Se requieren los datos del ingreso mensual.");
   }
 
   const rawPayload = payload as {
@@ -61,20 +61,20 @@ export const parseUpdateMonthlyIncomeInput = (monthId: string, incomeId: string,
     notes?: unknown;
   };
   const input: UpdateMonthlyIncomeInput = {
-    monthId: readNonEmptyString(monthId, "Month id"),
-    incomeId: readNonEmptyString(incomeId, "Income id"),
+    monthId: readNonEmptyString(monthId, "Identificador del mes"),
+    incomeId: readNonEmptyString(incomeId, "Identificador del ingreso"),
   };
 
   if (rawPayload.sourceName !== undefined) {
-    input.sourceName = readNonEmptyString(rawPayload.sourceName, "Income source");
+    input.sourceName = readNonEmptyString(rawPayload.sourceName, "Origen del ingreso");
   }
 
   if (rawPayload.amount !== undefined) {
-    input.amount = readPositiveAmount(rawPayload.amount, "Income amount");
+    input.amount = readPositiveAmount(rawPayload.amount, "Monto del ingreso");
   }
 
   if (rawPayload.receivedAt !== undefined) {
-    input.receivedAt = readIsoDateString(rawPayload.receivedAt, "Income received date");
+    input.receivedAt = readIsoDateString(rawPayload.receivedAt, "Fecha de recepción del ingreso");
   }
 
   if (rawPayload.notes !== undefined) {

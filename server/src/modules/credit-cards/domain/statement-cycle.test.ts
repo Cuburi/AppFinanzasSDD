@@ -12,7 +12,7 @@ test("statement cycle uses prior cutoff plus one day through current cutoff with
     cutoffDate: "2026-07-15",
     dueDate: "2026-08-04",
     from: new Date("2026-06-16T00:00:00.000Z"),
-    to: new Date("2026-07-15T23:59:59.999Z"),
+    to: new Date("2026-07-15T00:00:00.000Z"),
   });
 });
 
@@ -25,11 +25,11 @@ test("statement cycle advances after cutoff and clamps closing and due days in s
     cutoffDate: "2026-03-31",
     dueDate: "2026-04-30",
     from: new Date("2026-03-01T00:00:00.000Z"),
-    to: new Date("2026-03-31T23:59:59.999Z"),
+    to: new Date("2026-03-31T00:00:00.000Z"),
   });
 });
 
-test("statement period split includes the cutoff day in the closed statement and starts the open cycle on the next UTC day", () => {
+test("statement period split includes the cutoff day in the closed statement and starts the open cycle on the next calendar day", () => {
   assert.deepEqual(calculateStatementPeriodSplit({ closingDay: 15, dueDay: 4, today: new Date("2026-07-15T18:30:00.000Z") }), {
     closedStatement: {
       periodStart: "2026-06-16",
@@ -37,14 +37,14 @@ test("statement period split includes the cutoff day in the closed statement and
       cutoffDate: "2026-07-15",
       dueDate: "2026-08-04",
       from: new Date("2026-06-16T00:00:00.000Z"),
-      to: new Date("2026-07-15T23:59:59.999Z"),
+      to: new Date("2026-07-15T00:00:00.000Z"),
     },
     inProgressCycle: {
       periodStart: "2026-07-16",
       periodEnd: "2026-08-15",
       cutoffDate: "2026-08-15",
       from: new Date("2026-07-16T00:00:00.000Z"),
-      to: new Date("2026-08-15T23:59:59.999Z"),
+      to: new Date("2026-08-15T00:00:00.000Z"),
     },
   });
 });
@@ -57,14 +57,14 @@ test("statement period split keeps the same windows on the day after cutoff and 
       cutoffDate: "2026-02-28",
       dueDate: "2026-03-31",
       from: new Date("2026-02-01T00:00:00.000Z"),
-      to: new Date("2026-02-28T23:59:59.999Z"),
+      to: new Date("2026-02-28T00:00:00.000Z"),
     },
     inProgressCycle: {
       periodStart: "2026-03-01",
       periodEnd: "2026-03-31",
       cutoffDate: "2026-03-31",
       from: new Date("2026-03-01T00:00:00.000Z"),
-      to: new Date("2026-03-31T23:59:59.999Z"),
+      to: new Date("2026-03-31T00:00:00.000Z"),
     },
   });
 });

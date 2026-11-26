@@ -103,6 +103,6 @@ test("credit card Prisma repository rejects updates outside the owner scope befo
 
   const repository = createCreditCardPrismaRepository(db as Parameters<typeof createCreditCardPrismaRepository>[0]);
 
-  await assert.rejects(() => repository.update("owner-2", "card-1", { name: "Blocked" }), /not found/i);
+  await assert.rejects(() => repository.update("owner-2", "card-1", { name: "Blocked" }), /No se encontró/i);
   assert.deepEqual(calls, [{ where: { ownerId: "owner-2", id: "card-1" } }]);
 });

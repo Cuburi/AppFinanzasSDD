@@ -22,34 +22,34 @@ const readRequiredDepositSourceField = (value: unknown, label: string) => {
   try {
     return readNonEmptyString(value, label);
   } catch (error) {
-    throw invalidDepositSource(error instanceof Error ? error.message : `${label} is required.`);
+    throw invalidDepositSource(error instanceof Error ? error.message : `${label}: valor obligatorio.`);
   }
 };
 
 const readDepositAmount = (value: unknown) => {
   try {
-    return readPositiveAmount(value, "Deposit amount");
+    return readPositiveAmount(value, "Monto del depósito");
   } catch (error) {
-    throw new SemanticError("INVALID_AMOUNT", 400, error instanceof Error ? error.message : "Deposit amount is invalid.");
+    throw new SemanticError("INVALID_AMOUNT", 400, error instanceof Error ? error.message : "El monto del depósito no es válido.");
   }
 };
 
 const readDepositDate = (value: unknown) => {
   try {
-    return readIsoDateString(value, "Pocket deposit date");
+    return readIsoDateString(value, "Fecha del depósito al bolsillo");
   } catch (error) {
-    throw new SemanticError("INVALID_DATE", 400, error instanceof Error ? error.message : "Pocket deposit date is invalid.");
+    throw new SemanticError("INVALID_DATE", 400, error instanceof Error ? error.message : "La fecha del depósito al bolsillo no es válida.");
   }
 };
 
 export const parseWithdrawFromPocketInput = (payload: unknown): WithdrawFromPocketInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Pocket withdrawal payload is required.");
+    throw new Error("Se requieren los datos del retiro del bolsillo.");
   }
 
   const rawPayload = payload as { sourcePocketId?: unknown; amount?: unknown; occurredAt?: unknown; description?: unknown };
   return {
-    sourcePocketId: readNonEmptyString(rawPayload.sourcePocketId, "Source pocket"),
+    sourcePocketId: readNonEmptyString(rawPayload.sourcePocketId, "Bolsillo de origen"),
     amount: readDepositAmount(rawPayload.amount),
     occurredAt: readDepositDate(rawPayload.occurredAt),
     description: readOptionalString(rawPayload.description),
@@ -58,7 +58,7 @@ export const parseWithdrawFromPocketInput = (payload: unknown): WithdrawFromPock
 
 export const parseDepositToPocketInput = (payload: unknown): DepositToPocketInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Pocket deposit payload is required.");
+    throw new Error("Se requieren los datos del depósito al bolsillo.");
   }
 
   const rawPayload = payload as {
@@ -72,10 +72,10 @@ export const parseDepositToPocketInput = (payload: unknown): DepositToPocketInpu
   };
   const sourceKind = typeof rawPayload.sourceKind === "string" ? rawPayload.sourceKind.trim() : "";
   if (sourceKind !== "SUBCATEGORY" && sourceKind !== "MONTH_AVAILABLE" && sourceKind !== "EXTERNAL") {
-    throw invalidDepositSource("Pocket deposit source kind must be SUBCATEGORY, MONTH_AVAILABLE, or EXTERNAL.");
+    throw invalidDepositSource("El tipo de origen del depósito al bolsillo debe ser SUBCATEGORY, MONTH_AVAILABLE o EXTERNAL.");
   }
   const base = {
-    targetPocketId: readNonEmptyString(rawPayload.targetPocketId, "Target pocket"),
+    targetPocketId: readNonEmptyString(rawPayload.targetPocketId, "Bolsillo de destino"),
     amount: readDepositAmount(rawPayload.amount),
     occurredAt: readDepositDate((payload as { occurredAt?: unknown }).occurredAt),
     description: readOptionalString(rawPayload.description),
@@ -83,29 +83,29 @@ export const parseDepositToPocketInput = (payload: unknown): DepositToPocketInpu
 
   if (sourceKind === "SUBCATEGORY") {
     if (Object.hasOwn(rawPayload, "externalSourceLabel")) {
-      throw invalidDepositSource("Subcategory pocket deposits cannot specify an external source label.");
+      throw invalidDepositSource("Los depósitos al bolsillo desde una subcategoría no pueden indicar una etiqueta de origen externo.");
     }
     return {
       ...base,
       sourceKind,
-      monthId: readRequiredDepositSourceField(rawPayload.monthId, "Month id"),
-      sourceSubcategoryId: readRequiredDepositSourceField(rawPayload.sourceSubcategoryId, "Source subcategory"),
+      monthId: readRequiredDepositSourceField(rawPayload.monthId, "Identificador del mes"),
+      sourceSubcategoryId: readRequiredDepositSourceField(rawPayload.sourceSubcategoryId, "Subcategoría de origen"),
     };
   }
 
   if (sourceKind === "MONTH_AVAILABLE") {
     if (Object.hasOwn(rawPayload, "sourceSubcategoryId") || Object.hasOwn(rawPayload, "externalSourceLabel")) {
-      throw invalidDepositSource("Available-funds pocket deposits cannot specify a subcategory or external source label.");
+      throw invalidDepositSource("Los depósitos al bolsillo desde el dinero disponible no pueden indicar una subcategoría ni una etiqueta de origen externo.");
     }
-    return { ...base, sourceKind, monthId: readRequiredDepositSourceField(rawPayload.monthId, "Month id") };
+    return { ...base, sourceKind, monthId: readRequiredDepositSourceField(rawPayload.monthId, "Identificador del mes") };
   }
 
   if (sourceKind === "EXTERNAL") {
     if (Object.hasOwn(rawPayload, "monthId") || Object.hasOwn(rawPayload, "sourceSubcategoryId")) {
-      throw invalidDepositSource("External pocket deposits cannot specify a month or subcategory.");
+      throw invalidDepositSource("Los depósitos externos al bolsillo no pueden indicar un mes ni una subcategoría.");
     }
     const externalSourceLabel = readOptionalString(rawPayload.externalSourceLabel);
     return { ...base, sourceKind, ...(externalSourceLabel ? { externalSourceLabel } : {}) };
   }
-  throw invalidDepositSource("Pocket deposit source kind must be SUBCATEGORY, MONTH_AVAILABLE, or EXTERNAL.");
+  throw invalidDepositSource("El tipo de origen del depósito al bolsillo debe ser SUBCATEGORY, MONTH_AVAILABLE o EXTERNAL.");
 };

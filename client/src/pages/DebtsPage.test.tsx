@@ -22,14 +22,14 @@ const debtToPay: DebtView = {
   description: "Rent split",
   totalAmount: 300000,
   currency: "COP",
-  originDate: "2026-05-20T00:00:00.000Z",
+  originDate: "2026-05-20",
   remainingBalance: 200000,
   status: "OPEN",
   payments: [
     {
       id: "payment-1",
       amount: 100000,
-      paidAt: "2026-05-21T00:00:00.000Z",
+      paidAt: "2026-05-21",
       notes: "Initial payment",
     },
   ],
@@ -39,7 +39,7 @@ const paidDebt: DebtView = {
   ...debtToPay,
   remainingBalance: 0,
   status: "PAID",
-  payments: [...debtToPay.payments, { id: "payment-2", amount: 200000, paidAt: "2026-05-22T00:00:00.000Z", notes: "Final payment" }],
+  payments: [...debtToPay.payments, { id: "payment-2", amount: 200000, paidAt: "2026-05-22", notes: "Final payment" }],
 };
 
 describe("DebtsPage", () => {
@@ -81,7 +81,7 @@ describe("DebtsPage", () => {
     const amount = await screen.findByLabelText("Monto total");
     fireEvent.change(amount, { target: { value: "0124" } });
 
-    expect(amount).toHaveValue(124);
+    expect(amount).toHaveValue("$ 124");
   });
 
   it("creates a debt and keeps it visible in the MVP list", async () => {

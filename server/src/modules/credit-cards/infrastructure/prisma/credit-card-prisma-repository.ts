@@ -48,7 +48,7 @@ export const createCreditCardPrismaRepository = (db: PrismaCreditCardClient): Cr
   },
   async update(ownerId, id, input) {
     const existing = await db.creditCard.findFirst({ where: { ownerId, id } });
-    if (!existing) throw new Error("Credit card was not found.");
+    if (!existing) throw new Error("No se encontró Tarjeta de crédito.");
     const { limit, ...rest } = input;
     return mapRecord(
       await db.creditCard.update({

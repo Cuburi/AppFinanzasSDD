@@ -2,11 +2,11 @@ import { readNonEmptyString, toNumber } from "./shared-parsers.js";
 
 const readBoolean = (value: unknown, label: string): boolean => {
   if (value === undefined) {
-    throw new Error(`${label} is required.`);
+    throw new Error(`${label}: valor obligatorio.`);
   }
 
   if (typeof value !== "boolean") {
-    throw new Error(`${label} must be true or false.`);
+    throw new Error(`${label} debe ser true o false.`);
   }
 
   return value;
@@ -14,7 +14,7 @@ const readBoolean = (value: unknown, label: string): boolean => {
 
 const rejectTemplateIds = (payload: object) => {
   if ("templateCategoryId" in payload || "templateSubcategoryId" in payload) {
-    throw new Error("Template identities cannot be supplied for month edits.");
+    throw new Error("No se pueden proporcionar identificadores de la plantilla al editar el mes.");
   }
 };
 
@@ -61,14 +61,14 @@ export type DeleteMonthSubcategoryInput = {
 
 export const parseCreateMonthCategoryInput = (monthId: string, payload: unknown): CreateMonthCategoryInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Category payload is required.");
+    throw new Error("Se requieren los datos de la categoría.");
   }
 
   const rawPayload = payload as { name?: unknown; addToTemplate?: unknown };
 
   return {
-    monthId: readNonEmptyString(monthId, "Month id"),
-    name: readNonEmptyString(rawPayload.name, "Category name"),
+    monthId: readNonEmptyString(monthId, "Identificador del mes"),
+    name: readNonEmptyString(rawPayload.name, "Nombre de la categoría"),
     addToTemplate: readBoolean(rawPayload.addToTemplate, "addToTemplate"),
   };
 };
@@ -79,26 +79,26 @@ export const parseCreateMonthSubcategoryInput = (
   payload: unknown,
 ): CreateMonthSubcategoryInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Subcategory payload is required.");
+    throw new Error("Se requieren los datos de la subcategoría.");
   }
 
   const rawPayload = payload as { name?: unknown; plannedAmount?: unknown; defaultPocketId?: unknown; addToTemplate?: unknown };
   const plannedAmount = toNumber(rawPayload.plannedAmount);
 
   if (plannedAmount < 0) {
-    throw new Error("Planned amount must be zero or greater.");
+    throw new Error("El monto planeado debe ser mayor o igual a cero.");
   }
 
   const input: CreateMonthSubcategoryInput = {
-    monthId: readNonEmptyString(monthId, "Month id"),
-    categoryId: readNonEmptyString(categoryId, "Category id"),
-    name: readNonEmptyString(rawPayload.name, "Subcategory name"),
+    monthId: readNonEmptyString(monthId, "Identificador del mes"),
+    categoryId: readNonEmptyString(categoryId, "Identificador de la categoría"),
+    name: readNonEmptyString(rawPayload.name, "Nombre de la subcategoría"),
     plannedAmount,
     addToTemplate: readBoolean(rawPayload.addToTemplate, "addToTemplate"),
   };
 
   if (rawPayload.defaultPocketId !== undefined) {
-    input.defaultPocketId = rawPayload.defaultPocketId === null ? null : readNonEmptyString(rawPayload.defaultPocketId, "Default pocket");
+    input.defaultPocketId = rawPayload.defaultPocketId === null ? null : readNonEmptyString(rawPayload.defaultPocketId, "Bolsillo predeterminado");
   }
 
   return input;
@@ -106,23 +106,23 @@ export const parseCreateMonthSubcategoryInput = (
 
 export const parseUpdateMonthCategoryInput = (monthId: string, categoryId: string, payload: unknown): UpdateMonthCategoryInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Category payload is required.");
+    throw new Error("Se requieren los datos de la categoría.");
   }
 
   const rawPayload = payload as { name?: unknown; updateTemplate?: unknown };
   rejectTemplateIds(payload);
 
   return {
-    monthId: readNonEmptyString(monthId, "Month id"),
-    categoryId: readNonEmptyString(categoryId, "Category id"),
-    name: readNonEmptyString(rawPayload.name, "Category name"),
+    monthId: readNonEmptyString(monthId, "Identificador del mes"),
+    categoryId: readNonEmptyString(categoryId, "Identificador de la categoría"),
+    name: readNonEmptyString(rawPayload.name, "Nombre de la categoría"),
     updateTemplate: rawPayload.updateTemplate === undefined ? false : readBoolean(rawPayload.updateTemplate, "updateTemplate"),
   };
 };
 
 export const parseDeleteMonthCategoryInput = (monthId: string, categoryId: string): DeleteMonthCategoryInput => ({
-  monthId: readNonEmptyString(monthId, "Month id"),
-  categoryId: readNonEmptyString(categoryId, "Category id"),
+  monthId: readNonEmptyString(monthId, "Identificador del mes"),
+  categoryId: readNonEmptyString(categoryId, "Identificador de la categoría"),
 });
 
 export const parseUpdateMonthSubcategoryInput = (
@@ -131,7 +131,7 @@ export const parseUpdateMonthSubcategoryInput = (
   payload: unknown,
 ): UpdateMonthSubcategoryInput => {
   if (!payload || typeof payload !== "object") {
-    throw new Error("Subcategory payload is required.");
+    throw new Error("Se requieren los datos de la subcategoría.");
   }
 
   const rawPayload = payload as { name?: unknown; plannedAmount?: unknown; defaultPocketId?: unknown; updateTemplate?: unknown };
@@ -139,25 +139,25 @@ export const parseUpdateMonthSubcategoryInput = (
   const plannedAmount = toNumber(rawPayload.plannedAmount);
 
   if (plannedAmount < 0) {
-    throw new Error("Planned amount must be zero or greater.");
+    throw new Error("El monto planeado debe ser mayor o igual a cero.");
   }
 
   const input: UpdateMonthSubcategoryInput = {
-    monthId: readNonEmptyString(monthId, "Month id"),
-    subcategoryId: readNonEmptyString(subcategoryId, "Subcategory id"),
-    name: readNonEmptyString(rawPayload.name, "Subcategory name"),
+    monthId: readNonEmptyString(monthId, "Identificador del mes"),
+    subcategoryId: readNonEmptyString(subcategoryId, "Identificador de la subcategoría"),
+    name: readNonEmptyString(rawPayload.name, "Nombre de la subcategoría"),
     plannedAmount,
     updateTemplate: rawPayload.updateTemplate === undefined ? false : readBoolean(rawPayload.updateTemplate, "updateTemplate"),
   };
 
   if (rawPayload.defaultPocketId !== undefined) {
-    input.defaultPocketId = rawPayload.defaultPocketId === null ? null : readNonEmptyString(rawPayload.defaultPocketId, "Default pocket");
+    input.defaultPocketId = rawPayload.defaultPocketId === null ? null : readNonEmptyString(rawPayload.defaultPocketId, "Bolsillo predeterminado");
   }
 
   return input;
 };
 
 export const parseDeleteMonthSubcategoryInput = (monthId: string, subcategoryId: string): DeleteMonthSubcategoryInput => ({
-  monthId: readNonEmptyString(monthId, "Month id"),
-  subcategoryId: readNonEmptyString(subcategoryId, "Subcategory id"),
+  monthId: readNonEmptyString(monthId, "Identificador del mes"),
+  subcategoryId: readNonEmptyString(subcategoryId, "Identificador de la subcategoría"),
 });

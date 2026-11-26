@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent } from "react";
 
 import { api } from "../lib/api";
-import { formatCop, normalizeAmountInput, parseAmountInput } from "../lib/money";
-import { Button, Card, FeedbackBanner, StatusPill } from "../components/ui";
+import { formatCop, parseAmountInput, toMoneyInputValue } from "../lib/money";
+import { Button, Card, FeedbackBanner, MoneyInput, StatusPill } from "../components/ui";
 import { ActiveMonthDashboard } from "../features/monthly-cycle/active-month-dashboard/components/ActiveMonthDashboard";
 import { RegistrationSlip } from "../features/monthly-cycle/active-month-dashboard/components/RegistrationSlip";
 import { MonthlyLedger } from "../features/monthly-cycle/active-month-dashboard/components/MonthlyLedger";
@@ -22,27 +22,6 @@ const localCalendarDate = (date = new Date()) => {
 };
 const formatMonthDate = (month: Month) => `${month.year}-${String(month.month).padStart(2, "0")}-01`;
 const defaultMovementDate = (month: Month, date = new Date()) => (date.getFullYear() === month.year && date.getMonth() + 1 === month.month ? localCalendarDate(date) : formatMonthDate(month));
-const timestampForMovementDate = (dateValue: string, reference = new Date()) => {
-  const [year, month, day] = dateValue.split("-").map(Number);
-  if (!year || !month || !day) return dateValue;
-  return new Date(year, month - 1, day, reference.getHours(), reference.getMinutes(), reference.getSeconds(), reference.getMilliseconds()).toISOString();
-};
-// Keep the selected local calendar date and its offset without changing the real clock time.
-const timestampForExpenseDate = (dateValue: string, reference = new Date()) => {
-  const instant = new Date(timestampForMovementDate(dateValue, reference));
-  const offset = -instant.getTimezoneOffset();
-  const pad = (value: number) => String(value).padStart(2, "0");
-  const time = `${pad(instant.getHours())}:${pad(instant.getMinutes())}:${pad(instant.getSeconds())}.${String(instant.getMilliseconds()).padStart(3, "0")}`;
-  return `${localCalendarDate(instant)}T${time}${offset < 0 ? "-" : "+"}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
-};
-const expenseEditDate = (value: string, month: Month) => {
-  const utcDate = value.slice(0, 10);
-  const linkedPeriod = `${month.year}-${String(month.month).padStart(2, "0")}`;
-  const localDate = localCalendarDate(new Date(value));
-  // Preserve legacy date-only edits; recover the local date only across a month boundary.
-  return !utcDate.startsWith(linkedPeriod) && localDate.startsWith(linkedPeriod) ? localDate : utcDate;
-};
-const formatDisplayDate = (value: string) => new Date(value).toLocaleDateString("es-CO", { timeZone: "UTC" });
 const formatPaymentMethod = (paymentMethod: PaymentMethod) => (paymentMethod === "CASH" ? "Efectivo" : "No efectivo");
 const balanceTrend = (amount: number) => (amount < 0 ? "negative" : amount > 0 ? "positive" : "neutral");
 const formatCreditCardLabel = (card: CreditCardView) => `${card.issuer} ${card.name}`;
@@ -57,7 +36,6 @@ export const ActiveMonthPage = () => {
   const historyRequestId = useRef(0);
   const monthlyHistoryRequestId = useRef(0);
   const expenseAmountInputRef = useRef<HTMLInputElement>(null);
-  const boundaryExpenseEdit = useRef<{ occurredAt: string; date: string } | null>(null);
   const expenseSlipRef = useRef<HTMLElement>(null);
   const incomeSourceInputRef = useRef<HTMLInputElement>(null);
   const incomeSlipRef = useRef<HTMLElement>(null);
@@ -261,7 +239,7 @@ export const ActiveMonthPage = () => {
   const resetIncomeForm = (monthData = activeMonth) => {
     setIncomeSourceName("");
     setIncomeAmount("");
-    setIncomeReceivedAt(monthData ? formatMonthDate(monthData) : "");
+    setIncomeReceivedAt(monthData ? defaultMovementDate(monthData) : "");
     setIncomeNotes("");
     setEditingIncomeId(null);
     setSecondaryForm(null);
@@ -273,7 +251,6 @@ export const ActiveMonthPage = () => {
   };
 
   const resetExpenseForm = (monthData = activeMonth) => {
-    boundaryExpenseEdit.current = null;
     setExpenseCategoryId("");
     setExpenseSubcategoryId("");
     setExpenseAmount("");
@@ -348,8 +325,8 @@ export const ActiveMonthPage = () => {
   const startEditingIncome = (income: MonthlyIncome) => {
     setIncomeFeedback(null);
     setIncomeSourceName(income.sourceName);
-    setIncomeAmount(String(income.amount));
-    setIncomeReceivedAt(income.receivedAt.slice(0, 10));
+    setIncomeAmount(toMoneyInputValue(income.amount));
+    setIncomeReceivedAt(income.receivedAt);
     setIncomeNotes(income.notes ?? "");
     setSecondaryForm("income");
     setEditingIncomeId(income.id);
@@ -362,11 +339,9 @@ export const ActiveMonthPage = () => {
       : "";
     setExpenseCategoryId(categoryId);
     setExpenseSubcategoryId(categoryId ? expense.subcategory?.id ?? "" : "");
-    setExpenseAmount(String(expense.amount));
+    setExpenseAmount(toMoneyInputValue(expense.amount));
     setExpenseDescription(expense.description ?? "");
-    const editDate = activeMonth ? expenseEditDate(expense.occurredAt, activeMonth) : expense.occurredAt.slice(0, 10);
-    boundaryExpenseEdit.current = editDate !== expense.occurredAt.slice(0, 10) ? { occurredAt: expense.occurredAt, date: editDate } : null;
-    setExpenseOccurredAt(editDate);
+    setExpenseOccurredAt(expense.occurredAt);
     setExpensePaymentMethod(expense.paymentMethod);
     setExpenseCreditCardId(expense.paymentMethod === "CASH" ? "" : expense.creditCardId ?? "");
     setEditingExpenseId(expense.id);
@@ -433,7 +408,7 @@ export const ActiveMonthPage = () => {
     setEditingSubcategoryId(subcategory.id);
     setSubcategoryName(subcategory.name);
     setSubcategoryUpdateTemplate(false);
-    setSubcategoryPlannedAmount(String(subcategory.plannedAmount));
+    setSubcategoryPlannedAmount(toMoneyInputValue(subcategory.plannedAmount));
     setSubcategoryDefaultPocketId(subcategory.defaultPocketId ?? "");
   };
 
@@ -445,9 +420,7 @@ export const ActiveMonthPage = () => {
       sourceSubcategoryId: expenseSubcategoryId || null,
       amount: parseAmountInput(expenseAmount),
       description: expenseDescription,
-      occurredAt: editingExpenseId
-        ? boundaryExpenseEdit.current?.date === expenseOccurredAt ? boundaryExpenseEdit.current.occurredAt : expenseOccurredAt || formatMonthDate(activeMonth)
-        : timestampForExpenseDate(expenseOccurredAt || defaultMovementDate(activeMonth)),
+      occurredAt: expenseOccurredAt || defaultMovementDate(activeMonth),
       paymentMethod: expenseCreditCardId ? "NON_CASH" : expensePaymentMethod,
       creditCardId: expensePaymentMethod === "CASH" ? null : expenseCreditCardId || null,
     };
@@ -599,7 +572,7 @@ export const ActiveMonthPage = () => {
       const updatedMonth = await api.withdrawCash({
         monthId: activeMonth.id,
         amount: parseAmountInput(withdrawalAmount),
-        occurredAt: timestampForMovementDate(withdrawalOccurredAt || defaultMovementDate(activeMonth)),
+        occurredAt: withdrawalOccurredAt || defaultMovementDate(activeMonth),
         description: withdrawalDescription || undefined,
       });
       dashboard.replaceMonth(updatedMonth);
@@ -626,7 +599,7 @@ export const ActiveMonthPage = () => {
         monthId: activeMonth.id,
         sourceName: incomeSourceName,
         amount: parseAmountInput(incomeAmount),
-        receivedAt: editingIncomeId ? incomeReceivedAt || formatMonthDate(activeMonth) : timestampForMovementDate(incomeReceivedAt || defaultMovementDate(activeMonth)),
+        receivedAt: incomeReceivedAt || defaultMovementDate(activeMonth),
         notes: incomeNotes || null,
       };
       const updatedMonth = editingIncomeId
@@ -679,7 +652,7 @@ export const ActiveMonthPage = () => {
         monthId: activeMonth.id,
         targetPocketId: depositPocketId,
         amount: parseAmountInput(depositAmount),
-        occurredAt: timestampForMovementDate(depositOccurredAt || defaultMovementDate(activeMonth)),
+        occurredAt: depositOccurredAt || defaultMovementDate(activeMonth),
       };
       const updatedMonth = await api.depositToPocket(
         depositSourceKind === "SUBCATEGORY"
@@ -764,7 +737,7 @@ export const ActiveMonthPage = () => {
                       <form aria-label="Editar subcategoría del mes activo" className="month-structure-edit" onSubmit={handleSubcategory}>
                         <div className="month-subcategory-fields">
                           <label className="field"><span>Nombre subcategoría</span><input autoFocus value={subcategoryName} onChange={(event) => setSubcategoryName(event.target.value)} required /></label>
-                          <label className="field field-amount"><span>Planificado</span><input min="0" step="0.01" type="number" value={subcategoryPlannedAmount} onChange={(event) => setSubcategoryPlannedAmount(normalizeAmountInput(event.target.value))} required /></label>
+                          <label className="field field-amount"><span>Planificado</span><MoneyInput value={subcategoryPlannedAmount} onValueChange={setSubcategoryPlannedAmount} required /></label>
                           <label className="field"><span>Bolsillo predeterminado</span><select value={subcategoryDefaultPocketId} onChange={(event) => setSubcategoryDefaultPocketId(event.target.value)}><option value="">Sin bolsillo predeterminado</option>{subcategoryDefaultPocketId && !activePockets.some((pocket) => pocket.id === subcategoryDefaultPocketId) ? <option value={subcategoryDefaultPocketId}>Bolsillo no disponible (conservar)</option> : null}{activePockets.map((pocket) => <option key={pocket.id} value={pocket.id}>{pocket.name} ({formatCop(pocket.balance)})</option>)}</select></label>
                         </div>
                         <div className="month-template-option">
@@ -862,7 +835,7 @@ export const ActiveMonthPage = () => {
       formId="expense-form"
       mode={editingExpenseId ? "edit" : "create"}
       onSubmit={handleExpense}
-      primaryFields={<><label className="field expense-amount-field"><span>Monto</span><input min="0.01" ref={expenseAmountInputRef} step="0.01" type="number" value={expenseAmount} onChange={(event) => setExpenseAmount(normalizeAmountInput(event.target.value))} required /></label><div className="expense-category-fields"><label className="field expense-category-field"><span>Categoría del gasto</span><select value={expenseCategoryId} onChange={handleExpenseCategoryChange}><option value="">Sin categoría (Uncategorized)</option>{activeMonth.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label className="field expense-subcategory-field"><span>Subcategoría del gasto</span><select disabled={!expenseCategory} required={Boolean(expenseCategory)} value={expenseSubcategoryId} onChange={(event) => setExpenseSubcategoryId(event.target.value)}><option value="">{expenseCategory ? "Selecciona una subcategoría" : "Selecciona primero una categoría"}</option>{expenseCategory?.subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label></div></>}
+      primaryFields={<><label className="field expense-amount-field"><span>Monto</span><MoneyInput ref={expenseAmountInputRef} value={expenseAmount} onValueChange={setExpenseAmount} required /></label><div className="expense-category-fields"><label className="field expense-category-field"><span>Categoría del gasto</span><select value={expenseCategoryId} onChange={handleExpenseCategoryChange}><option value="">Sin categoría (Uncategorized)</option>{activeMonth.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label className="field expense-subcategory-field"><span>Subcategoría del gasto</span><select disabled={!expenseCategory} required={Boolean(expenseCategory)} value={expenseSubcategoryId} onChange={(event) => setExpenseSubcategoryId(event.target.value)}><option value="">{expenseCategory ? "Selecciona una subcategoría" : "Selecciona primero una categoría"}</option>{expenseCategory?.subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label></div></>}
       purpose={editingExpenseId ? "Corrección del mes" : "Movimiento del mes"}
       slipRef={expenseSlipRef}
       supportingFields={<><label className="field"><span>Fecha del gasto</span><input type="date" value={expenseOccurredAt || defaultMovementDate(activeMonth)} onChange={(event) => setExpenseOccurredAt(event.target.value)} required /></label><label className="field"><span>Método de pago</span><select value={expensePaymentMethod} onChange={handleExpensePaymentMethodChange} required><option value="NON_CASH">No efectivo</option><option value="CASH">Efectivo</option></select></label><label className="field"><span>Tarjeta de crédito (opcional)</span><select value={expenseCreditCardId} onChange={handleExpenseCreditCardChange}><option value="">Sin tarjeta / efectivo</option>{activeCreditCards.map((card) => <option key={card.id} value={card.id}>{formatCreditCardLabel(card)}</option>)}</select></label><label className="field expense-description-field"><span>Descripción (opcional)</span><input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} /></label></>}
@@ -919,13 +892,13 @@ export const ActiveMonthPage = () => {
             actions={<><Button disabled={submitting} type="submit">{incomeSubmitting ? editingIncomeId ? "Actualizando ingreso..." : "Guardando ingreso..." : editingIncomeId ? "Actualizar ingreso" : "Registrar ingreso"}</Button><Button variant="secondary" disabled={submitting} onClick={() => resetIncomeForm()} type="button">{editingIncomeId ? "Cancelar edición de ingreso" : "Cancelar ingreso"}</Button></>}
             feedback={incomeFeedback ? <FeedbackBanner tone={incomeFeedback.kind}>{incomeFeedback.text}</FeedbackBanner> : null}
             formClassName="income-capture-form" mode={editingIncomeId ? "edit" : "create"} onSubmit={handleIncome}
-            primaryFields={<><label className="field income-source-field"><span>Fuente del ingreso</span><input ref={incomeSourceInputRef} value={incomeSourceName} onChange={(event) => setIncomeSourceName(event.target.value)} required /></label><label className="field income-amount-field"><span>Monto</span><input min="0.01" step="0.01" type="number" value={incomeAmount} onChange={(event) => setIncomeAmount(normalizeAmountInput(event.target.value))} required /></label></>}
+            primaryFields={<><label className="field income-source-field"><span>Fuente del ingreso</span><input ref={incomeSourceInputRef} value={incomeSourceName} onChange={(event) => setIncomeSourceName(event.target.value)} required /></label><label className="field income-amount-field"><span>Monto</span><MoneyInput value={incomeAmount} onValueChange={setIncomeAmount} required /></label></>}
             purpose="Entrada del mes" slipRef={incomeSlipRef}
-            supportingFields={<><label className="field"><span>Fecha</span><input type="date" value={incomeReceivedAt || formatMonthDate(activeMonth)} onChange={(event) => setIncomeReceivedAt(event.target.value)} required /></label><label className="field income-notes-field"><span>Notas</span><input value={incomeNotes} onChange={(event) => setIncomeNotes(event.target.value)} /></label></>}
+            supportingFields={<><label className="field"><span>Fecha</span><input type="date" value={incomeReceivedAt || defaultMovementDate(activeMonth)} onChange={(event) => setIncomeReceivedAt(event.target.value)} required /></label><label className="field income-notes-field"><span>Notas</span><input value={incomeNotes} onChange={(event) => setIncomeNotes(event.target.value)} /></label></>}
             title={editingIncomeId ? "Editar ingreso" : "Registrar ingreso"} variant="secondary"
           /></div> : null}
-          {secondaryForm === "withdrawal" ? <div className="secondary-form-panel"><RegistrationSlip actions={<><Button disabled={submitting || !canMutateActiveMonth} type="submit">Retirar efectivo</Button><Button variant="secondary" disabled={submitting} onClick={() => setSecondaryForm(null)} type="button">Cancelar retiro</Button></>} formClassName="secondary-movement-form" mode="create" onSubmit={handleCashWithdrawal} primaryFields={<><label className="field"><span>Monto a retirar</span><input min="0.01" step="0.01" type="number" value={withdrawalAmount} onChange={(event) => setWithdrawalAmount(normalizeAmountInput(event.target.value))} required /></label><label className="field"><span>Fecha del retiro</span><input type="date" value={withdrawalOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setWithdrawalOccurredAt(event.target.value)} required /></label></>} purpose="Salida a efectivo" supportingFields={<label className="field"><span>Descripción del retiro (opcional)</span><input value={withdrawalDescription} onChange={(event) => setWithdrawalDescription(event.target.value)} /></label>} title="Retirar efectivo" variant="secondary" /></div> : null}
-          {secondaryForm === "deposit" ? <div className="secondary-form-panel"><RegistrationSlip actions={<><Button disabled={submitting || !canMutateActiveMonth || pocketsLoadStatus !== "ready"} type="submit">Depositar en bolsillo</Button><Button variant="secondary" disabled={submitting} onClick={() => setSecondaryForm(null)} type="button">Cancelar depósito</Button></>} formClassName="secondary-movement-form" mode="create" onSubmit={handleDeposit} primaryFields={<><label className="field"><span>Bolsillo destino</span><select disabled={pocketsLoadStatus !== "ready"} value={depositPocketId} onChange={(event) => setDepositPocketId(event.target.value)} required><option value="">Selecciona un bolsillo activo</option>{activePockets.map((pocket) => <option key={pocket.id} value={pocket.id}>{pocket.name} ({formatCop(pocket.balance)})</option>)}</select></label><div className="deposit-amount-group"><label className="field"><span>Monto</span><input min="0.01" step="0.01" type="number" value={depositAmount} onChange={(event) => setDepositAmount(normalizeAmountInput(event.target.value))} required /></label><Button className="deposit-maximum-button" disabled={depositMaximum === null || submitting || !canMutateActiveMonth} onClick={() => { if (depositMaximum !== null) setDepositAmount(String(depositMaximum)); }} type="button" variant="secondary">Usar máximo disponible</Button></div></>} purpose="Reserva en bolsillo" supportingFields={<><label className="field"><span>Origen de los fondos</span><select value={depositSourceKind} onChange={handleDepositSourceKindChange} required><option value="SUBCATEGORY">Subcategoría</option><option value="MONTH_AVAILABLE">Disponible del mes</option></select></label>{depositSourceKind === "SUBCATEGORY" ? <><label className="field"><span>Categoría de origen</span><select value={depositSourceCategoryId} onChange={handleDepositSourceCategoryChange} required><option value="">Selecciona una categoría</option>{activeMonth.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label className="field"><span>Subcategoría de origen</span><select disabled={!depositSourceCategory} value={depositSourceSubcategoryId} onChange={(event) => setDepositSourceSubcategoryId(event.target.value)} required><option value="">{depositSourceCategory ? "Selecciona una subcategoría" : "Selecciona primero una categoría"}</option>{depositSourceCategory?.subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label></> : null}<label className="field"><span>Fecha del depósito</span><input type="date" value={depositOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setDepositOccurredAt(event.target.value)} required /></label>{pocketsLoadStatus === "loading" ? <p role="status">Cargando bolsillos activos.</p> : null}{pocketsLoadStatus === "error" ? <p role="alert">No se pudieron cargar los bolsillos activos.</p> : null}</>} title="Depositar en bolsillo" variant="secondary" /></div> : null}
+          {secondaryForm === "withdrawal" ? <div className="secondary-form-panel"><RegistrationSlip actions={<><Button disabled={submitting || !canMutateActiveMonth} type="submit">Retirar efectivo</Button><Button variant="secondary" disabled={submitting} onClick={() => setSecondaryForm(null)} type="button">Cancelar retiro</Button></>} formClassName="secondary-movement-form" mode="create" onSubmit={handleCashWithdrawal} primaryFields={<><label className="field"><span>Monto a retirar</span><MoneyInput value={withdrawalAmount} onValueChange={setWithdrawalAmount} required /></label><label className="field"><span>Fecha del retiro</span><input type="date" value={withdrawalOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setWithdrawalOccurredAt(event.target.value)} required /></label></>} purpose="Salida a efectivo" supportingFields={<label className="field"><span>Descripción del retiro (opcional)</span><input value={withdrawalDescription} onChange={(event) => setWithdrawalDescription(event.target.value)} /></label>} title="Retirar efectivo" variant="secondary" /></div> : null}
+          {secondaryForm === "deposit" ? <div className="secondary-form-panel"><RegistrationSlip actions={<><Button disabled={submitting || !canMutateActiveMonth || pocketsLoadStatus !== "ready"} type="submit">Depositar en bolsillo</Button><Button variant="secondary" disabled={submitting} onClick={() => setSecondaryForm(null)} type="button">Cancelar depósito</Button></>} formClassName="secondary-movement-form" mode="create" onSubmit={handleDeposit} primaryFields={<><label className="field"><span>Bolsillo destino</span><select disabled={pocketsLoadStatus !== "ready"} value={depositPocketId} onChange={(event) => setDepositPocketId(event.target.value)} required><option value="">Selecciona un bolsillo activo</option>{activePockets.map((pocket) => <option key={pocket.id} value={pocket.id}>{pocket.name} ({formatCop(pocket.balance)})</option>)}</select></label><div className="deposit-amount-group"><label className="field"><span>Monto</span><MoneyInput value={depositAmount} onValueChange={setDepositAmount} required /></label><Button className="deposit-maximum-button" disabled={depositMaximum === null || submitting || !canMutateActiveMonth} onClick={() => { if (depositMaximum !== null) setDepositAmount(toMoneyInputValue(depositMaximum)); }} type="button" variant="secondary">Usar máximo disponible</Button></div></>} purpose="Reserva en bolsillo" supportingFields={<><label className="field"><span>Origen de los fondos</span><select value={depositSourceKind} onChange={handleDepositSourceKindChange} required><option value="SUBCATEGORY">Subcategoría</option><option value="MONTH_AVAILABLE">Disponible del mes</option></select></label>{depositSourceKind === "SUBCATEGORY" ? <><label className="field"><span>Categoría de origen</span><select value={depositSourceCategoryId} onChange={handleDepositSourceCategoryChange} required><option value="">Selecciona una categoría</option>{activeMonth.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label className="field"><span>Subcategoría de origen</span><select disabled={!depositSourceCategory} value={depositSourceSubcategoryId} onChange={(event) => setDepositSourceSubcategoryId(event.target.value)} required><option value="">{depositSourceCategory ? "Selecciona una subcategoría" : "Selecciona primero una categoría"}</option>{depositSourceCategory?.subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name} ({formatCop(subcategory.available)})</option>)}</select></label></> : null}<label className="field"><span>Fecha del depósito</span><input type="date" value={depositOccurredAt || formatMonthDate(activeMonth)} onChange={(event) => setDepositOccurredAt(event.target.value)} required /></label>{pocketsLoadStatus === "loading" ? <p role="status">Cargando bolsillos activos.</p> : null}{pocketsLoadStatus === "error" ? <p role="alert">No se pudieron cargar los bolsillos activos.</p> : null}</>} title="Depositar en bolsillo" variant="secondary" /></div> : null}
           {secondaryForm === "deposit" && pocketsLoadStatus === "error" ? <Button onClick={() => void loadActivePockets()} type="button" variant="tertiary">Reintentar bolsillos activos</Button> : null}
         </>
       ) : null}
@@ -996,7 +969,7 @@ export const ActiveMonthPage = () => {
                   </label>
                   <label className="field small-field">
                     <span>Planificado inicial</span>
-                    <input min="0" step="0.01" type="number" value={newSubcategoryPlannedAmount} onChange={(event) => setNewSubcategoryPlannedAmount(normalizeAmountInput(event.target.value))} required />
+                    <MoneyInput value={newSubcategoryPlannedAmount} onValueChange={setNewSubcategoryPlannedAmount} required />
                   </label>
                   <label className="field">
                     <span>Bolsillo predeterminado inicial</span>

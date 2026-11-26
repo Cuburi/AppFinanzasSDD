@@ -14,7 +14,7 @@ export const createUpdatePocketUseCase = ({ pockets }: { pockets: PocketReposito
     const normalizedName = normalizePocketName(input.name);
     const existing = await pockets.findByName(normalizedName);
     if (existing && existing.id !== id) {
-      throw new DomainError(409, "A pocket with that name already exists.");
+      throw new DomainError(409, "Ya existe un bolsillo con ese nombre.");
     }
   }
 
