@@ -651,14 +651,12 @@ describe("idempotent financial create headers", () => {
     await api.withdrawCash({ monthId: "month-1", amount: 50, occurredAt: "2026-05-12" }, { idempotencyKey: "cash-retry-key" });
     await api.createMonthlyIncome({ monthId: "month-1", sourceName: "Salary", amount: 1000, receivedAt: "2026-05-01" }, { idempotencyKey: "income-retry-key" });
     await api.depositToPocket({ sourceKind: "MONTH_AVAILABLE", monthId: "month-1", targetPocketId: "pocket-1", amount: 25, occurredAt: "2026-05-13" }, { idempotencyKey: "deposit-retry-key" });
-    await api.applyClosureAction({ monthId: "month-1", type: "SURPLUS_TO_POCKET_ON_CLOSE", targetPocketId: "pocket-1", amount: 25 }, { idempotencyKey: "closure-retry-key" });
 
     expect(vi.mocked(fetch).mock.calls.map(([, init]) => (init?.headers as Record<string, string>)["Idempotency-Key"])).toEqual([
       "expense-retry-key",
       "cash-retry-key",
       "income-retry-key",
       "deposit-retry-key",
-      "closure-retry-key",
     ]);
   });
 
@@ -678,7 +676,7 @@ describe("idempotent financial create headers", () => {
     ]);
   });
 
-  it("sends Idempotency-Key on monthly income and closure action creates", async () => {
+  it("sends Idempotency-Key on monthly income creates", async () => {
     const monthPayload = { id: "month-1" };
     const closurePayload = { monthId: "month-1", status: "ACTIVE", pendingSurpluses: [], pendingDeficits: [], budgetVariances: [], availableMoney: 0, availableMoneyBlocker: null, canClose: true };
     vi.mocked(fetch)
@@ -686,15 +684,11 @@ describe("idempotent financial create headers", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(closurePayload), { status: 201 }));
 
     await expect(api.createMonthlyIncome({ monthId: "month-1", sourceName: "Salary", amount: 1000, receivedAt: "2026-05-01" })).resolves.toEqual(monthPayload);
-    await expect(api.applyClosureAction({ monthId: "month-1", type: "SURPLUS_TO_POCKET_ON_CLOSE", targetPocketId: "pocket-1", amount: 25 })).resolves.toEqual(closurePayload);
 
     expect(fetch).toHaveBeenNthCalledWith(1, "/api/months/month-1/incomes", expect.objectContaining({
       method: "POST",
       headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
     }));
-    expect(fetch).toHaveBeenNthCalledWith(2, "/api/months/month-1/closure-actions", expect.objectContaining({
-      method: "POST",
-      headers: expect.objectContaining({ "Content-Type": "application/json", "Idempotency-Key": expect.any(String) }),
-    }));
+    expect(api).not.toHaveProperty("applyClosureAction");
   });
 });

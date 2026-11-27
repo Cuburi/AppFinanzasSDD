@@ -58,7 +58,6 @@ export const composeMonthlyCycleService = ({
   updateMonthlyIncome: incomeUseCases.updateMonthlyIncome,
   deleteMonthlyIncome: incomeUseCases.deleteMonthlyIncome,
   getClosureReview: closureUseCases.getClosureReview,
-  applyClosureAction: closureUseCases.applyClosureAction,
   closeMonth: closureUseCases.closeMonth,
   getMonth: closureUseCases.getMonth,
   getLatestClosedMonth: closureUseCases.getLatestClosedMonth,

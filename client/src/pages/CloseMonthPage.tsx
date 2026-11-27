@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "../lib/api";
-import { Button, Card, FeedbackBanner, MoneyInput, StatusPill } from "../components/ui";
+import { Button, Card, FeedbackBanner } from "../components/ui";
 import type { CloseMonthInput, ClosureReview, Month } from "../types";
 import { ClosedMonthDashboard } from "../features/monthly-cycle/closed-month-dashboard/components/ClosedMonthDashboard";
 import { GuidedClosure } from "../features/monthly-cycle/month-closure/GuidedClosure";
-import { formatCop, formatMoneyInput, toMoneyInputValue } from "../lib/money";
-
-type TextById = Record<string, string>;
+import { formatCop } from "../lib/money";
 const errorText = (error: unknown) => error instanceof Error ? error.message : "No se pudo completar la operación.";
 const selectedClosedId = () => new URLSearchParams(window.location.search).get("closedMonthId");
 const selectClosed = (id: string | null) => {
@@ -30,8 +28,6 @@ export const CloseMonthPage = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
-  const [deficitSourceIds, setDeficitSourceIds] = useState<TextById>({});
-  const [deficitAmounts, setDeficitAmounts] = useState<TextById>({});
   const request = useRef(0);
   const busy = useRef(false);
 
@@ -93,36 +89,6 @@ export const CloseMonthPage = () => {
       window.removeEventListener("popstate", pop);
     };
   }, []);
-
-  const applyDeficitCoverage = async (event: React.FormEvent<HTMLFormElement>, targetSubcategoryId: string) => {
-    event.preventDefault();
-    if (!activeMonth || !review || busy.current) return;
-    const deficit = review.pendingDeficits.find(item => item.subcategoryId === targetSubcategoryId);
-    if (!deficit) return;
-    busy.current = true;
-    setSubmitting(true);
-    setError(null);
-    setMessage(null);
-    try {
-      await api.applyClosureAction({
-        monthId: activeMonth.id,
-        type: "DEFICIT_COVER_FROM_SUBCATEGORY",
-        sourceSubcategoryId: deficitSourceIds[targetSubcategoryId],
-        targetSubcategoryId,
-        amount: deficitAmounts[targetSubcategoryId] ? Number(deficitAmounts[targetSubcategoryId]) : undefined,
-        description: "Cobertura de desfalco al cierre",
-      });
-      await refresh();
-      setDeficitAmounts(current => ({ ...current, [targetSubcategoryId]: "" }));
-      setDeficitSourceIds(current => ({ ...current, [targetSubcategoryId]: "" }));
-      setMessage(`Desfalco de ${deficit.subcategoryName} cubierto desde otra subcategoría.`);
-    } catch (failure) {
-      setError(errorText(failure));
-    } finally {
-      busy.current = false;
-      setSubmitting(false);
-    }
-  };
 
   const closeMonth = async (input?: CloseMonthInput) => {
     if (!activeMonth || !review || busy.current) return;
@@ -236,57 +202,7 @@ export const CloseMonthPage = () => {
           pending={submitting}
           onClose={input => void closeMonth(input)}
         >
-          {review.pendingDeficits.length > 0 ? (
-            <section className="month-closure-deficits" aria-label="Desfalcos pendientes">
-              <h3>Desfalcos pendientes</h3>
-              {review.pendingDeficits.map(deficit => (
-                <form
-                  className="month-closure-deficit"
-                  key={deficit.subcategoryId}
-                  onSubmit={event => void applyDeficitCoverage(event, deficit.subcategoryId)}
-                >
-                  <strong>{deficit.subcategoryName}: {formatCop(deficit.amount)}</strong>
-                  {review.pendingSurpluses.length === 0 ? (
-                    <StatusPill tone="danger">
-                      No hay subcategorías con sobrante disponible. Registrá o resolvé una fuente antes de cubrir este desfalco.
-                    </StatusPill>
-                  ) : null}
-                  <label className="field">
-                    Subcategoría origen con sobrante
-                    <select
-                      required
-                      disabled={submitting}
-                      value={deficitSourceIds[deficit.subcategoryId] ?? ""}
-                      onChange={event => setDeficitSourceIds(current => ({
-                        ...current, [deficit.subcategoryId]: event.target.value,
-                      }))}
-                    >
-                      <option value="">Elegí origen</option>
-                      {review.pendingSurpluses.map(surplus => (
-                        <option key={surplus.subcategoryId} value={surplus.subcategoryId}>
-                          {surplus.subcategoryName} ({formatCop(surplus.amount)})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    Monto
-                    <MoneyInput
-                      disabled={submitting}
-                      placeholder={formatMoneyInput(toMoneyInputValue(deficit.amount))}
-                      value={deficitAmounts[deficit.subcategoryId] ?? ""}
-                      onValueChange={digits => setDeficitAmounts(current => ({
-                        ...current, [deficit.subcategoryId]: digits,
-                      }))}
-                    />
-                  </label>
-                  <Button disabled={submitting || review.pendingSurpluses.length === 0} type="submit">
-                    Cubrir desfalco
-                  </Button>
-                </form>
-              ))}
-            </section>
-          ) : null}
+
         </GuidedClosure>
       ) : null}
     </section>

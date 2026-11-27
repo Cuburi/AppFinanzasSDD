@@ -1,5 +1,31 @@
 import { expect, test } from "@playwright/test";
 
+test("negative closure acknowledges external shortfall without cover actions", async ({ page }) => {
+  const month = { id: "negative", year: 2026, month: 10, status: "ACTIVE", openedAt: "2026-10-01", closedAt: null, monthlyIncomeTotal: 0, availableMoney: -10000, cashBalance: 0, incomes: [], categories: [] };
+  const posts: unknown[] = [];
+  await page.route(url => url.pathname.startsWith("/api/"), async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    let payload: unknown;
+    if (path === "/api/months/active") payload = { month };
+    else if (path.endsWith("/closure-review")) payload = { monthId: month.id, status: "ACTIVE", canClose: false, requiresDisposition: false, requiresAcknowledgement: true, warningsKey: "shortfall:1000000", shortfallAmount: 10000, availableMoney: -10000, pendingDeficits: [], pendingSurpluses: [], budgetVariances: [] };
+    else if (path === "/api/months/negative/close" && request.method() === "POST") {
+      posts.push(request.postDataJSON());
+      payload = { ...month, status: "CLOSED", closureAllocation: { availableMoney: -10000, carryAmount: 0, excludedAmount: 0, shortfallAmount: 10000 } };
+    } else { await route.fulfill({ status: 503, body: "Unexpected intercepted endpoint" }); return; }
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(payload) });
+  });
+  await page.goto("/close-month");
+  await expect(page.getByRole("button", { name: "Revisar cierre →" })).toBeDisabled();
+  await page.getByRole("checkbox", { name: "Entiendo, cerrar igual" }).check();
+  await page.getByRole("button", { name: "Revisar cierre →" }).click();
+  await expect(page.getByRole("radio")).toHaveCount(0);
+  await page.getByRole("button", { name: "Confirmar cierre" }).click();
+  await expect(page.getByRole("region", { name: "Resumen del mes cerrado" })).toBeVisible();
+  await expect(page.getByText("Cubierto fuera de la app", { exact: true })).toBeVisible();
+  expect(posts).toEqual([{ carryAmount: 0, excludedAmount: 0, shortfallAmount: 10000, acknowledgedWarningsKey: "shortfall:1000000" }]);
+});
+
 for (const width of [1440, 320]) {
   test(`real guided closure stays compact and reloadable at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });

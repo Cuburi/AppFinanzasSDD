@@ -587,21 +587,7 @@ test("applyClosureAction rejects surplus transfers before checking default pocke
   }
 
   const service = createMonthlyCycleTestService(createDbStub({ monthById: month }).db);
-
-  await assert.rejects(
-    () =>
-      service.applyClosureAction({
-        monthId: month.id,
-        type: "SURPLUS_TO_POCKET_ON_CLOSE",
-        sourceSubcategoryId: subcategory.id,
-      }),
-    (error: unknown) => {
-      assert.ok(error instanceof DomainError);
-      assert.equal(error.statusCode, 409);
-      assert.match(error.message, /La variación del presupuesto es informativa y no se puede transferir/i);
-      return true;
-    },
-  );
+  assert.equal("applyClosureAction" in service, false);
 });
 
 test("openMonth snapshots the current template into a new active month", async () => {
@@ -1518,10 +1504,7 @@ test("applyClosureAction rejects surplus transfer as non-transferable budget var
   const dbStub = createDbStub({ monthById: month });
   const service = createMonthlyCycleTestService(dbStub.db);
 
-  await assert.rejects(
-    () => service.applyClosureAction({ monthId: month.id, type: "SURPLUS_TO_POCKET_ON_CLOSE", sourceSubcategoryId: subcategory.id }),
-    { message: "La variación del presupuesto es informativa y no se puede transferir." },
-  );
+  assert.equal("applyClosureAction" in service, false);
 
   assert.equal(dbStub.getCapturedMovements().length, 0);
 });
@@ -1537,21 +1520,8 @@ test("applyClosureAction keeps surplus transfers non-transferable without a defa
   subcategory.defaultPocketId = null;
   const dbStub = createDbStub({ monthById: month });
   const service = createMonthlyCycleTestService(dbStub.db);
-
-  await assert.rejects(
-    () =>
-      service.applyClosureAction({
-        monthId: month.id,
-        type: "SURPLUS_TO_POCKET_ON_CLOSE",
-        sourceSubcategoryId: subcategory.id,
-      }),
-    (error: unknown) => {
-      assert.ok(error instanceof DomainError);
-      assert.equal(error.statusCode, 409);
-      assert.match(error.message, /La variación del presupuesto es informativa y no se puede transferir/i);
-      return true;
-    },
-  );
+  assert.equal("applyClosureAction" in service, false);
+  assert.equal(dbStub.getCapturedMovements().length, 0);
 });
 
 test("closeMonth permits informational surplus variance when month money is reconciled", async () => {

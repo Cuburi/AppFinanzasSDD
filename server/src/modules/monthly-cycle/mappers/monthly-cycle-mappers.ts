@@ -51,9 +51,10 @@ export const mapMonth = (month: MonthRecord): MonthView => {
     openingSourceMonthId: month.openingSourceMonthId ?? null,
     closureAllocation: month.closureCarryAmount != null && month.closureExcludedAmount != null
       ? {
-          availableMoney: Number((decimalToNumber(month.closureCarryAmount) + decimalToNumber(month.closureExcludedAmount)).toFixed(2)),
+          availableMoney: Number((decimalToNumber(month.closureCarryAmount) + decimalToNumber(month.closureExcludedAmount) - decimalToNumber(month.closureShortfallAmount ?? 0)).toFixed(2)),
           carryAmount: decimalToNumber(month.closureCarryAmount),
           excludedAmount: decimalToNumber(month.closureExcludedAmount),
+          shortfallAmount: decimalToNumber(month.closureShortfallAmount ?? 0),
         }
       : null,
     cashBalance: calculateCashBalance(month.movements),

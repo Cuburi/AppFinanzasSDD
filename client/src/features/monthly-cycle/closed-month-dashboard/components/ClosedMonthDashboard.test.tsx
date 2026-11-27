@@ -22,6 +22,14 @@ const closedMonth: Month = {
 describe("ClosedMonthDashboard", () => {
   afterEach(cleanup);
 
+  it("records external shortfall and negative closing availability", () => {
+    render(<ClosedMonthDashboard month={{ ...closedMonth, availableMoney: -90,
+      closureAllocation: { availableMoney: -90, carryAmount: 0, excludedAmount: 0, shortfallAmount: 90 },
+    }} onOpenNextMonth={vi.fn()} />);
+    expect(screen.getByText("Cubierto fuera de la app").nextElementSibling).toHaveTextContent("$90 COP");
+    expect(screen.getByText("Disponible al cerrar").nextElementSibling).toHaveTextContent("$-90 COP");
+  });
+
   it("renders the supplied closed-month values as read-only information", () => {
     render(<ClosedMonthDashboard month={closedMonth} onOpenNextMonth={vi.fn()} />);
 

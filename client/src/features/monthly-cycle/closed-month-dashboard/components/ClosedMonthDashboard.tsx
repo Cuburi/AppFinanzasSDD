@@ -41,7 +41,8 @@ export function ClosedMonthDashboard({ month, onOpenNextMonth, isOpeningNextMont
           </div>
         </dl>
         {month.closureAllocation ? <section aria-label="Historial de distribución del cierre" className="month-closure-history">
-          <h2>Destino del sobrante</h2>
+          <h2>Distribución del cierre</h2>
+          {(month.closureAllocation.shortfallAmount ?? 0) > 0 ? <dl><div><dt>Cubierto fuera de la app</dt><dd>{formatCop(month.closureAllocation.shortfallAmount!)}</dd></div></dl> : null}
           <dl><div><dt>Disponible al cerrar</dt><dd>{formatCop(month.closureAllocation.availableMoney)}</dd></div><div><dt>Saldo inicial del siguiente mes</dt><dd>{formatCop(month.closureAllocation.carryAmount)}</dd></div><div><dt>Fuera del seguimiento</dt><dd>{formatCop(month.closureAllocation.excludedAmount)}</dd></div></dl>
           <p>El saldo inicial no es un ingreso nuevo. Lo excluido queda en este historial: no es un gasto ni disponible del siguiente mes. El efectivo físico se arrastra de forma independiente.</p>
         </section> : <p>Cierre anterior sin distribución registrada.</p>}

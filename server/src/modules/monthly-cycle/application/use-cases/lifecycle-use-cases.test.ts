@@ -132,8 +132,8 @@ const createLifecyclePorts = () => {
 };
 
 test("lifecycle use cases expose only the month lifecycle public surface", () => {
-  assert.deepEqual(LIFECYCLE_USE_CASE_NAMES, ["openMonth", "getActiveMonth", "closeMonth"]);
-  assert.deepEqual(Object.keys(createLifecycleUseCases(createLifecyclePorts().ports)), ["openMonth", "getActiveMonth", "closeMonth"]);
+  assert.deepEqual(LIFECYCLE_USE_CASE_NAMES, ["openMonth", "getActiveMonth"]);
+  assert.deepEqual(Object.keys(createLifecycleUseCases(createLifecyclePorts().ports)), ["openMonth", "getActiveMonth"]);
 });
 
 test("openMonth snapshots template data through transaction-scoped ports", async () => {
@@ -155,24 +155,11 @@ test("openMonth snapshots template data through transaction-scoped ports", async
   ]);
 });
 
-test("getActiveMonth and closeMonth keep read and close semantics behind ports", async () => {
+test("getActiveMonth keeps read semantics behind ports", async () => {
   const { calls, ports } = createLifecyclePorts();
   const useCases = createLifecycleUseCases(ports);
 
   const found = await useCases.getActiveMonth();
-  const closed = await useCases.closeMonth("month-1", () => ({
-    monthId: "month-1",
-    status: MonthStatus.ACTIVE,
-    canClose: true,
-    pendingSubcategories: [],
-    pendingSurpluses: [],
-    pendingDeficits: [],
-    budgetVariances: [],
-    availableMoney: 0,
-    availableMoneyBlocker: null,
-  }));
-
   assert.equal(found?.id, "month-1");
-  assert.equal(closed.status, MonthStatus.CLOSED);
-  assert.deepEqual(calls, ["months.findActive", "transactionRunner.run", "tx.months.lockForMutation:month-1", "tx.months.close:month-1"]);
+  assert.deepEqual(calls, ["months.findActive"]);
 });

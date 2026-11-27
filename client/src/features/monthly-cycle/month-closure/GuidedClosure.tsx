@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button, Card, MoneyInput, StatusPill } from "../../../components/ui";
 import { formatCop } from "../../../lib/money";
@@ -17,17 +17,20 @@ type Props = {
   review: ClosureReview;
   pending: boolean;
   onClose: (input?: CloseMonthInput) => void;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 };
 
 export function GuidedClosure({ month, review, pending, onClose, children }: Props) {
   const [step, setStep] = useState(1);
+  const [acknowledged, setAcknowledged] = useState(false);
+  useEffect(() => { setAcknowledged(false); setStep(1); setMode("carry"); setCarry(""); setExcluded(""); }, [review]);
+  const negative = review.availableMoney < 0;
   const [mode, setMode] = useState("carry");
   const [carry, setCarry] = useState("");
   const [excluded, setExcluded] = useState("");
   const details = useRef<HTMLDetailsElement>(null);
   const headings = useRef<(HTMLElement | null)[]>([]);
-  const total = cents(String(review.availableMoney));
+  const total = cents(String(Math.max(0, review.availableMoney)));
   const carryCents = mode === "carry" ? total : mode === "outside" ? 0 : cents(carry);
   const excludedCents = mode === "outside" ? total : mode === "carry" ? 0 : cents(excluded);
   const valid = total !== null
@@ -38,8 +41,7 @@ export function GuidedClosure({ month, review, pending, onClose, children }: Pro
   const ready = month.status === "ACTIVE"
     && review.status === "ACTIVE"
     && total !== null
-    && review.pendingDeficits.length === 0
-    && (total > 0 || review.canClose);
+    && (!review.requiresAcknowledgement || acknowledged);
 
   const go = (next: number) => {
     if (pending) return;
@@ -109,19 +111,21 @@ export function GuidedClosure({ month, review, pending, onClose, children }: Pro
         </details>
         {review.availableMoney < 0 ? (
           <StatusPill tone="danger" aria-label="Danger: Dinero disponible en déficit">
-            El dinero disponible del mes está en negativo. Corregí ingresos, gastos o depósitos desde Mes activo antes de cerrar.
+            El faltante se registrará como cubierto fuera de la app. El siguiente mes empieza en $0.
           </StatusPill>
         ) : null}
-        {!ready ? (
-          <StatusPill tone="warning">
-            Cierre bloqueado: resolvé los desfalcos y el disponible negativo. Si ya los resolviste, refrescá la revisión.
+        {review.pendingDeficits.map(deficit => (
+          <StatusPill key={deficit.subcategoryId} tone="warning">
+            {deficit.subcategoryName} se pasó {formatCop(deficit.amount)} del presupuesto
           </StatusPill>
-        ) : (
-          <StatusPill tone="success">Cierre listo para revisar</StatusPill>
-        )}
+        ))}
+        {review.requiresAcknowledgement ? (
+          <label><input type="checkbox" checked={acknowledged} disabled={pending}
+            onChange={event => setAcknowledged(event.target.checked)} />Entiendo, cerrar igual</label>
+        ) : <StatusPill tone="success">Cierre listo para revisar</StatusPill>}
         {children}
         <div className="month-closure-actions">
-          <Button disabled={pending || !ready} onClick={() => go(2)}>Elegir destino →</Button>
+          <Button disabled={pending || !ready} onClick={() => go(negative ? 3 : 2)}>{negative ? "Revisar cierre →" : "Elegir destino →"}</Button>
         </div>
       </Card>
 
@@ -208,19 +212,22 @@ export function GuidedClosure({ month, review, pending, onClose, children }: Pro
         <dl>
           <div><dt>Saldo inicial del siguiente mes</dt><dd>{formatCop((carryCents ?? 0) / 100)}</dd></div>
           <div><dt>Fuera del seguimiento</dt><dd>{formatCop((excludedCents ?? 0) / 100)}</dd></div>
-          <div><dt>Total distribuido</dt><dd>{formatCop(review.availableMoney)}</dd></div>
+          {negative ? <div><dt>Cubierto fuera de la app</dt><dd>{formatCop(review.shortfallAmount)}</dd></div> : null}
+          <div><dt>Disponible al cerrar</dt><dd>{formatCop(review.availableMoney)}</dd></div>
         </dl>
         <p className="month-closure-note">El mes cerrado queda de solo lectura. El traspaso no es un ingreso nuevo. La parte fuera del seguimiento se registra en el historial del cierre; no es un gasto ni un borrado.</p>
         <p>Nada cambia hasta confirmar el cierre.</p>
         <div className="month-closure-actions">
-          <Button variant="secondary" disabled={pending} onClick={() => go(2)}>← Cambiar destino</Button>
+          <Button variant="secondary" disabled={pending} onClick={() => go(negative ? 1 : 2)}>← Cambiar destino</Button>
           <Button
             disabled={pending || !ready || !valid}
             onClick={() => {
               if (ready && valid) {
-                onClose(total === 0 ? undefined : {
+                onClose(total === 0 && !review.requiresAcknowledgement ? undefined : {
                   carryAmount: carryCents! / 100,
                   excludedAmount: excludedCents! / 100,
+                  ...(negative ? { shortfallAmount: review.shortfallAmount } : {}),
+                  ...(review.requiresAcknowledgement ? { acknowledgedWarningsKey: review.warningsKey! } : {}),
                 });
               }
             }}

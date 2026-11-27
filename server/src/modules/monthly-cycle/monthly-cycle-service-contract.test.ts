@@ -21,7 +21,7 @@ test("composeMonthlyCycleService exposes pocket withdrawal from movement use cas
     cashUseCases: { withdrawCash: noop, getCashSummary: noop } as never,
     reportsUseCases: { getBasicReport: noop } as never,
     expenseHistoryUseCases: { listExpenseHistory: noop } as never,
-    closureUseCases: { getClosureReview: noop, applyClosureAction: noop, closeMonth: noop } as never,
+    closureUseCases: { getClosureReview: noop, closeMonth: noop } as never,
     monthStructureUseCases: {
       createMonthCategory: noop,
       updateMonthCategory: noop,

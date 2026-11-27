@@ -129,6 +129,7 @@ export const createMonthlyCyclePrismaAdapters = (db: MonthlyCycleDb): MonthlyCyc
           ...(allocation ? {
             closureCarryAmount: toPrismaDecimal(decimal(allocation.carryAmount)),
             closureExcludedAmount: toPrismaDecimal(decimal(allocation.excludedAmount)),
+            closureShortfallAmount: toPrismaDecimal(decimal(allocation.shortfallAmount ?? 0)),
           } : {}),
         },
         include: monthInclude,
