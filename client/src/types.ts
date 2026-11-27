@@ -334,8 +334,8 @@ export type UpdateMonthlyIncomeInput = {
   notes?: string | null;
 };
 
-export type ClosureAllocation = { availableMoney: number; carryAmount: number; excludedAmount: number };
-export type CloseMonthInput = Pick<ClosureAllocation, "carryAmount" | "excludedAmount">;
+export type ClosureAllocation = { availableMoney: number; carryAmount: number; excludedAmount: number; shortfallAmount?: number };
+export type CloseMonthInput = Pick<ClosureAllocation, "carryAmount" | "excludedAmount"> & { shortfallAmount?: number; acknowledgedWarnings?: true };
 
 export type Month = {
   openingBalance?: number;
@@ -377,6 +377,8 @@ export type ClosureBudgetVariance = {
 };
 
 export type ClosureReview = {
+  requiresAcknowledgement: boolean;
+  shortfallAmount: number;
   requiresDisposition?: boolean;
   closureAllocation?: ClosureAllocation | null;
   monthId: string;
@@ -389,13 +391,4 @@ export type ClosureReview = {
   canClose: boolean;
 };
 
-export type ClosureActionInput = {
-  monthId: string;
-  type: "SURPLUS_TO_POCKET_ON_CLOSE" | "DEFICIT_COVER_FROM_SUBCATEGORY" | "DEFICIT_COVER_FROM_POCKET";
-  sourceSubcategoryId?: string;
-  targetSubcategoryId?: string;
-  sourcePocketId?: string;
-  targetPocketId?: string;
-  amount?: number;
-  description?: string;
-};
+

@@ -1,6 +1,5 @@
 import type {
   BusinessDate,
-  ClosureActionInput,
   CloseMonthInput,
   ClosureReview,
   BasicMonthlyReport,
@@ -451,23 +450,6 @@ export const api = {
   },
   async getClosureReview(monthId: string): Promise<ClosureReview> {
     const response = await fetch(`/api/months/${monthId}/closure-review`);
-    return readJson<ClosureReview>(response);
-  },
-  async applyClosureAction(input: ClosureActionInput, options: IdempotencyOptions = {}): Promise<ClosureReview> {
-    const response = await fetch(`/api/months/${input.monthId}/closure-actions`, {
-      method: "POST",
-      headers: jsonHeaders(options),
-      body: JSON.stringify({
-        type: input.type,
-        sourceSubcategoryId: input.sourceSubcategoryId,
-        targetSubcategoryId: input.targetSubcategoryId,
-        sourcePocketId: input.sourcePocketId,
-        targetPocketId: input.targetPocketId,
-        amount: input.amount,
-        description: input.description,
-      }),
-    });
-
     return readJson<ClosureReview>(response);
   },
   async closeMonth(monthId: string, input?: CloseMonthInput): Promise<Month> {

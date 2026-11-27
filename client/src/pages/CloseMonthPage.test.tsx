@@ -10,7 +10,6 @@ const apiMock = vi.hoisted(() => ({
   getMonth: vi.fn(),
   getLatestClosedMonth: vi.fn(),
   getClosureReview: vi.fn(),
-  applyClosureAction: vi.fn(),
   closeMonth: vi.fn(),
   openMonth: vi.fn(),
 }));
@@ -37,6 +36,8 @@ const review: ClosureReview = {
   status: "ACTIVE",
   canClose: false,
   requiresDisposition: true,
+  requiresAcknowledgement: false,
+  shortfallAmount: 0,
   closureAllocation: null,
   availableMoney: 300000,
   availableMoneyBlocker: "SURPLUS",
@@ -230,10 +231,12 @@ describe("guided monthly closure", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("preserves deficit coverage and blocks negative availability", async () => {
+  it.each([300000, 0, -90])("acknowledges warnings and closes available %s exactly", async (availableMoney) => {
     apiMock.getClosureReview.mockResolvedValue({
       ...review,
-      availableMoney: -90,
+      availableMoney,
+      requiresAcknowledgement: true,
+      shortfallAmount: availableMoney < 0 ? 90 : 0,
       availableMoneyBlocker: "DEFICIT",
       pendingDeficits: [{ subcategoryId: "food", subcategoryName: "Comida", amount: 90 }],
       pendingSurpluses: [{
@@ -242,21 +245,33 @@ describe("guided monthly closure", () => {
       }],
     });
     render(<CloseMonthPage />);
-    expect(await screen.findByRole("status", { name: "Danger: Dinero disponible en déficit" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Elegir destino →" })).toBeDisabled();
-    await userEvent.selectOptions(screen.getByLabelText("Subcategoría origen con sobrante"), "fun");
-    await userEvent.type(screen.getByLabelText("Monto"), "90");
-    await userEvent.click(screen.getByRole("button", { name: "Cubrir desfalco" }));
-
-    await waitFor(() => expect(apiMock.applyClosureAction).toHaveBeenCalledWith({
-      monthId: "m1",
-      type: "DEFICIT_COVER_FROM_SUBCATEGORY",
-      sourceSubcategoryId: "fun",
-      targetSubcategoryId: "food",
-      amount: 90,
-      description: "Cobertura de desfalco al cierre",
-    }));
+    expect(await screen.findByText("Comida se pasó $90 COP del presupuesto")).toBeInTheDocument();
+    const advance = screen.getByRole("button", { name: availableMoney < 0 ? "Revisar cierre →" : "Elegir destino →" });
+    expect(advance).toBeDisabled();
     expect(apiMock.closeMonth).not.toHaveBeenCalled();
+    expect(screen.queryByText("Cubrir desfalco")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("checkbox", { name: "Entiendo, cerrar igual" }));
+    await userEvent.click(advance);
+    if (availableMoney >= 0) await confirmation();
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar cierre" }));
+    await waitFor(() => expect(apiMock.closeMonth.mock.calls).toEqual([["m1", {
+      carryAmount: Math.max(0, availableMoney), excludedAmount: 0,
+      ...(availableMoney < 0 ? { shortfallAmount: 90 } : {}), acknowledgedWarnings: true,
+    }]]));
+  });
+
+  it("requires a fresh acknowledgement after a stale warning close", async () => {
+    apiMock.getClosureReview.mockResolvedValue({ ...review, requiresAcknowledgement: true });
+    apiMock.closeMonth.mockRejectedValue(new Error("La distribución del cierre debe ser igual al dinero disponible actual. Actualice la revisión del cierre."));
+    render(<CloseMonthPage />);
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Entiendo, cerrar igual" }));
+    await destination();
+    await confirmation();
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar cierre" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("La distribución del cierre debe ser igual al dinero disponible actual. Actualice la revisión del cierre.");
+    expect(screen.getByRole("checkbox", { name: "Entiendo, cerrar igual" })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Elegir destino →" })).toBeDisabled();
+    expect(apiMock.closeMonth).toHaveBeenCalledTimes(1);
   });
 
   it("preserves zero bodyless close, December rollover, pending open and retry errors", async () => {

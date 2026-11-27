@@ -20,12 +20,14 @@ Product rule: `docs/product/monthly-closure.md`, section "Decidido (2026-11-26):
 
 ## Tasks
 
-- [ ] T1 — S1–S5 — inline — server + migration: review fields, acknowledged close, negative close with shortfall, opening $0, remove closure-actions; tests; contract docs. Commit: —
-- [ ] T2 — S1–S4 — inline — client: warnings + "Entiendo, cerrar igual", negative close flow, remove cover forms, closed-month shortfall; tests + e2e; screen docs. Commit: —
+- [x] T1 — S1–S5 — inline — server + migration: review fields, acknowledged close, negative close with shortfall, opening $0, remove closure-actions; tests; contract docs. Commit: e9c8a11
+- [x] T2 — S1–S4 — inline — client: warnings + "Entiendo, cerrar igual", negative close flow, remove cover forms, closed-month shortfall; tests + e2e; screen docs. Commit: see git log (feat(closure): warn and confirm instead of blocking in the closure screen)
 - [ ] T3 — S1–S5 — verify — independent verification (Risk items 1 and 3), full suites. Commit: —
 
 ## Log
 
 - L1 — User request: "Dale vamos con la implementacion del 3" (v1.0 item 3: implement the decided monthly-closure rule).
 - L2 — Exploration: blocking at `closure-use-cases.ts:216–218`; review `canClose` at `:80–83`; only `closureCarryAmount`/`closureExcludedAmount` stored (`prisma/schema.prisma:109–110`), DB check forbids negatives (`20261104030000_guided_monthly_closure/migration.sql`); opening uses `closureCarryAmount ?? 0` (`month-lifecycle-service.ts:55–71`). Pocket cover lowers pocket and raises a subcategory budget but does not raise available money (`balance-calculator.ts:74–82`, `ledger-mappers.ts:35–36`), which corrected an earlier explanation to the user and led to S4.
+- L4 — T1 evidence: RED `warnings require acknowledgement and permit explicit negative closure` (requiresAcknowledgement undefined). Server build exit 0; `pnpm --dir server test` against dev 367/369, the 2 failures are the pre-existing isolation guards of `guided-closure.postgres.integration.test.ts`, which pass 2/2 in a disposable `guided_closure_t1_*` schema (migrated, run, dropped). Migration `20261126000000_closure_shortfall` applied to dev only. Legacy lifecycle close kept as delegate to the closure use case (has callers). Parent extracted `matchesCurrentAvailability` for readability. Slice boundary: T1 is its own commit (Risk items 1 and 3).
 - L3 — Out of scope: reports for closed months (Reports only loads the active month); a new pocket → available movement (v1.1 if needed).
+- L5 — T2 evidence: RED three warning-flow cases (missing warning text) and dashboard shortfall test (missing "Cubierto fuera de la app"). `pnpm --dir client build` exit 0, `typecheck` exit 0, `pnpm --dir client test` 27 files / 295 tests passed, `npx playwright test` 9/9 passed (includes new intercepted negative-closure scenario).
