@@ -2,6 +2,29 @@
 
 El cierre revisa gastos, efectivo y diferencias de presupuesto antes de elegir el destino del disponible real. Los saldos positivos de categorías son informativos, no dinero adicional. Los déficits de categorías deben cubrirse y el disponible no puede ser negativo.
 
+## Decidido (2026-11-26): el cierre avisa, no bloquea
+
+**Estado: decisión de producto para v1.0, pendiente de implementación.** Hasta implementarla, las reglas actuales descritas en el resto de este documento siguen vigentes.
+
+Principio: la app registra el dinero, no lo controla. Una desviación de presupuesto (planear mal) es información; un disponible negativo (faltó dinero) se avisa, pero puede haberse resuelto fuera de la app.
+
+1. **Subcategoría sobrepasada con disponible positivo.** Ejemplo: Transporte con $50.000 presupuestados y $60.000 gastados (−$10.000) y disponible +$500.000. El cierre se permite tras un aviso en Revisar y una confirmación explícita («Entiendo, cerrar igual»). El gasto ya está registrado y descontado: no se descuenta otra vez ni hay que reponer. Presupuesto, gasto real y desviación se conservan en el cierre y en los reportes.
+2. **Disponible negativo.** El cierre se permite tras un aviso y una confirmación explícita. Opcionalmente se puede reponer desde un bolsillo registrado (dinero real que entra al mes); no es obligatorio, porque el faltante puede cubrirse con dinero que no vive en la app (por ejemplo, una cuenta de alto rendimiento).
+3. **Mes siguiente tras cerrar en negativo sin reponer:** arranca con saldo inicial $0. El cierre registra el faltante como «cubierto fuera de la app» y queda visible en el historial y los reportes; es la contraparte de «dejar fuera del seguimiento» en el sobrante positivo.
+4. **Se elimina la reposición desde otra subcategoría:** solo reacomodaba presupuesto, sin mover dinero, y ocultaba la desviación. Los movimientos de reposición ya registrados en meses anteriores se siguen mostrando en el historial.
+
+Decisiones del usuario:
+
+> Conincido con la C pero ahm no se si dejar la parte de poder "reponer" porque en teoria en ese caso el gasto ya se registro
+
+> Concuerdo contigo dejarlo cuando el disponible es negativo, pero aca algo muy importante es no limitarlo a sacar de bolsilllo dejemoslo tambien como a confirmar porque, por ejemplo mi bolsillo de emergencia no lo tengo en la app porque diariamiente crece por queesta en una cuenta de alto rendimiento pero bueno el punto es la posibilidad de darle al usuario que cierre el mes y ya el pues  a nivel interno gestione ese desfalco porque no siempre involucra que gaste de mis bolsillos registrados
+
+Mes siguiente tras cerrar en negativo: «Arranca en $0».
+
+Solicitud original:
+
+> Ahm, eso anotalo porque creo que hay que mirarlo bine, me refiero creo que eso de lo negativo sirve mas como para informar, no se si deba limitar el cierre del mes, es decir si mi subcategoria de transporte quedo con -10,000 pero mi reporte general del mes es +500,000 quiere decir que este mas gaste mas delo presupuestado en esa sub categoria pero no quiere decir que no pueida cerrar el mes, pero tocaria revisarlo bien, ademas de que esto tambien ayuda en terminos de reportes saber si una categoria tiene mucho o poco asignado
+
 ## Pantalla de cierre
 
 La ruta `/close-month` ofrece tres pasos: **Revisar → Destino → Confirmar**, con progreso lateral en escritorio y horizontal en móvil. Los paneles comparten tamaño intrínseco sin mostrar ni enfocar pasos inactivos. El detalle nativo de efectivo, bolsillos y presupuesto se cierra al avanzar de revisión a destino. Volver conserva la selección y los textos de división mientras no se refresque la revisión.

@@ -4,11 +4,21 @@ Use this file to capture real-use frictions and follow-up ideas before they beco
 
 ## Agreed order
 
-1. Small daily-use fixes, together: translate server error messages, currency format while typing, collapsible pocket movements.
-2. RM-027 UI diagnosis, before any serious screen redesign.
-3. Credit cards: screen improvements and statement payments as one piece of work.
-4. Recurring expenses and recurring incomes together.
-5. Excel export last, so it includes the data added by the previous items.
+Goal (2026-11-26): reach a stable, frozen v1.0 to study, defend and include in a portfolio. User: "tengo que poder defender este proyecto a pezar de lo que hice con IA".
+
+### v1.0 (frozen scope)
+
+1. [x] Small daily-use fixes, together: translate server error messages, currency format while typing, collapsible pocket movements (PR #228).
+2. [x] Decide the monthly-closure rule for overspent subcategories with positive general availability (`docs/product/monthly-closure.md`, "Decidido (2026-11-26)"): warn and confirm instead of blocking; negative availability also closes with confirmation, optional pocket cover, next month starts at $0; remove cover from another subcategory.
+2b. [ ] Implement the decided monthly-closure rule.
+3. [ ] RM-027 UI diagnosis, then targeted fixes from its findings (no full redesign).
+4. [ ] Credit cards: screen improvements and statement payments as one bounded piece of work.
+5. [ ] Freeze v1.0: README, seed/demo data (never personal data), screenshots or demo, architecture and decision docs.
+
+### v1.1 (public roadmap, after v1.0)
+
+- Recurring expenses and recurring incomes together.
+- Excel export last, so it includes the data added by the previous items.
 
 ## Inbox
 

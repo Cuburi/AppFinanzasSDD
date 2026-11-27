@@ -1,0 +1,31 @@
+# Closure warns, does not block
+
+Branch: `feat/closure-warn-not-block` (from `dev`). v1.0 item 3 in `odd/tasks/personal-use-backlog.md`.
+Product rule: `docs/product/monthly-closure.md`, section "Decidido (2026-11-26): el cierre avisa, no bloquea".
+
+## Specs
+
+- S1 — Overspent subcategory with positive (or zero) available money does not block closing. User: "Conincido con la C". Rule C: "Si una subcategoría se pasa de su presupuesto pero el disponible general es positivo, el mes se puede cerrar igual. En el paso Revisar aparece un aviso, por ejemplo: «Transporte se pasó $10.000 del presupuesto». Para seguir marcás algo como «Entiendo, cerrar igual»." The expense is not discounted again; planned, spent and deviation stay visible.
+- S2 — Negative available money does not block closing either, after a warning and explicit confirmation. User: "algo muy importante es no limitarlo a sacar de bolsilllo dejemoslo tambien como a confirmar porque, por ejemplo mi bolsillo de emergencia no lo tengo en la app porque diariamiente crece por queesta en una cuenta de alto rendimiento pero bueno el punto es la posibilidad de darle al usuario que cierre el mes y ya el pues  a nivel interno gestione ese desfalco porque no siempre involucra que gaste de mis bolsillos registrados".
+- S3 — After closing with negative available money, the next month starts at $0. User choice: "Arranca en $0 (recomendada)". The closure records the shortfall as covered outside the app ("cubierto fuera de la app") and it stays visible in the closed-month history.
+- S4 — Both closure cover actions are removed. User: "Ahm no se si dejar la parte de poder "reponer" porque en teoria en ese caso el gasto ya se registro" and choice "A. Quitar ambas del cierre (recomendada)": "Cerrás en negativo con confirmación; si usaste un bolsillo de la app, registrás un retiro en Bolsillos. Sin movimientos nuevos." Historical cover movements keep being shown in the ledger.
+- S5 — The confirmation is enforced by the server, not only the screen (agent technical decision, shown to the user): closing with warnings requires an explicit acknowledgement; a stale review (amounts changed since the user confirmed) is rejected and the user must review again.
+
+## Contract (agent technical decisions)
+
+- Review adds `requiresAcknowledgement: boolean` (true when any subcategory is overspent or available money is negative) and `shortfallAmount: number` (absolute negative available money, else 0). `canClose` keeps meaning "bodyless close allowed": ACTIVE, zero available, no warnings.
+- `POST /api/months/:id/close` body: `{ carryAmount, excludedAmount, shortfallAmount?, acknowledgedWarnings? }`. Cents rule: `carry + excluded − shortfall = available`. Negative available: carry = excluded = 0 and shortfall = −available. Non-negative available: shortfall absent or 0. Warnings without `acknowledgedWarnings: true`: 409. Stale amounts: 409.
+- `Month.closureShortfallAmount Decimal(12,2)` nullable, additive migration; new closures store 0 or the shortfall; legacy closures keep null (read as 0). `closureAllocation` adds `shortfallAmount`; `availableMoney = carry + excluded − shortfall`.
+- `POST /api/months/:id/closure-actions` and its use case/parser are removed. Movement types and ledger projections of past covers stay.
+
+## Tasks
+
+- [ ] T1 — S1–S5 — inline — server + migration: review fields, acknowledged close, negative close with shortfall, opening $0, remove closure-actions; tests; contract docs. Commit: —
+- [ ] T2 — S1–S4 — inline — client: warnings + "Entiendo, cerrar igual", negative close flow, remove cover forms, closed-month shortfall; tests + e2e; screen docs. Commit: —
+- [ ] T3 — S1–S5 — verify — independent verification (Risk items 1 and 3), full suites. Commit: —
+
+## Log
+
+- L1 — User request: "Dale vamos con la implementacion del 3" (v1.0 item 3: implement the decided monthly-closure rule).
+- L2 — Exploration: blocking at `closure-use-cases.ts:216–218`; review `canClose` at `:80–83`; only `closureCarryAmount`/`closureExcludedAmount` stored (`prisma/schema.prisma:109–110`), DB check forbids negatives (`20261104030000_guided_monthly_closure/migration.sql`); opening uses `closureCarryAmount ?? 0` (`month-lifecycle-service.ts:55–71`). Pocket cover lowers pocket and raises a subcategory budget but does not raise available money (`balance-calculator.ts:74–82`, `ledger-mappers.ts:35–36`), which corrected an earlier explanation to the user and led to S4.
+- L3 — Out of scope: reports for closed months (Reports only loads the active month); a new pocket → available movement (v1.1 if needed).
