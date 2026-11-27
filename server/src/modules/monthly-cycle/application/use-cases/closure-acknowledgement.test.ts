@@ -62,7 +62,7 @@ test("warnings (positive, zero and negative availability) close once after ackno
       message: "Debe confirmar que entiende los avisos antes de cerrar el mes.",
     });
     assert.equal(hash(f.row()), before);
-    const closed = await f.service.closeMonth("month-ack", { ...input, acknowledgedWarnings: true });
+    const closed = await f.service.closeMonth("month-ack", { ...input, acknowledgedWarningsKey: review.warningsKey! });
     assert.equal(hash([f.row().categories, f.row().movements]), financial);
     assert.deepEqual(await f.service.closeMonth("month-ack", input), closed);
     assert.equal(f.writes(), 1);
@@ -71,13 +71,29 @@ test("warnings (positive, zero and negative availability) close once after ackno
 
 test("close validates the locked state, not the earlier review", async () => {
   const f = fixture(560);
-  assert.equal((await f.service.getClosureReview("month-ack")).availableMoney, 500);
+  const review = await f.service.getClosureReview("month-ack");
+  assert.equal(review.availableMoney, 500);
   f.replace({ ...f.row(), openingBalance: 559 } as unknown as MonthRecord);
   const before = hash(f.row());
   await assert.rejects(
-    () => f.service.closeMonth("month-ack", { carryAmount: 500, excludedAmount: 0, acknowledgedWarnings: true }),
+    () => f.service.closeMonth("month-ack", { carryAmount: 500, excludedAmount: 0, acknowledgedWarningsKey: review.warningsKey! }),
     { statusCode: 409, message: "La distribución del cierre debe ser igual al dinero disponible actual. Actualice la revisión del cierre." },
   );
+  assert.equal(hash(f.row()), before);
+  assert.equal(f.writes(), 0);
+});
+
+test("warning-only changes invalidate acknowledgement without changing availability", async () => {
+  const f = fixture(560);
+  const review = await f.service.getClosureReview("month-ack");
+  const row = f.row();
+  f.replace({ ...row, categories: row.categories.map(category => ({ ...category, subcategories: category.subcategories.map(sub => ({ ...sub, plannedAmount: 40 })) })) } as unknown as MonthRecord);
+  const before = hash(f.row());
+  assert.equal((await f.service.getClosureReview("month-ack")).availableMoney, review.availableMoney);
+  await assert.rejects(() => f.service.closeMonth("month-ack", { carryAmount: 500, excludedAmount: 0, acknowledgedWarningsKey: review.warningsKey! }), {
+    statusCode: 409, message: "Los avisos del cierre cambiaron. Actualice la revisión del cierre.",
+  });
+  assert.equal((await f.service.getMonth("month-ack")).status, "ACTIVE");
   assert.equal(hash(f.row()), before);
   assert.equal(f.writes(), 0);
 });

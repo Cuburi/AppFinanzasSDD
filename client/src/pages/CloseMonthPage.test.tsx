@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CloseMonthPage } from "./CloseMonthPage";
+import { GuidedClosure } from "../features/monthly-cycle/month-closure/GuidedClosure";
 import type { ClosureReview, Month } from "../types";
 
 const apiMock = vi.hoisted(() => ({
@@ -37,6 +38,7 @@ const review: ClosureReview = {
   canClose: false,
   requiresDisposition: true,
   requiresAcknowledgement: false,
+  warningsKey: null,
   shortfallAmount: 0,
   closureAllocation: null,
   availableMoney: 300000,
@@ -236,6 +238,7 @@ describe("guided monthly closure", () => {
       ...review,
       availableMoney,
       requiresAcknowledgement: true,
+      warningsKey: "food:9000|shortfall:0",
       shortfallAmount: availableMoney < 0 ? 90 : 0,
       availableMoneyBlocker: "DEFICIT",
       pendingDeficits: [{ subcategoryId: "food", subcategoryName: "Comida", amount: 90 }],
@@ -256,12 +259,28 @@ describe("guided monthly closure", () => {
     await userEvent.click(screen.getByRole("button", { name: "Confirmar cierre" }));
     await waitFor(() => expect(apiMock.closeMonth.mock.calls).toEqual([["m1", {
       carryAmount: Math.max(0, availableMoney), excludedAmount: 0,
-      ...(availableMoney < 0 ? { shortfallAmount: 90 } : {}), acknowledgedWarnings: true,
+      ...(availableMoney < 0 ? { shortfallAmount: 90 } : {}), acknowledgedWarningsKey: "food:9000|shortfall:0",
     }]]));
   });
 
+  it("resets a positive split when a refreshed review becomes negative", async () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<GuidedClosure month={month} review={review} pending={false} onClose={onClose} />);
+    await destination();
+    await userEvent.click(screen.getByRole("radio", { name: /Dividir el sobrante/ }));
+    await userEvent.type(screen.getByLabelText("Al siguiente mes (COP)"), "100000");
+    await userEvent.type(screen.getByLabelText("Fuera del seguimiento (COP)"), "200000");
+    await confirmation();
+    rerender(<GuidedClosure month={month} review={{ ...review, availableMoney: -90, requiresAcknowledgement: true, warningsKey: "shortfall:9000", shortfallAmount: 90 }} pending={false} onClose={onClose} />);
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Entiendo, cerrar igual" }));
+    await userEvent.click(screen.getByRole("button", { name: "Revisar cierre →" }));
+    expect(screen.getByRole("button", { name: "Confirmar cierre" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar cierre" }));
+    expect(onClose.mock.calls).toEqual([[{ carryAmount: 0, excludedAmount: 0, shortfallAmount: 90, acknowledgedWarningsKey: "shortfall:9000" }]]);
+  });
+
   it("requires a fresh acknowledgement after a stale warning close", async () => {
-    apiMock.getClosureReview.mockResolvedValue({ ...review, requiresAcknowledgement: true });
+    apiMock.getClosureReview.mockResolvedValue({ ...review, requiresAcknowledgement: true, warningsKey: "food:9000|shortfall:0" });
     apiMock.closeMonth.mockRejectedValue(new Error("La distribución del cierre debe ser igual al dinero disponible actual. Actualice la revisión del cierre."));
     render(<CloseMonthPage />);
     await userEvent.click(await screen.findByRole("checkbox", { name: "Entiendo, cerrar igual" }));

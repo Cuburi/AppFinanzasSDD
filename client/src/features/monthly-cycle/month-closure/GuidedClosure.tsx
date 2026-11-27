@@ -23,7 +23,7 @@ type Props = {
 export function GuidedClosure({ month, review, pending, onClose, children }: Props) {
   const [step, setStep] = useState(1);
   const [acknowledged, setAcknowledged] = useState(false);
-  useEffect(() => { setAcknowledged(false); setStep(1); }, [review]);
+  useEffect(() => { setAcknowledged(false); setStep(1); setMode("carry"); setCarry(""); setExcluded(""); }, [review]);
   const negative = review.availableMoney < 0;
   const [mode, setMode] = useState("carry");
   const [carry, setCarry] = useState("");
@@ -227,7 +227,7 @@ export function GuidedClosure({ month, review, pending, onClose, children }: Pro
                   carryAmount: carryCents! / 100,
                   excludedAmount: excludedCents! / 100,
                   ...(negative ? { shortfallAmount: review.shortfallAmount } : {}),
-                  ...(review.requiresAcknowledgement ? { acknowledgedWarnings: true as const } : {}),
+                  ...(review.requiresAcknowledgement ? { acknowledgedWarningsKey: review.warningsKey! } : {}),
                 });
               }
             }}

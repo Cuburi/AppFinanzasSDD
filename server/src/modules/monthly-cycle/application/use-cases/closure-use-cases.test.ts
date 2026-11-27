@@ -135,7 +135,7 @@ test("warnings require acknowledgement and permit explicit negative closure", as
   assert.equal((await service.getMonth(negative.id)).status, "ACTIVE");
   assert.equal((await service.getMonth(negative.id)).closureAllocation, null);
   assert.equal(calls.some((call) => (call as string[])[0] === "tx.months.close"), false);
-  const closed = await service.closeMonth(negative.id, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 300, acknowledgedWarnings: true });
+  const closed = await service.closeMonth(negative.id, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 300, acknowledgedWarningsKey: review.warningsKey! });
   assert.equal(closed.status, "CLOSED");
 });
 
@@ -202,7 +202,8 @@ test("acknowledged subcategory warnings close without creating cover movements",
   await assert.rejects(() => service.closeMonth("month-1", { carryAmount: 0, excludedAmount: 0 }), { statusCode: 409, message: "Debe confirmar que entiende los avisos antes de cerrar el mes." });
   assert.equal((await service.getMonth("month-1")).status, "ACTIVE");
   assert.equal((await service.getMonth("month-1")).closureAllocation, null);
-  assert.equal((await service.closeMonth("month-1", { carryAmount: 0, excludedAmount: 0, acknowledgedWarnings: true })).status, "CLOSED");
+  const review = await service.getClosureReview("month-1");
+  assert.equal((await service.closeMonth("month-1", { carryAmount: 0, excludedAmount: 0, acknowledgedWarningsKey: review.warningsKey! })).status, "CLOSED");
   assert.equal(calls.some(call => (call as string[])[0] === "tx.movements.create"), false);
 });
 
@@ -217,7 +218,8 @@ test("stale confirmed amounts reject without mutating the month", async () => {
     const { ports, calls } = createClosurePorts(month);
     const service = createClosureUseCases(ports);
     const before = await service.getMonth("month-1");
-    await assert.rejects(() => service.closeMonth("month-1", { ...allocation, acknowledgedWarnings: true }), { statusCode: 409, message: "La distribución del cierre debe ser igual al dinero disponible actual. Actualice la revisión del cierre." });
+    const review = await service.getClosureReview("month-1");
+    await assert.rejects(() => service.closeMonth("month-1", { ...allocation, acknowledgedWarningsKey: review.warningsKey ?? undefined }), { statusCode: 409, message: "La distribución del cierre debe ser igual al dinero disponible actual. Actualice la revisión del cierre." });
     assert.deepEqual(await service.getMonth("month-1"), before);
     assert.equal(calls.some(call => (call as string[])[0] === "tx.months.close"), false);
   }

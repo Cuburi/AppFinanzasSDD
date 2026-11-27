@@ -1086,7 +1086,7 @@ test("service integration: confirmed deficit closure preserves deviation without
   });
   const review = await service.getClosureReview(month.id);
   assert.equal(review.requiresAcknowledgement, true);
-  const closed = await service.closeMonth(month.id, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 150, acknowledgedWarnings: true });
+  const closed = await service.closeMonth(month.id, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 150, acknowledgedWarningsKey: review.warningsKey! });
   assert.equal(closed.status, "CLOSED");
   assert.equal(getCapturedMovements().length, 1);
   assert.equal(review.pendingDeficits.length, 1);
@@ -1723,7 +1723,7 @@ test("guided closure retains zero baseline and confirms negative money and budge
     await assert.rejects(() => service.closeMonth(month.id, { carryAmount: kind === "deficit" ? 650 : 0, excludedAmount: 0 }), { statusCode: 409 });
     assert.deepEqual(await service.getActiveMonth(), before);
     assert.deepEqual(await service.getMonthlyLedger({ monthId: month.id, includeSystemEvents: true }), ledger);
-    const allocation = { carryAmount: kind === "deficit" ? 650 : 0, excludedAmount: 0, shortfallAmount: kind === "negative" ? 350 : 0, acknowledgedWarnings: true as const };
+    const allocation = { carryAmount: kind === "deficit" ? 650 : 0, excludedAmount: 0, shortfallAmount: kind === "negative" ? 350 : 0, acknowledgedWarningsKey: (await service.getClosureReview(month.id)).warningsKey! };
     const closed = await service.closeMonth(month.id, allocation);
     assert.equal(closed.status, "CLOSED");
     assert.deepEqual(await service.closeMonth(month.id, allocation), closed);

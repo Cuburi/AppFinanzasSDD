@@ -72,7 +72,7 @@ test("guided closure PostgreSQL persists decisions and serializes close/open ret
     const negative = await service.recordExpense({ monthId: february.id, sourceSubcategoryId: null, amount: 10, occurredAt: "2099-02-01", paymentMethod: "NON_CASH" });
     await assert.rejects(() => service.closeMonth(february.id, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 10 }), { statusCode: 409, message: "Debe confirmar que entiende los avisos antes de cerrar el mes." });
     assert.deepEqual(await service.getActiveMonth(), negative);
-    const negativeClosed = await service.closeMonth(february.id, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 10, acknowledgedWarnings: true });
+    const negativeClosed = await service.closeMonth(february.id, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 10, acknowledgedWarningsKey: (await service.getClosureReview(february.id)).warningsKey! });
     assert.deepEqual(negativeClosed.closureAllocation, { availableMoney: -10, carryAmount: 0, excludedAmount: 0, shortfallAmount: 10 });
     const march = await service.openMonth({ year: 2099, month: 3 });
     ids.push(march.id);

@@ -22,7 +22,7 @@ export type ClosureCategoryVarianceView = {
   informational: true;
 };
 
-export type CloseMonthInput = { carryAmount: number; excludedAmount: number; shortfallAmount?: number; acknowledgedWarnings?: true };
+export type CloseMonthInput = { carryAmount: number; excludedAmount: number; shortfallAmount?: number; acknowledgedWarningsKey?: string };
 export type ClosureAllocationView = CloseMonthInput & { availableMoney: number };
 
 /** Strict cents, not coercion or rounding: validate direct use-case callers too. */
@@ -31,9 +31,9 @@ export const parseCloseMonthInput = (payload: unknown): CloseMonthInput | undefi
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new DomainError(400, "La distribución del cierre debe incluir carryAmount y excludedAmount.");
   }
-  const { carryAmount, excludedAmount, shortfallAmount, acknowledgedWarnings } = payload as CloseMonthInput;
-  if (acknowledgedWarnings !== undefined && acknowledgedWarnings !== true) {
-    throw new DomainError(400, "La confirmación de los avisos debe ser true.");
+  const { carryAmount, excludedAmount, shortfallAmount, acknowledgedWarningsKey } = payload as CloseMonthInput;
+  if (acknowledgedWarningsKey !== undefined && (typeof acknowledgedWarningsKey !== "string" || !acknowledgedWarningsKey.trim())) {
+    throw new DomainError(400, "La confirmación de los avisos debe ser una clave no vacía.");
   }
   for (const value of [carryAmount, excludedAmount, ...(shortfallAmount === undefined ? [] : [shortfallAmount])]) {
     if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 9_999_999_999.99 ||
@@ -41,7 +41,7 @@ export const parseCloseMonthInput = (payload: unknown): CloseMonthInput | undefi
       throw new DomainError(400, "Los montos del cierre deben ser números finitos no negativos con máximo dos decimales.");
     }
   }
-  return { carryAmount, excludedAmount, ...(shortfallAmount === undefined ? {} : { shortfallAmount }), ...(acknowledgedWarnings === undefined ? {} : { acknowledgedWarnings }) };
+  return { carryAmount, excludedAmount, ...(shortfallAmount === undefined ? {} : { shortfallAmount }), ...(acknowledgedWarningsKey === undefined ? {} : { acknowledgedWarningsKey }) };
 };
 
 export type ClosureReviewView = {
@@ -54,6 +54,7 @@ export type ClosureReviewView = {
   availableMoneyBlocker: "SURPLUS" | "DEFICIT" | null;
   canClose: boolean;
   requiresAcknowledgement: boolean;
+  warningsKey: string | null;
   shortfallAmount: number;
   requiresDisposition?: boolean;
   closureAllocation?: ClosureAllocationView | null;

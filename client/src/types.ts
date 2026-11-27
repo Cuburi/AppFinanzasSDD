@@ -335,7 +335,7 @@ export type UpdateMonthlyIncomeInput = {
 };
 
 export type ClosureAllocation = { availableMoney: number; carryAmount: number; excludedAmount: number; shortfallAmount?: number };
-export type CloseMonthInput = Pick<ClosureAllocation, "carryAmount" | "excludedAmount"> & { shortfallAmount?: number; acknowledgedWarnings?: true };
+export type CloseMonthInput = Pick<ClosureAllocation, "carryAmount" | "excludedAmount"> & { shortfallAmount?: number; acknowledgedWarningsKey?: string };
 
 export type Month = {
   openingBalance?: number;
@@ -378,6 +378,7 @@ export type ClosureBudgetVariance = {
 
 export type ClosureReview = {
   requiresAcknowledgement: boolean;
+  warningsKey: string | null;
   shortfallAmount: number;
   requiresDisposition?: boolean;
   closureAllocation?: ClosureAllocation | null;

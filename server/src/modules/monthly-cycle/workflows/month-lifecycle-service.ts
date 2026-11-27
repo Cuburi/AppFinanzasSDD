@@ -1,13 +1,10 @@
 import { MonthStatus, MovementType } from "../application/monthly-cycle-types.js";
 
-import { createClosureUseCases } from "../application/use-cases/closure-use-cases.js";
-import type { CloseMonthInput } from "../dto/closure.dto.js";
-import type { ClosureReviewView, MonthView, OpenMonthInput, TemplateInput } from "../dto/index.js";
+import type { MonthView, OpenMonthInput, TemplateInput } from "../dto/index.js";
 import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
 import { calculateCashBalance } from "../shared/cash-ledger.js";
 import { decimal } from "../shared/money.js";
 import { decimalToNumber } from "../shared/money.js";
-import type { MonthRecord } from "../shared/service-types.js";
 import { DomainError } from "../shared/service-errors.js";
 import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflow-dependencies.js";
 
@@ -103,8 +100,5 @@ export const createMonthLifecycleService = (dependencies: MonthlyCycleWorkflowDe
       return mapMonth(month);
     },
 
-    async closeMonth(monthId: string, _buildReview: (month: MonthRecord) => ClosureReviewView, allocation?: CloseMonthInput): Promise<MonthView> {
-      return createClosureUseCases(ports).closeMonth(monthId, allocation);
-    },
   };
 };

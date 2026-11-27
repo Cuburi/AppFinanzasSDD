@@ -35,6 +35,7 @@ export const buildClosureReview = (month: MonthRecord): ClosureReviewView => {
     availableMoneyBlocker: isZero(balances.availableMoney) ? null : balances.availableMoney > 0 ? "SURPLUS" : "DEFICIT",
     requiresDisposition: balances.availableMoney > 0 && !isZero(balances.availableMoney),
     requiresAcknowledgement,
+    warningsKey: requiresAcknowledgement ? [...pendingDeficits.map(item => `${item.subcategoryId}:${toCents(item.amount)}`).sort(), `shortfall:${toCents(Math.max(0, -balances.availableMoney))}`].join("|") : null,
     shortfallAmount: balances.availableMoney < 0 ? Number((-balances.availableMoney).toFixed(2)) : 0,
     closureAllocation: mapMonth(month).closureAllocation ?? null,
     canClose: month.status === MonthStatus.ACTIVE && !requiresAcknowledgement && isZero(balances.availableMoney),
@@ -72,8 +73,11 @@ export const createClosureUseCases = (ports: MonthlyCyclePorts): ClosureUseCases
             (!allocation && (!stored || stored.availableMoney === 0))) return existingMonth;
         throw new DomainError(409, "El mes ya se cerró con una distribución diferente.");
       }
-      if (review.requiresAcknowledgement && !allocation?.acknowledgedWarnings) {
+      if (review.requiresAcknowledgement && !allocation?.acknowledgedWarningsKey) {
         throw new DomainError(409, "Debe confirmar que entiende los avisos antes de cerrar el mes.");
+      }
+      if (review.requiresAcknowledgement && allocation?.acknowledgedWarningsKey !== review.warningsKey) {
+        throw new DomainError(409, "Los avisos del cierre cambiaron. Actualice la revisión del cierre.");
       }
       if (!allocation && !review.canClose) {
         throw new DomainError(409, "No se puede cerrar el mes mientras haya saldos pendientes de subcategorías o dinero disponible sin resolver.");

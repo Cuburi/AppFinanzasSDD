@@ -16,13 +16,13 @@ test("closure DTO preserves bodyless zero compatibility and validates exact cent
 });
 
 test("closure DTO rejects invalid acknowledgement and shortfall values", () => {
-  for (const acknowledgedWarnings of [false, null, 1, "true"]) {
-    assert.throws(() => parseCloseMonthInput({ carryAmount: 0, excludedAmount: 0, acknowledgedWarnings }), { statusCode: 400, message: "La confirmación de los avisos debe ser true." });
+  for (const acknowledgedWarningsKey of [false, true, null, 1, "", " ", [], {}]) {
+    assert.throws(() => parseCloseMonthInput({ carryAmount: 0, excludedAmount: 0, acknowledgedWarningsKey }), { statusCode: 400, message: "La confirmación de los avisos debe ser una clave no vacía." });
   }
   for (const shortfallAmount of [-1, null, "1", 0.001, Infinity]) {
     assert.throws(() => parseCloseMonthInput({ carryAmount: 0, excludedAmount: 0, shortfallAmount }), { statusCode: 400, message: "Los montos del cierre deben ser números finitos no negativos con máximo dos decimales." });
   }
-  assert.deepEqual(parseCloseMonthInput({ carryAmount: 0, excludedAmount: 0, shortfallAmount: 1, acknowledgedWarnings: true }), { carryAmount: 0, excludedAmount: 0, shortfallAmount: 1, acknowledgedWarnings: true });
+  assert.deepEqual(parseCloseMonthInput({ carryAmount: 0, excludedAmount: 0, shortfallAmount: 1, acknowledgedWarningsKey: "shortfall:100" }), { carryAmount: 0, excludedAmount: 0, shortfallAmount: 1, acknowledgedWarningsKey: "shortfall:100" });
 });
 
 test("closure HTTP validates before delegation, supports bodyless baseline, and reloads persisted results", async () => {

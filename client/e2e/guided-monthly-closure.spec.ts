@@ -8,7 +8,7 @@ test("negative closure acknowledges external shortfall without cover actions", a
     const path = new URL(request.url()).pathname;
     let payload: unknown;
     if (path === "/api/months/active") payload = { month };
-    else if (path.endsWith("/closure-review")) payload = { monthId: month.id, status: "ACTIVE", canClose: false, requiresDisposition: false, requiresAcknowledgement: true, shortfallAmount: 10000, availableMoney: -10000, pendingDeficits: [], pendingSurpluses: [], budgetVariances: [] };
+    else if (path.endsWith("/closure-review")) payload = { monthId: month.id, status: "ACTIVE", canClose: false, requiresDisposition: false, requiresAcknowledgement: true, warningsKey: "shortfall:1000000", shortfallAmount: 10000, availableMoney: -10000, pendingDeficits: [], pendingSurpluses: [], budgetVariances: [] };
     else if (path === "/api/months/negative/close" && request.method() === "POST") {
       posts.push(request.postDataJSON());
       payload = { ...month, status: "CLOSED", closureAllocation: { availableMoney: -10000, carryAmount: 0, excludedAmount: 0, shortfallAmount: 10000 } };
@@ -23,7 +23,7 @@ test("negative closure acknowledges external shortfall without cover actions", a
   await page.getByRole("button", { name: "Confirmar cierre" }).click();
   await expect(page.getByRole("region", { name: "Resumen del mes cerrado" })).toBeVisible();
   await expect(page.getByText("Cubierto fuera de la app", { exact: true })).toBeVisible();
-  expect(posts).toEqual([{ carryAmount: 0, excludedAmount: 0, shortfallAmount: 10000, acknowledgedWarnings: true }]);
+  expect(posts).toEqual([{ carryAmount: 0, excludedAmount: 0, shortfallAmount: 10000, acknowledgedWarningsKey: "shortfall:1000000" }]);
 });
 
 for (const width of [1440, 320]) {

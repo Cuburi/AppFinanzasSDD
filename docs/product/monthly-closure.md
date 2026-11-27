@@ -42,7 +42,7 @@ El cierre correcto guarda su identidad en `?closedMonthId=…` mediante el histo
 - **Pasar todo al siguiente mes:** `carryAmount` igual al disponible, `excludedAmount: 0`.
 - **Dejar todo fuera del seguimiento:** `carryAmount: 0`, `excludedAmount` igual al disponible.
 - **Dividir el sobrante:** ambos montos suman exactamente el disponible actual.
-- **Disponible negativo:** `carryAmount: 0`, `excludedAmount: 0`, `shortfallAmount` igual al faltante absoluto y `acknowledgedWarnings: true`. Se registra como «cubierto fuera de la app».
+- **Disponible negativo:** `carryAmount: 0`, `excludedAmount: 0`, `shortfallAmount` igual al faltante absoluto y `acknowledgedWarningsKey: review.warningsKey`. Se registra como «cubierto fuera de la app».
 
 La igualdad en centavos es `carryAmount + excludedAmount − shortfallAmount = availableMoney`. Con disponible no negativo, el faltante se omite o es cero.
 
@@ -51,9 +51,9 @@ Los montos son números finitos no negativos con hasta dos decimales COP; no se 
 ## Contrato HTTP para la pantalla
 
 - `GET /api/months/active` → `{ month: MonthView | null }` (existente).
-- `GET /api/months/:id/closure-review` → revisión existente, más `requiresDisposition: boolean`, `requiresAcknowledgement: boolean`, `shortfallAmount: number` y `closureAllocation: null | { availableMoney, carryAmount, excludedAmount, shortfallAmount }`. `canClose` conserva su significado anterior: cierre sin payload permitido. Un sobrante positivo exige disposición aunque no tenga déficits.
+- `GET /api/months/:id/closure-review` → revisión existente, más `requiresDisposition: boolean`, `requiresAcknowledgement: boolean`, `warningsKey: string | null` (déficits ordenados por ID con montos en centavos y faltante; null sin avisos), `shortfallAmount: number` y `closureAllocation: null | { availableMoney, carryAmount, excludedAmount, shortfallAmount }`. `canClose` conserva su significado anterior: cierre sin payload permitido. Un sobrante positivo exige disposición aunque no tenga déficits.
 - `POST /api/months/:id/close` con `{ "carryAmount": 100000, "excludedAmount": 200000 }` → `MonthView`. Con ingreso 1000000 y gastos no efectivos 700000, estos destinos reparten 300000. También se admite 100000.01/199999.99.
-- El POST sin cuerpo solo se permite en un mes ACTIVE, con disponible cero y sin avisos. Con avisos, se exige `acknowledgedWarnings: true`; de lo contrario devuelve 409 («Debe confirmar que entiende los avisos antes de cerrar el mes.»). Si se incluye la confirmación con otro valor, devuelve 400. Payload parcial, null, strings, negativos, no finitos o más de dos decimales: 400. Distribución incorrecta/desactualizada o decisión repetida diferente: 409. Los déficits confirmados no bloquean el cierre.
+- El POST sin cuerpo solo se permite en un mes ACTIVE, con disponible cero y sin avisos. Con avisos, se exige `acknowledgedWarningsKey: review.warningsKey`; de lo contrario devuelve 409 («Debe confirmar que entiende los avisos antes de cerrar el mes.»). La clave debe ser un string no vacío (otro tipo o vacío: 400). Una clave desactualizada devuelve 409 («Los avisos del cierre cambiaron. Actualice la revisión del cierre.») sin mutación, incluso si el disponible no cambió. Payload parcial, null, strings, negativos, no finitos o más de dos decimales: 400. Distribución incorrecta/desactualizada o decisión repetida diferente: 409. Los déficits confirmados no bloquean el cierre.
 - `GET /api/months/:id` → `MonthView` persistido (404 si no existe).
 - `GET /api/months/latest-closed` → `{ month: MonthView | null }`, ordenado por año/mes descendente.
 - `POST /api/months/open` con `{ year, month }` conserva su respuesta 201 y rechaza meses ya existentes/otro mes activo con 409. La UI propone el mes inmediatamente siguiente, incluso diciembre → enero, pero la API permite saltos cronológicos.
