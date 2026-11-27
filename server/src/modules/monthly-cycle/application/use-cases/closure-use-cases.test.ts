@@ -5,6 +5,7 @@ import { MonthStatus, MovementType, Prisma } from "../../../../lib/prisma-client
 import { CLOSURE_USE_CASE_NAMES, createClosureUseCases } from "./closure-use-cases.js";
 import type { MonthlyCyclePorts } from "../ports/monthly-cycle-ports.js";
 import type { MonthRecord } from "../../shared/service-types.js";
+import type { CloseMonthInput } from "../../dto/closure.dto.js";
 
 const amount = (value: number) => new Prisma.Decimal(value.toFixed(2));
 
@@ -121,18 +122,33 @@ const createClosurePorts = (month: MonthRecord = balancedMonth) => {
   return { calls, ports, getLockCalls: () => lockCalls };
 };
 
+test("warnings require acknowledgement and permit explicit negative closure", async () => {
+  const negative = { ...deficitMonth, incomes: [] };
+  const { ports, calls } = createClosurePorts(negative);
+  const service = createClosureUseCases(ports);
+  const review = await service.getClosureReview(negative.id);
+  assert.equal(review.requiresAcknowledgement, true);
+  assert.equal(review.shortfallAmount, 300);
+  assert.equal(review.canClose, false);
+  await assert.rejects(() => service.closeMonth(negative.id, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 300 }),
+    { statusCode: 409, message: "Debe confirmar que entiende los avisos antes de cerrar el mes." });
+  assert.equal((await service.getMonth(negative.id)).status, "ACTIVE");
+  assert.equal((await service.getMonth(negative.id)).closureAllocation, null);
+  assert.equal(calls.some((call) => (call as string[])[0] === "tx.months.close"), false);
+  const closed = await service.closeMonth(negative.id, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 300, acknowledgedWarnings: true });
+  assert.equal(closed.status, "CLOSED");
+});
+
 test("closure mutations lock the owning month before evaluating mutable state", async () => {
-  const closureActionPorts = createClosurePorts(deficitMonth);
   const closePorts = createClosurePorts();
 
-  await createClosureUseCases(closureActionPorts.ports).applyClosureAction({ monthId: "month-1", type: MovementType.DEFICIT_COVER_FROM_POCKET, sourcePocketId: "pocket-safe", targetSubcategoryId: "sub-market", amount: 25 });
   await createClosureUseCases(closePorts.ports).closeMonth("month-1");
 
-  assert.equal(closureActionPorts.getLockCalls() + closePorts.getLockCalls(), 2);
+  assert.equal(closePorts.getLockCalls(), 1);
 });
 
 test("closure use cases expose only the closure public surface", () => {
-  assert.deepEqual(CLOSURE_USE_CASE_NAMES, ["getClosureReview", "applyClosureAction", "closeMonth", "getMonth", "getLatestClosedMonth"]);
+  assert.deepEqual(CLOSURE_USE_CASE_NAMES, ["getClosureReview", "closeMonth", "getMonth", "getLatestClosedMonth"]);
   assert.deepEqual(Object.keys(createClosureUseCases(createClosurePorts().ports)).sort(), [...CLOSURE_USE_CASE_NAMES].sort());
 });
 
@@ -179,35 +195,32 @@ test("closure keeps surplus as informational budget variance when uncategorized 
   });
 });
 
-test("applyClosureAction rejects surplus transfer and persists deficit closure movements inside the transaction runner", async () => {
-  const { calls, ports } = createClosurePorts(surplusMonth);
-  const deficitPorts = createClosurePorts(deficitMonth);
-  const useCases = createClosureUseCases(ports);
+test("acknowledged subcategory warnings close without creating cover movements", async () => {
+  const { calls, ports } = createClosurePorts(deficitMonth);
+  const service = createClosureUseCases(ports);
+  assert.equal((await service.getClosureReview("month-1")).requiresAcknowledgement, true);
+  await assert.rejects(() => service.closeMonth("month-1", { carryAmount: 0, excludedAmount: 0 }), { statusCode: 409, message: "Debe confirmar que entiende los avisos antes de cerrar el mes." });
+  assert.equal((await service.getMonth("month-1")).status, "ACTIVE");
+  assert.equal((await service.getMonth("month-1")).closureAllocation, null);
+  assert.equal((await service.closeMonth("month-1", { carryAmount: 0, excludedAmount: 0, acknowledgedWarnings: true })).status, "CLOSED");
+  assert.equal(calls.some(call => (call as string[])[0] === "tx.movements.create"), false);
+});
 
-  await assert.rejects(
-    () => useCases.applyClosureAction({ monthId: "month-1", type: MovementType.SURPLUS_TO_POCKET_ON_CLOSE, sourceSubcategoryId: "sub-market" }),
-    { message: "La variación del presupuesto es informativa y no se puede transferir." },
-  );
-  const deficitReview = await createClosureUseCases(deficitPorts.ports).applyClosureAction({
-    monthId: "month-1",
-    type: MovementType.DEFICIT_COVER_FROM_POCKET,
-    sourcePocketId: "pocket-safe",
-    targetSubcategoryId: "sub-market",
-    amount: 25,
-  });
-
-  assert.equal(deficitReview.pendingDeficits.length, 1);
-  assert.deepEqual(calls, [
-    ["transactionRunner.run"],
-    ["tx.months.findById", "month-1"],
-  ]);
-  assert.deepEqual(deficitPorts.calls, [
-    ["transactionRunner.run"],
-    ["tx.months.findById", "month-1"],
-    ["tx.pockets.ensurePocketIsActive", "pocket-safe", "Bolsillo de origen"],
-    ["tx.movements.create", "DEFICIT_COVER_FROM_POCKET", "25", null, "sub-market", "pocket-safe", null],
-    ["tx.months.findById", "month-1"],
-  ]);
+test("stale confirmed amounts reject without mutating the month", async () => {
+  const negativeMonth: MonthRecord = { ...deficitMonth, incomes: [] };
+  const cases: Array<[MonthRecord, CloseMonthInput]> = [
+    [surplusMonth, { carryAmount: 99, excludedAmount: 0 }],
+    [negativeMonth, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 299 }],
+    [surplusMonth, { carryAmount: 101, excludedAmount: 0, shortfallAmount: 1 }],
+  ];
+  for (const [month, allocation] of cases) {
+    const { ports, calls } = createClosurePorts(month);
+    const service = createClosureUseCases(ports);
+    const before = await service.getMonth("month-1");
+    await assert.rejects(() => service.closeMonth("month-1", { ...allocation, acknowledgedWarnings: true }), { statusCode: 409, message: "La distribución del cierre debe ser igual al dinero disponible actual. Actualice la revisión del cierre." });
+    assert.deepEqual(await service.getMonth("month-1"), before);
+    assert.equal(calls.some(call => (call as string[])[0] === "tx.months.close"), false);
+  }
 });
 
 test("closeMonth keeps closure validation and month close inside the transaction runner", async () => {

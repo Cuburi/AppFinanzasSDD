@@ -1,13 +1,14 @@
 import { MonthStatus, MovementType } from "../application/monthly-cycle-types.js";
 
+import { createClosureUseCases } from "../application/use-cases/closure-use-cases.js";
+import type { CloseMonthInput } from "../dto/closure.dto.js";
 import type { ClosureReviewView, MonthView, OpenMonthInput, TemplateInput } from "../dto/index.js";
 import { mapMonth } from "../mappers/monthly-cycle-mappers.js";
 import { calculateCashBalance } from "../shared/cash-ledger.js";
 import { decimal } from "../shared/money.js";
 import { decimalToNumber } from "../shared/money.js";
-import { lockMutableMonthForMutation } from "../shared/month-queries.js";
-import { DomainError } from "../shared/service-errors.js";
 import type { MonthRecord } from "../shared/service-types.js";
+import { DomainError } from "../shared/service-errors.js";
 import { resolveMonthlyCyclePorts, type MonthlyCycleWorkflowDependencies } from "./workflow-dependencies.js";
 
 import { businessDateToPrisma } from "../../../shared/business-date.js";
@@ -102,20 +103,8 @@ export const createMonthLifecycleService = (dependencies: MonthlyCycleWorkflowDe
       return mapMonth(month);
     },
 
-    async closeMonth(monthId: string, buildClosureReview: (month: MonthRecord) => ClosureReviewView): Promise<MonthView> {
-      const month = await ports.transactionRunner.run(async (txPorts) => {
-        const existingMonth = await lockMutableMonthForMutation(txPorts.months, monthId);
-
-        const review = buildClosureReview(existingMonth);
-
-        if (!review.canClose) {
-          throw new DomainError(409, "No se puede cerrar el mes mientras haya saldos pendientes de subcategorías o dinero disponible sin resolver.");
-        }
-
-        return txPorts.months.close(monthId);
-      });
-
-      return mapMonth(month);
+    async closeMonth(monthId: string, _buildReview: (month: MonthRecord) => ClosureReviewView, allocation?: CloseMonthInput): Promise<MonthView> {
+      return createClosureUseCases(ports).closeMonth(monthId, allocation);
     },
   };
 };

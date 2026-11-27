@@ -67,6 +67,18 @@ test("guided closure PostgreSQL persists decisions and serializes close/open ret
     assert.equal(ledger.entries.filter((entry) => entry.eventType === "OPENING_BALANCE").length, 1);
     assert.equal((await service.getMonthlyLedger({ monthId: january.id, includeSystemEvents: false })).entries.some((entry) => entry.eventType === "OPENING_BALANCE"), false);
     await service.closeMonth(january.id, { carryAmount: 0, excludedAmount: 100_000 });
+    const february = await service.openMonth({ year: 2099, month: 2 });
+    ids.push(february.id);
+    const negative = await service.recordExpense({ monthId: february.id, sourceSubcategoryId: null, amount: 10, occurredAt: "2099-02-01", paymentMethod: "NON_CASH" });
+    await assert.rejects(() => service.closeMonth(february.id, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 10 }), { statusCode: 409, message: "Debe confirmar que entiende los avisos antes de cerrar el mes." });
+    assert.deepEqual(await service.getActiveMonth(), negative);
+    const negativeClosed = await service.closeMonth(february.id, { carryAmount: 0, excludedAmount: 0, shortfallAmount: 10, acknowledgedWarnings: true });
+    assert.deepEqual(negativeClosed.closureAllocation, { availableMoney: -10, carryAmount: 0, excludedAmount: 0, shortfallAmount: 10 });
+    const march = await service.openMonth({ year: 2099, month: 3 });
+    ids.push(march.id);
+    assert.equal(march.openingBalance, 0);
+    assert.equal(march.availableMoney, 0);
+    assert.equal(march.openingSourceMonthId, february.id);
   } finally {
     // Only fixture IDs in the caller's new isolated schema, recipients before sources.
     for (const id of ids.reverse()) {

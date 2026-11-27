@@ -115,8 +115,9 @@ test("guided closure dates both deficit movement types using the injected Bogota
   for (const type of ["DEFICIT_COVER_FROM_SUBCATEGORY", "DEFICIT_COVER_FROM_POCKET"] as const) {
     const { month, ports, records } = fixture();
     month.movements.push({ id: "expense", type: "EXPENSE", amount: money(150), sourceSubcategoryId: "target", targetSubcategoryId: null, sourcePocketId: null, targetPocketId: null });
-    await createClosureUseCases(ports, () => todayInBogota(instant)).applyClosureAction({ monthId: month.id, type, sourceSubcategoryId: "source", sourcePocketId: "pocket", targetSubcategoryId: "target", amount: 10 });
-    assert.equal(records[0]!.occurredAt!.toISOString(), "2026-10-31T00:00:00.000Z");
+    month.movements.push({ id: "historical-cover", type, amount: money(10), occurredAt: businessDateToPrisma("2026-10-31"), sourceSubcategoryId: "source", sourcePocketId: "pocket", targetSubcategoryId: "target", targetPocketId: null });
+    assert.equal(mapMonthlyLedger(month, true).entries.some(entry => entry.occurredAt === "2026-10-31"), true);
+    assert.equal(records.length, 0);
   }
 });
 

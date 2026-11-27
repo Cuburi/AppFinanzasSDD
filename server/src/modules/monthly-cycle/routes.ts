@@ -18,7 +18,6 @@ import {
   type UpdateMonthSubcategoryInput,
   type UpdateMonthlyIncomeInput,
   parseCreateMonthlyIncomeInput,
-  parseClosureActionInput,
   parseCloseMonthInput,
   parseCreateMonthCategoryInput,
   parseCreateMonthSubcategoryInput,
@@ -432,21 +431,6 @@ export const createMonthlyCycleRouter = (routeService: Partial<MonthlyCycleRoute
 
       response.status(400).json({ message: readMessage(error) });
     }
-  });
-
-  router.post("/months/:id/closure-actions", async (request, response) => {
-    const result = await runCreate(request, "POST /api/months/:id/closure-actions", async () => {
-      try {
-        const payload = parseClosureActionInput(request.params.id, request.body);
-        const review = await service.applyClosureAction(payload);
-        return { statusCode: 201, body: review };
-      } catch (error) {
-        if (isDomainError(error)) return { statusCode: error.statusCode, body: { message: error.message } };
-
-        return { statusCode: 400, body: { message: readMessage(error) } };
-      }
-    });
-    response.status(result.statusCode).json(result.body);
   });
 
   router.post("/months/:id/close", async (request, response) => {

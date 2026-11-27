@@ -249,7 +249,6 @@ const closeFirstWriterFactories: WriterDefinition[] = [
   { name: "createMonthSubcategory", write: (fixture, ports) => createMonthStructureUseCases(ports).createMonthSubcategory({ monthId: fixture.month.id, categoryId: fixture.emptyCategoryId, name: "late", plannedAmount: 0, addToTemplate: false }) },
   { name: "updateMonthSubcategory", write: (fixture, ports) => createMonthStructureUseCases(ports).updateMonthSubcategory({ monthId: fixture.month.id, subcategoryId: fixture.emptySubcategoryId, name: "late", plannedAmount: 0 }) },
   { name: "deleteMonthSubcategory", write: (fixture, ports) => createMonthStructureUseCases(ports).deleteMonthSubcategory(fixture.month.id, fixture.emptySubcategoryId) },
-  { name: "applyClosureAction", write: (fixture, ports) => createClosureUseCases(ports).applyClosureAction({ monthId: fixture.month.id, type: MovementType.SURPLUS_TO_POCKET_ON_CLOSE, sourceSubcategoryId: fixture.subcategoryId, targetPocketId: fixture.pocket.id }) },
 ];
 
 const runCloseFirstWriterMatrix = async ({
@@ -358,8 +357,8 @@ test("close-first matrix aggregates injected writer and cleanup failures after e
   );
 
   assert.ok(error instanceof CloseFirstMatrixAggregateError);
-  assert.equal(error.writerOutcomes.length, 16);
-  assert.equal(error.cleanupOutcomes.length, 16);
+  assert.equal(error.writerOutcomes.length, 15);
+  assert.equal(error.cleanupOutcomes.length, 15);
   assert.deepEqual(error.writerOutcomes.find(({ writer }) => writer === injectedWriter), {
     writer: injectedWriter,
     status: "failed",

@@ -170,6 +170,8 @@ test("getActiveMonth and closeMonth keep read and close semantics behind ports",
     budgetVariances: [],
     availableMoney: 0,
     availableMoneyBlocker: null,
+    requiresAcknowledgement: false,
+    shortfallAmount: 0,
   }));
 
   assert.equal(found?.id, "month-1");
