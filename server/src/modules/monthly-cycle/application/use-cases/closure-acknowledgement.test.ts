@@ -98,6 +98,24 @@ test("warning-only changes invalidate acknowledgement without changing availabil
   assert.equal(f.writes(), 0);
 });
 
+test("an acknowledgement for warnings that have since cleared is rejected as stale", async () => {
+  const f = fixture(560);
+  const review = await f.service.getClosureReview("month-ack");
+  assert.equal(review.requiresAcknowledgement, true);
+  const row = f.row();
+  f.replace({ ...row, categories: row.categories.map(category => ({ ...category, subcategories: category.subcategories.map(sub => ({ ...sub, plannedAmount: 60 })) })) } as unknown as MonthRecord);
+  const cleared = await f.service.getClosureReview("month-ack");
+  assert.equal(cleared.requiresAcknowledgement, false);
+  assert.equal(cleared.availableMoney, review.availableMoney);
+  const before = hash(f.row());
+  await assert.rejects(() => f.service.closeMonth("month-ack", { carryAmount: 500, excludedAmount: 0, acknowledgedWarningsKey: review.warningsKey! }), {
+    statusCode: 409, message: "Los avisos del cierre cambiaron. Actualice la revisión del cierre.",
+  });
+  assert.equal((await f.service.getMonth("month-ack")).status, "ACTIVE");
+  assert.equal(hash(f.row()), before);
+  assert.equal(f.writes(), 0);
+});
+
 test("a legacy closure with NULL shortfall maps and retries as zero shortfall", async () => {
   const f = fixture(560);
   f.replace({ ...f.row(), status: "CLOSED", closureCarryAmount: 500, closureExcludedAmount: 0, closureShortfallAmount: null } as unknown as MonthRecord);

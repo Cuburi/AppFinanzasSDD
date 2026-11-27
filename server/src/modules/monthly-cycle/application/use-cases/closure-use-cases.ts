@@ -76,7 +76,10 @@ export const createClosureUseCases = (ports: MonthlyCyclePorts): ClosureUseCases
       if (review.requiresAcknowledgement && !allocation?.acknowledgedWarningsKey) {
         throw new DomainError(409, "Debe confirmar que entiende los avisos antes de cerrar el mes.");
       }
-      if (review.requiresAcknowledgement && allocation?.acknowledgedWarningsKey !== review.warningsKey) {
+      // A supplied key must match the current warnings, including "no warnings" (null): warnings that cleared
+      // after the user confirmed still mean the review they saw is stale.
+      const acknowledgedKey = allocation?.acknowledgedWarningsKey;
+      if ((review.requiresAcknowledgement || acknowledgedKey !== undefined) && acknowledgedKey !== review.warningsKey) {
         throw new DomainError(409, "Los avisos del cierre cambiaron. Actualice la revisión del cierre.");
       }
       if (!allocation && !review.canClose) {
